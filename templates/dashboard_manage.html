@@ -618,9 +618,9 @@
     <script>
         // Pass API keys data to JavaScript
         window.apiKeysData = [];
-        {% if api_keys %}
+        /* {% if api_keys %} */
         window.apiKeysData = {{ api_keys | tojson | safe }};
-        {% endif %}
+        /* {% endif %} */
 
         // Initialize all progress bars after page load
         document.addEventListener('DOMContentLoaded', function () {
