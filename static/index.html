@@ -46,13 +46,6 @@
             }
         }
 
-        function updateCurlCommand() {
-            const baseUrl = document.getElementById('base_url_display').textContent;
-            const apiKey = document.getElementById('api_key_display').textContent;
-            if (apiKey === '未生成API密钥') return;
-            const curlCommand = `curl ${baseUrl}/v1/chat/completions -H "Content-Type: application/json" -H "Authorization: Bearer ${apiKey}" -d '{"messages": [{"role": "user","content": "Hi"}],"model": "glm-4-flash"}'`;
-            document.getElementById('curl_command_display').textContent = curlCommand;
-        }
 
         function copyToClipboard(elementId) {
             var text = document.getElementById(elementId).innerText;
@@ -138,166 +131,224 @@
         document.addEventListener('DOMContentLoaded', loadModels);
     </script>
 
-    <style>
+        <style>
+        /* 现代化设计系统 */
+        :root {
+            --primary: #6366f1;
+            --primary-light: #818cf8;
+            --primary-dark: #4f46e5;
+            --secondary: #10b981;
+            --accent: #f59e0b;
+            --background: #f8fafc;
+            --card: #ffffff;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border: #e2e8f0;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
         /* 动画效果 */
         @keyframes fadeIn {
             from {
                 opacity: 0;
                 transform: translateY(20px);
             }
-
             to {
                 opacity: 1;
                 transform: translateY(0);
             }
         }
 
-        :root {
-            --primary: #4f46e5;
-            --primary-light: #818cf8;
-            --secondary: #10b981;
-            --background: #fafafa;
-            --card: #ffffff;
-            --text-primary: #1f2937;
-            --text-secondary: #4b5563;
-            --border: #e5e7eb;
-            --success: #10b981;
-            --warning: #f59e0b;
-            --danger: #ef4444;
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
         }
 
         .fade-in {
-            animation: fadeIn 0.5s ease-in-out;
+            animation: fadeIn 0.6s ease-out;
         }
 
-        .hover-scale {
-            transition: transform 0.3s ease;
+        .slide-in {
+            animation: slideIn 0.4s ease-out;
         }
 
-        .hover-scale:hover {
-            transform: scale(1.02);
+        .pulse {
+            animation: pulse 2s infinite;
         }
 
+        /* 现代化卡片设计 */
+        .card {
+            background: linear-gradient(135deg, var(--card) 0%, #fafbfc 100%);
+            border-radius: 16px;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-xl);
+            transform: translateY(-4px);
+        }
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
+        /* 现代化按钮 */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            padding: 0.75rem 1.5rem;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            box-shadow: var(--shadow-md);
+            border: none;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-icon {
+            padding: 0.75rem;
+            border-radius: 12px;
+            background: var(--primary);
+        }
+
+        /* 现代化输入框 */
+        .input-modern {
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 0.875rem 1rem;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: var(--card);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .input-modern:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+            transform: translateY(-1px);
+        }
+
+        /* 现代化滚动条 */
         .custom-scrollbar {
             scrollbar-width: thin;
             scrollbar-color: var(--primary-light) var(--border);
         }
 
         .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
+            width: 8px;
+            height: 8px;
         }
 
         .custom-scrollbar::-webkit-scrollbar-track {
             background: var(--border);
-            border-radius: 3px;
+            border-radius: 4px;
         }
 
         .custom-scrollbar::-webkit-scrollbar-thumb {
             background: var(--primary-light);
-            border-radius: 3px;
-        }
-
-        .card {
-            background-color: var(--card);
-            border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05),
-                0 2px 4px -1px rgba(0, 0, 0, 0.03);
-            transition: all 0.3s ease;
-            overflow: hidden;
-        }
-
-        .card:hover {
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.07),
-                0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            transform: translateY(-2px);
-        }
-
-        .progress-bar {
-            height: 8px;
             border-radius: 4px;
-            background-color: var(--border);
+            border: 2px solid var(--border);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: var(--primary);
+        }
+
+        /* 信息卡片样式 */
+        .info-card {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-radius: 16px;
+            padding: 1.5rem;
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+            position: relative;
             overflow: hidden;
         }
 
-        .progress-bar-fill {
+        .info-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
             height: 100%;
-            background-color: var(--primary);
-            transition: width 0.5s ease;
+            background: linear-gradient(to bottom, var(--primary), var(--secondary));
         }
 
-        /* 统一按钮样式 */
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 8px;
-            padding: 0.6rem 1.2rem;
-            font-weight: 500;
-            transition: all 0.2s;
-            background-color: #4f46e5;
-            color: white;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        .info-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
         }
 
-        .btn:hover {
-            background-color: #4338ca;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        }
-
-        .btn-icon {
-            padding: 0.5rem;
-            border-radius: 8px;
-        }
-
-        .modal {
-            background-color: rgba(0, 0, 0, 0.5);
-        }
-
-        .modal-content {
-            background-color: var(--card);
-            border-radius: 12px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-        }
-
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: #e5e7eb;
-            border-radius: 3px;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #818cf8;
-            border-radius: 3px;
-        }
-
-        /* 响应式布局调整 */
-        @media (max-width: 640px) {
-            .content-wrapper {
-                padding: 1rem;
-            }
-
-            .item-container {
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            .item-content {
-                margin-top: 0.5rem;
-            }
-
-            .label-text {
-                font-size: 1rem;
-                margin-bottom: 0.5rem;
-            }
-        }
-
-        /* Model列表样式 */
+        /* Model列表现代化设计 */
         .model-list-container {
             position: relative;
         }
@@ -305,9 +356,11 @@
         .model-list {
             max-height: 0;
             overflow-y: hidden;
-            transition: max-height 0.3s ease-out;
-            background-color: white;
-            border-radius: 0.5rem;
+            transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            background: var(--card);
+            border-radius: 12px;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border);
         }
 
         .model-list.scrollable {
@@ -316,33 +369,16 @@
 
         .model-list-container:hover .model-list {
             max-height: var(--model-list-max-height, 288px);
-            transition: max-height 0.5s ease-in;
-        }
-
-        /* 优化滚动条样式 */
-        .model-list::-webkit-scrollbar {
-            width: 4px;
-        }
-
-        .model-list::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 2px;
-        }
-
-        .model-list::-webkit-scrollbar-thumb {
-            background: #888;
-            border-radius: 2px;
-        }
-
-        .model-list::-webkit-scrollbar-thumb:hover {
-            background: #555;
         }
 
         .model-item {
-            padding: 0.75rem;
-            border-bottom: 1px solid #e5e7eb;
-            transition: background-color 0.2s;
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border);
+            transition: all 0.2s ease;
             cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
         }
 
         .model-item:last-child {
@@ -350,49 +386,99 @@
         }
 
         .model-item:hover {
-            background-color: #f3f4f6;
+            background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%);
+            transform: translateX(4px);
         }
 
-        /* 确保最后一个项目的边框圆角 */
-        .model-list .model-item:last-child {
-            border-bottom-left-radius: 0.5rem;
-            border-bottom-right-radius: 0.5rem;
+        .model-item::before {
+            content: '▸';
+            color: var(--primary);
+            font-size: 0.875rem;
         }
 
-        /* 文本截断和展开 */
+        /* 文本样式优化 */
         .truncate-text {
             max-width: 100%;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+            padding: 0.5rem 0.75rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
         }
 
         @media (min-width: 768px) {
             .truncate-text {
-                max-width: 400px;
+                max-width: 500px;
             }
         }
 
-        .truncate-text:hover {
-            white-space: normal;
-            overflow: visible;
+        /* 模态框现代化 */
+        .modal {
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(8px);
         }
 
-        /* Modal animation */
+        .modal-content {
+            background: var(--card);
+            border-radius: 20px;
+            box-shadow: var(--shadow-xl);
+            border: 1px solid var(--border);
+        }
+
         @keyframes modalFadeIn {
             from {
                 opacity: 0;
-                transform: translateY(-20px);
+                transform: scale(0.9) translateY(-20px);
             }
-
             to {
                 opacity: 1;
-                transform: translateY(0);
+                transform: scale(1) translateY(0);
             }
         }
 
         #contactModal.fade-in {
-            animation: modalFadeIn 0.3s ease-out;
+            animation: modalFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* 响应式优化 */
+        @media (max-width: 768px) {
+            .card {
+                border-radius: 12px;
+                margin: 0.5rem;
+            }
+            
+            .btn {
+                padding: 0.875rem 1.25rem;
+                font-size: 0.9rem;
+            }
+            
+            .input-modern {
+                padding: 0.75rem;
+                font-size: 1rem;
+            }
+            
+            .info-card {
+                padding: 1.25rem;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .card {
+                border-radius: 10px;
+            }
+            
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .truncate-text {
+                max-width: 100%;
+                font-size: 0.875rem;
+            }
         }
 
         /* Footer icons hover effect */
@@ -432,9 +518,10 @@
                 </h2>
                 <div class="flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-4">
                     <input type="tel" id="phone_input"
-                        class="flex-grow w-full md:w-auto px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        class="input-modern flex-grow w-full md:w-auto"
                         placeholder="请输入手机号">
                     <button onclick="generateApiKey()" class="btn w-full md:w-auto">
+                        <i class="fas fa-key mr-2"></i>
                         获取API密钥
                     </button>
                 </div>
@@ -442,79 +529,71 @@
         </div>
 
         <!-- API Information Display Area -->
-        <div class="space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <!-- API Key Display -->
-            <div class="card fade-in">
-                <div class="bg-gray-50 rounded-lg p-4 hover-scale">
-                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
-                        <div class="flex items-center mb-2 md:mb-0">
-                            <i class="fas fa-key text-indigo-600 text-lg mr-3"></i>
-                            <span class="text-lg font-bold text-gray-800">API密钥</span>
+            <div class="info-card fade-in">
+                <div class="flex flex-col h-full">
+                    <div class="flex items-center mb-3">
+                        <div class="bg-indigo-100 p-2 rounded-lg mr-3">
+                            <i class="fas fa-key text-indigo-600 text-lg"></i>
                         </div>
-                        <div class="flex items-center w-full md:w-auto">
-                            <span id="api_key_display"
-                                class="truncate-text text-green-600 font-mono mr-2">生成API密钥后请保存</span>
-                            <button onclick="copyToClipboard('api_key_display')" class="btn btn-icon">
-                                <i class="fas fa-copy"></i>
-                            </button>
-                        </div>
+                        <h3 class="text-lg font-semibold text-gray-800">API密钥</h3>
                     </div>
-                </div>
-            </div>
-
-            <!-- Base URL 显示 -->
-            <div class="bg-gray-50 rounded-lg p-4 hover-scale">
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
-                    <div class="flex items-center mb-2 md:mb-0">
-                        <i class="fas fa-link text-indigo-600 text-lg mr-3"></i>
-                        <span class="text-lg font-bold text-gray-800">Base URL</span>
-                    </div>
-                    <div class="flex items-center w-full md:w-auto">
-                        <span id="base_url_display"
-                            class="truncate-text text-green-600 font-mono mr-2">https://api.aihao.world</span>
-                        <button onclick="copyToClipboard('base_url_display')" class="btn btn-icon">
-                            <i class="fas fa-copy"></i>
+                    <div class="flex-1 flex items-center justify-between">
+                        <span id="api_key_display" class="truncate-text text-gray-700">生成API密钥后请保存</span>
+                        <button onclick="copyToClipboard('api_key_display')" class="btn-icon ml-3">
+                            <i class="fas fa-copy text-white"></i>
                         </button>
                     </div>
                 </div>
             </div>
 
-            <!-- Command 显示 -->
-            <div class="bg-gray-50 rounded-lg p-4 hover-scale">
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
-                    <div class="flex items-center mb-2 md:mb-0">
-                        <i class="fas fa-terminal text-indigo-600 text-lg mr-3"></i>
-                        <span class="text-lg font-bold text-gray-800">Command</span>
+            <!-- Base URL 显示 -->
+            <div class="info-card fade-in">
+                <div class="flex flex-col h-full">
+                    <div class="flex items-center mb-3">
+                        <div class="bg-green-100 p-2 rounded-lg mr-3">
+                            <i class="fas fa-link text-green-600 text-lg"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-800">Base URL</h3>
                     </div>
-                    <div class="flex items-center w-full md:w-auto">
-                        <span id="curl_command_display"
-                            class="truncate-text text-green-600 font-mono mr-2">生成API密钥后将显示</span>
-                        <button onclick="copyToClipboard('curl_command_display')" class="btn btn-icon">
-                            <i class="fas fa-copy"></i>
+                    <div class="flex-1 flex items-center justify-between">
+                        <span id="base_url_display" class="truncate-text text-gray-700">https://api.aihao.world</span>
+                        <button onclick="copyToClipboard('base_url_display')" class="btn-icon ml-3">
+                            <i class="fas fa-copy text-white"></i>
                         </button>
                     </div>
                 </div>
             </div>
 
             <!-- Model 列表 -->
-            <div class="bg-gray-50 rounded-lg p-4 hover-scale model-list-container">
-                <div class="flex items-center mb-2">
-                    <i class="fas fa-cube text-indigo-600 text-lg mr-3"></i>
-                    <span class="text-lg font-bold text-gray-800">Model</span>
-                </div>
-                <div class="model-list bg-white rounded-lg shadow-sm" id="model_list">
-                    <!-- Models will be loaded dynamically -->
+            <div class="info-card fade-in model-list-container md:col-span-2">
+                <div class="flex flex-col h-full">
+                    <div class="flex items-center mb-3">
+                        <div class="bg-purple-100 p-2 rounded-lg mr-3">
+                            <i class="fas fa-cube text-purple-600 text-lg"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-800">支持的模型</h3>
+                    </div>
+                    <div class="model-list" id="model_list">
+                        <!-- Models will be loaded dynamically -->
+                    </div>
                 </div>
             </div>
 
             <!-- Usage 显示 -->
-            <div class="bg-gray-50 rounded-lg p-4 hover-scale">
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
-                    <div class="flex items-center mb-2 md:mb-0">
-                        <i class="fas fa-chart-line text-indigo-600 text-lg mr-3"></i>
-                        <span class="text-lg font-bold text-gray-800">Usage</span>
+            <div class="info-card fade-in md:col-span-2">
+                <div class="flex flex-col h-full">
+                    <div class="flex items-center mb-3">
+                        <div class="bg-blue-100 p-2 rounded-lg mr-3">
+                            <i class="fas fa-chart-line text-blue-600 text-lg"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-800">使用限额</h3>
                     </div>
-                    <span class="text-green-600">1,000,000 tokens limit</span>
+                    <div class="flex-1 flex items-center justify-between">
+                        <span class="text-gray-700">每个API密钥限额</span>
+                        <span class="text-green-600 font-semibold">1,000,000 tokens</span>
+                    </div>
                 </div>
             </div>
         </div>

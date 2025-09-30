@@ -101,11 +101,11 @@ async def update_llm_servers(request: Request):
 
 @router.get("/models")
 @router.get("/v1/models")
-async def list_models():
-    """Get available models list"""
+async def list_models(request: Request):
+    """Get available models list - 使用缓存数据优化性能"""
     try:
-        with open(settings.LLM_SERVERS_FILE, "r", encoding="utf-8") as f:
-            config = json.load(f)
+        _, api_service = get_services(request)
+        config = api_service.llm_servers_cache  # 使用缓存数据
 
         models = []
         for server_url, server_info in config.items():
@@ -136,18 +136,11 @@ def get_services(request: Request) -> tuple[LLMService, ApiService]:
 
 
 @router.get("/get-models")
-async def get_models():
-    """获取可用的模型列表"""
+async def get_models(request: Request):
+    """获取可用的模型列表 - 使用缓存数据优化性能"""
     try:
-        # 检查文件是否存在
-        if not os.path.exists(settings.LLM_SERVERS_FILE):
-            raise FileNotFoundError(
-                f"LLM servers configuration file not found at {settings.LLM_SERVERS_FILE}"
-            )
-
-        # 读取JSON文件
-        with open(settings.LLM_SERVERS_FILE, "r", encoding="utf-8") as f:
-            config = json.load(f)
+        _, api_service = get_services(request)
+        config = api_service.llm_servers_cache  # 使用缓存数据
 
         # 获取所有活跃模型
         models = []
@@ -158,13 +151,6 @@ async def get_models():
 
         return {"models": models}
 
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=500, detail=f"Configuration error: {str(e)}")
-    except json.JSONDecodeError as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Invalid JSON format in configuration file: {str(e)}",
-        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error loading models: {str(e)}")
 

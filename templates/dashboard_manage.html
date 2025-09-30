@@ -10,26 +10,35 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        /* 现代化设计系统 - 与首页保持一致 */
         :root {
-            --primary: #4f46e5;
+            --primary: #6366f1;
             --primary-light: #818cf8;
+            --primary-dark: #4f46e5;
             --secondary: #10b981;
-            --background: #fafafa;
+            --accent: #f59e0b;
+            --background: #f8fafc;
             --card: #ffffff;
-            --text-primary: #1f2937;
-            --text-secondary: #4b5563;
-            --border: #e5e7eb;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border: #e2e8f0;
             --success: #10b981;
             --warning: #f59e0b;
             --danger: #ef4444;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
         }
         
         body {
             font-family: 'Inter', sans-serif;
-            background-color: var(--background);
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
             color: var(--text-primary);
+            min-height: 100vh;
         }
         
+        /* 动画效果 */
         @keyframes fadeIn {
             from {
                 opacity: 0;
@@ -41,43 +50,55 @@
             }
         }
         
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
         .fade-in {
-            animation: fadeIn 0.5s ease-in-out;
+            animation: fadeIn 0.6s ease-out;
         }
         
-        .custom-scrollbar {
-            scrollbar-width: thin;
-            scrollbar-color: var(--primary-light) var(--border);
+        .slide-in {
+            animation: slideIn 0.4s ease-out;
         }
         
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: var(--border);
-            border-radius: 3px;
-        }
-        
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: var(--primary-light);
-            border-radius: 3px;
-        }
-        
+        /* 现代化卡片设计 */
         .card {
-            background-color: var(--card);
-            border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 
-                        0 2px 4px -1px rgba(0, 0, 0, 0.03);
-            transition: all 0.3s ease;
+            background: linear-gradient(135deg, var(--card) 0%, #fafbfc 100%);
+            border-radius: 16px;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             overflow: hidden;
+            position: relative;
+        }
+        
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            opacity: 0;
+            transition: opacity 0.3s ease;
         }
         
         .card:hover {
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.07), 
-                        0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            transform: translateY(-2px);
+            box-shadow: var(--shadow-xl);
+            transform: translateY(-4px);
+        }
+        
+        .card:hover::before {
+            opacity: 1;
         }
         
         .scalable-card {
@@ -90,13 +111,15 @@
         
         .card-header {
             border-bottom: 1px solid var(--border);
-            padding: 1.25rem 1.5rem;
+            padding: 1.5rem 2rem;
+            background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%);
         }
         
         .card-body {
-            padding: 1.5rem;
+            padding: 2rem;
         }
         
+        /* 现代化进度条 */
         .progress-bar {
             height: 8px;
             border-radius: 4px;
@@ -106,60 +129,138 @@
         
         .progress-bar-fill {
             height: 100%;
-            background-color: var(--primary);
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
             transition: width 0.5s ease;
+            border-radius: 4px;
         }
         
+        /* 现代化表格 */
         .table-header {
-            background-color: #f9fafb;
+            background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%);
             color: var(--text-primary);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             font-size: 0.75rem;
+            border-bottom: 2px solid var(--border);
         }
         
         .table-row {
             border-bottom: 1px solid var(--border);
-            transition: background-color 0.2s;
+            transition: all 0.2s ease;
         }
         
         .table-row:hover {
-            background-color: #f9fafb;
+            background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%);
+            transform: translateX(4px);
         }
         
+        /* 现代化按钮 */
         .btn-primary {
-            background-color: var(--primary);
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
             color: white;
-            border-radius: 8px;
-            padding: 0.5rem 1rem;
-            font-weight: 500;
-            transition: all 0.2s;
+            border-radius: 12px;
+            padding: 0.75rem 1.5rem;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: none;
+            cursor: pointer;
+            box-shadow: var(--shadow-md);
         }
         
         .btn-primary:hover {
-            background-color: #4338ca;
-            transform: translateY(-1px);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
         }
         
+        /* 现代化模态框 */
         .modal {
-            background-color: rgba(0, 0, 0, 0.5);
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(8px);
         }
         
         .modal-content {
-            background-color: var(--card);
-            border-radius: 12px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            background: var(--card);
+            border-radius: 20px;
+            box-shadow: var(--shadow-xl);
+            border: 1px solid var(--border);
         }
         
-        /* Mobile responsive styles */
+        /* 现代化滚动条 */
+        .custom-scrollbar {
+            scrollbar-width: thin;
+            scrollbar-color: var(--primary-light) var(--border);
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: var(--border);
+            border-radius: 4px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: var(--primary-light);
+            border-radius: 4px;
+            border: 2px solid var(--border);
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: var(--primary);
+        }
+        
+        /* 移动端优化 */
         @media only screen and (max-width: 768px) {
             .table-hidden {
                 display: none;
             }
             
             .card {
+                border-radius: 12px;
+                margin: 0.5rem;
+            }
+            
+            .card-header {
+                padding: 1.25rem 1.5rem;
+            }
+            
+            .card-body {
+                padding: 1.5rem;
+            }
+            
+            .btn-primary {
+                padding: 0.875rem 1.25rem;
+                font-size: 0.9rem;
+            }
+        }
+        
+        @media only screen and (max-width: 640px) {
+            .card {
+                border-radius: 10px;
+            }
+            
+            .table-row {
+                display: block;
+                margin-bottom: 1rem;
+                border: 1px solid var(--border);
                 border-radius: 8px;
+                padding: 1rem;
+            }
+            
+            .table-row td {
+                display: block;
+                padding: 0.5rem 0;
+                border: none;
+            }
+            
+            .table-row td:before {
+                content: attr(data-label);
+                font-weight: 600;
+                color: var(--text-secondary);
+                margin-right: 0.5rem;
             }
         }
     </style>
@@ -395,22 +496,22 @@
                 <div class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-600 mb-2">Server URL</label>
-                        <input type="text" id="serverUrl" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        <input type="text" id="serverUrl" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
                             placeholder="https://api.example.com">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-600 mb-2">Device Info</label>
-                        <input type="text" id="serverDevice" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        <input type="text" id="serverDevice" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
                             placeholder="GPU/CPU info">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-600 mb-2">API Key (optional)</label>
-                        <input type="text" id="serverApiKey" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        <input type="text" id="serverApiKey" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
                             placeholder="Optional API key">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-600 mb-2">Models (JSON format)</label>
-                        <textarea id="serverModels" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" rows="4"
+                        <textarea id="serverModels" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200" rows="4"
                             placeholder='{"public-model-name": {"name": "actual-model-name", "reqs": 0, "status": true}}'></textarea>
                     </div>
                 </div>

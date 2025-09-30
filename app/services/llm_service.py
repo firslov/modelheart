@@ -53,7 +53,7 @@ class LLMService:
         # logger.info("HTTP client initialized with optimized settings")
 
     async def _monitor_connection_pool(self) -> None:
-        """监控并动态调整连接池"""
+        """监控并动态调整连接池 - 优化性能"""
         current_time = time.time()
         if (
             current_time - self._connection_pool_stats["last_check"]
@@ -272,27 +272,11 @@ class LLMService:
             self._update_server_health(target, False)
             logger.error(f"HTTP error for {target}: {exc.response.status_code}")
 
-            # 仅重置问题连接
-            if self.http_client:
-                await self.http_client.aclose(force=False)
-                self.http_client = httpx.AsyncClient(
-                    limits=httpx.Limits(
-                        max_connections=1000,
-                        max_keepalive_connections=100,
-                        keepalive_expiry=300,
-                    ),
-                    timeout=httpx.Timeout(
-                        connect=10.0, read=300.0, write=10.0, pool=10.0
-                    ),
-                    transport=httpx.AsyncHTTPTransport(
-                        retries=3,
-                        http2=True,
-                        socket_options=[
-                            (socket.IPPROTO_TCP, socket.TCP_NODELAY, 1),
-                            (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1),
-                        ],
-                    ),
-                )
+            # 仅在服务器错误时重建客户端（500+错误）
+            if exc.response.status_code >= 500:  # 服务器错误
+                if self.http_client:
+                    await self.http_client.aclose(force=False)
+                    await self.initialize()  # 重新初始化
 
             if stream:
                 return exc.response
