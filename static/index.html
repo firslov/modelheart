@@ -37,7 +37,6 @@
                 } else {
                     const apiKey = data.api_key;
                     document.getElementById('api_key_display').textContent = apiKey;
-                    updateCurlCommand();
                     showMessage('API密钥生成成功!');
                 }
             } catch (error) {
@@ -131,7 +130,7 @@
         document.addEventListener('DOMContentLoaded', loadModels);
     </script>
 
-        <style>
+    <style>
         /* 现代化设计系统 */
         :root {
             --primary: #6366f1;
@@ -159,6 +158,7 @@
                 opacity: 0;
                 transform: translateY(20px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -170,6 +170,7 @@
                 opacity: 0;
                 transform: translateX(-20px);
             }
+
             to {
                 opacity: 1;
                 transform: translateX(0);
@@ -177,9 +178,12 @@
         }
 
         @keyframes pulse {
-            0%, 100% {
+
+            0%,
+            100% {
                 transform: scale(1);
             }
+
             50% {
                 transform: scale(1.05);
             }
@@ -255,7 +259,7 @@
             left: -100%;
             width: 100%;
             height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
             transition: left 0.5s;
         }
 
@@ -433,6 +437,7 @@
                 opacity: 0;
                 transform: scale(0.9) translateY(-20px);
             }
+
             to {
                 opacity: 1;
                 transform: scale(1) translateY(0);
@@ -449,17 +454,17 @@
                 border-radius: 12px;
                 margin: 0.5rem;
             }
-            
+
             .btn {
                 padding: 0.875rem 1.25rem;
                 font-size: 0.9rem;
             }
-            
+
             .input-modern {
                 padding: 0.75rem;
                 font-size: 1rem;
             }
-            
+
             .info-card {
                 padding: 1.25rem;
             }
@@ -469,12 +474,12 @@
             .card {
                 border-radius: 10px;
             }
-            
+
             .btn {
                 width: 100%;
                 justify-content: center;
             }
-            
+
             .truncate-text {
                 max-width: 100%;
                 font-size: 0.875rem;
@@ -517,8 +522,7 @@
                     获取API密钥
                 </h2>
                 <div class="flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-4">
-                    <input type="tel" id="phone_input"
-                        class="input-modern flex-grow w-full md:w-auto"
+                    <input type="tel" id="phone_input" class="input-modern flex-grow w-full md:w-auto"
                         placeholder="请输入手机号">
                     <button onclick="generateApiKey()" class="btn w-full md:w-auto">
                         <i class="fas fa-key mr-2"></i>
