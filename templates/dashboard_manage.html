@@ -30,45 +30,47 @@
             --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
             --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
         }
-        
+
         body {
             font-family: 'Inter', sans-serif;
             background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
             color: var(--text-primary);
             min-height: 100vh;
         }
-        
+
         /* 动画效果 */
         @keyframes fadeIn {
             from {
                 opacity: 0;
                 transform: translateY(20px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
             }
         }
-        
+
         @keyframes slideIn {
             from {
                 opacity: 0;
                 transform: translateX(-20px);
             }
+
             to {
                 opacity: 1;
                 transform: translateX(0);
             }
         }
-        
+
         .fade-in {
             animation: fadeIn 0.6s ease-out;
         }
-        
+
         .slide-in {
             animation: slideIn 0.4s ease-out;
         }
-        
+
         /* 现代化卡片设计 */
         .card {
             background: linear-gradient(135deg, var(--card) 0%, #fafbfc 100%);
@@ -79,7 +81,7 @@
             overflow: hidden;
             position: relative;
         }
-        
+
         .card::before {
             content: '';
             position: absolute;
@@ -91,34 +93,34 @@
             opacity: 0;
             transition: opacity 0.3s ease;
         }
-        
+
         .card:hover {
             box-shadow: var(--shadow-xl);
             transform: translateY(-4px);
         }
-        
+
         .card:hover::before {
             opacity: 1;
         }
-        
+
         .scalable-card {
             transition: transform 0.3s ease;
         }
-        
+
         .scalable-card:hover {
             transform: translateY(-2px) scale(1.01);
         }
-        
+
         .card-header {
             border-bottom: 1px solid var(--border);
             padding: 1.5rem 2rem;
             background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%);
         }
-        
+
         .card-body {
             padding: 2rem;
         }
-        
+
         /* 现代化进度条 */
         .progress-bar {
             height: 8px;
@@ -126,14 +128,14 @@
             background-color: var(--border);
             overflow: hidden;
         }
-        
+
         .progress-bar-fill {
             height: 100%;
             background: linear-gradient(90deg, var(--primary), var(--secondary));
             transition: width 0.5s ease;
             border-radius: 4px;
         }
-        
+
         /* 现代化表格 */
         .table-header {
             background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%);
@@ -144,17 +146,17 @@
             font-size: 0.75rem;
             border-bottom: 2px solid var(--border);
         }
-        
+
         .table-row {
             border-bottom: 1px solid var(--border);
             transition: all 0.2s ease;
         }
-        
+
         .table-row:hover {
             background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%);
             transform: translateX(4px);
         }
-        
+
         /* 现代化按钮 */
         .btn-primary {
             background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
@@ -167,81 +169,81 @@
             cursor: pointer;
             box-shadow: var(--shadow-md);
         }
-        
+
         .btn-primary:hover {
             transform: translateY(-2px);
             box-shadow: var(--shadow-lg);
         }
-        
+
         /* 现代化模态框 */
         .modal {
             background: rgba(0, 0, 0, 0.6);
             backdrop-filter: blur(8px);
         }
-        
+
         .modal-content {
             background: var(--card);
             border-radius: 20px;
             box-shadow: var(--shadow-xl);
             border: 1px solid var(--border);
         }
-        
+
         /* 现代化滚动条 */
         .custom-scrollbar {
             scrollbar-width: thin;
             scrollbar-color: var(--primary-light) var(--border);
         }
-        
+
         .custom-scrollbar::-webkit-scrollbar {
             width: 8px;
             height: 8px;
         }
-        
+
         .custom-scrollbar::-webkit-scrollbar-track {
             background: var(--border);
             border-radius: 4px;
         }
-        
+
         .custom-scrollbar::-webkit-scrollbar-thumb {
             background: var(--primary-light);
             border-radius: 4px;
             border: 2px solid var(--border);
         }
-        
+
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
             background: var(--primary);
         }
-        
+
         /* 移动端优化 */
         @media only screen and (max-width: 768px) {
             .table-hidden {
                 display: none;
             }
-            
+
             .card {
                 border-radius: 12px;
                 margin: 0.5rem;
             }
-            
+
             .card-header {
                 padding: 1.25rem 1.5rem;
             }
-            
+
             .card-body {
                 padding: 1.5rem;
             }
-            
+
             .btn-primary {
                 padding: 0.875rem 1.25rem;
                 font-size: 0.9rem;
             }
         }
-        
+
         @media only screen and (max-width: 640px) {
             .card {
                 border-radius: 10px;
             }
-            
+
             .table-row {
                 display: block;
                 margin-bottom: 1rem;
@@ -249,13 +251,13 @@
                 border-radius: 8px;
                 padding: 1rem;
             }
-            
+
             .table-row td {
                 display: block;
                 padding: 0.5rem 0;
                 border: none;
             }
-            
+
             .table-row td:before {
                 content: attr(data-label);
                 font-weight: 600;
@@ -278,7 +280,7 @@
                     API <span class="text-indigo-600">Dashboard</span>
                 </h1>
             </div>
-            
+
             <div class="flex items-center gap-4">
                 <div class="flex items-center text-gray-600">
                     <i class="fas fa-clock mr-2"></i>
@@ -296,7 +298,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- Stats Summary -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-6">
             <div class="card">
@@ -312,7 +314,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <div class="card">
                 <div class="card-body">
                     <div class="flex justify-between items-center">
@@ -326,7 +328,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <div class="card">
                 <div class="card-body">
                     <div class="flex justify-between items-center">
@@ -344,7 +346,6 @@
 
         <!-- Usage Distribution -->
         <div class="card fade-in mb-6 scalable-card">
-    <div class="card fade-in mb-6">
             <div class="card-header">
                 <div class="flex items-center">
                     <i class="fas fa-chart-pie text-indigo-500 text-xl mr-3"></i>
@@ -353,29 +354,26 @@
             </div>
             <div class="card-body grid grid-cols-1 md:grid-cols-3 gap-4">
                 <!-- Usage Distribution - Data Attributes -->
-                <div class="flex flex-col items-center p-4 border border-gray-200 rounded-lg usage-distribution" 
-                     data-value="{{ less_than_100 }}" 
-                     data-total="{{ total_entries }}">
+                <div class="flex flex-col items-center p-4 border border-gray-200 rounded-lg usage-distribution"
+                    data-value="{{ less_than_100 }}" data-total="{{ total_entries }}">
                     <div class="text-3xl font-bold text-indigo-600 mb-2">{{ less_than_100 }}</div>
                     <div class="text-sm font-medium text-gray-500">Under 100</div>
                     <div class="mt-2 w-full bg-gray-200 rounded-full h-2.5">
                         <div class="progress-bar-fill bg-indigo-400 h-2.5 rounded-full"></div>
                     </div>
                 </div>
-                
-                <div class="flex flex-col items-center p-4 border border-gray-200 rounded-lg usage-distribution" 
-                     data-value="{{ between_100_and_10000 }}" 
-                     data-total="{{ total_entries }}">
+
+                <div class="flex flex-col items-center p-4 border border-gray-200 rounded-lg usage-distribution"
+                    data-value="{{ between_100_and_10000 }}" data-total="{{ total_entries }}">
                     <div class="text-3xl font-bold text-indigo-600 mb-2">{{ between_100_and_10000 }}</div>
                     <div class="text-sm font-medium text-gray-500">100 to 10,000</div>
                     <div class="mt-2 w-full bg-gray-200 rounded-full h-2.5">
                         <div class="progress-bar-fill bg-indigo-500 h-2.5 rounded-full"></div>
                     </div>
                 </div>
-                
-                <div class="flex flex-col items-center p-4 border border-gray-200 rounded-lg usage-distribution" 
-                     data-value="{{ more_than_10000 }}" 
-                     data-total="{{ total_entries }}">
+
+                <div class="flex flex-col items-center p-4 border border-gray-200 rounded-lg usage-distribution"
+                    data-value="{{ more_than_10000 }}" data-total="{{ total_entries }}">
                     <div class="text-3xl font-bold text-indigo-600 mb-2">{{ more_than_10000 }}</div>
                     <div class="text-sm font-medium text-gray-500">Over 10,000</div>
                     <div class="mt-2 w-full bg-gray-200 rounded-full h-2.5">
@@ -393,8 +391,7 @@
                     <i class="fas fa-server text-indigo-500 text-xl mr-3"></i>
                     <h2 class="text-lg font-semibold text-gray-800">LLM Servers</h2>
                 </div>
-                <button onclick="showAddServerModal()"
-                    class="btn-primary flex items-center">
+                <button onclick="showAddServerModal()" class="btn-primary flex items-center">
                     <i class="fas fa-plus mr-2"></i> Add Server
                 </button>
             </div>
@@ -419,7 +416,6 @@
 
         <!-- API Keys Table -->
         <div class="card fade-in scalable-card">
-    <div class="card fade-in">
             <div class="card-header">
                 <div class="flex items-center">
                     <i class="fas fa-key text-indigo-500 text-xl mr-3"></i>
@@ -436,6 +432,7 @@
                                 <th class="px-4 py-3 text-left">Usage</th>
                                 <th class="px-4 py-3 text-left">Limit</th>
                                 <th class="px-4 py-3 text-left">Reqs</th>
+                                <th class="px-4 py-3 text-left">Model Usage</th>
                                 <th class="px-4 py-3 text-left">Created At</th>
                                 <th class="px-4 py-3 text-left">Last Used</th>
                                 <th class="px-4 py-3 text-left">Actions</th>
@@ -450,31 +447,47 @@
                                     <div class="flex flex-col">
                                         <span class="font-medium">{{ api_key.usage }}/{{ api_key.limit }}</span>
                                         <div class="progress-bar mt-1 w-full">
-                                            <div class="progress-bar-fill api-key-usage" 
-                                             data-usage="{{ api_key.usage }}"
-                                             data-limit="{{ api_key.limit }}"></div>
+                                            <div class="progress-bar-fill api-key-usage"
+                                                data-usage="{{ api_key.usage }}" data-limit="{{ api_key.limit }}"></div>
                                         </div>
                                     </div>
                                 </td>
-                                <td id="limit_{{ api_key.key }}" class="px-4 py-3 text-sm text-gray-600">{{ api_key.limit }}</td>
+                                <td id="limit_{{ api_key.key }}" class="px-4 py-3 text-sm text-gray-600">{{
+                                    api_key.limit }}</td>
                                 <td class="px-4 py-3 text-sm text-gray-600">{{ api_key.reqs }}</td>
+                                <td class="px-4 py-3 text-sm text-gray-600">
+                                    {% if api_key.model_usage %}
+                                    <div class="model-usage-container" data-key="{{ api_key.key }}">
+                                        <button onclick="toggleModelUsage('{{ api_key.key }}')"
+                                            class="text-indigo-500 hover:text-indigo-700 transition-colors text-xs font-medium">
+                                            <i class="fas fa-chart-bar mr-1"></i>
+                                            View Details ({{ api_key.model_usage|length }} models)
+                                        </button>
+                                    </div>
+                                    {% else %}
+                                    <span class="text-gray-400 text-xs">No model usage</span>
+                                    {% endif %}
+                                </td>
                                 <td class="px-4 py-3 text-sm text-gray-600">{{ api_key.created_at or 'N/A' }}</td>
                                 <td class="px-4 py-3 text-sm text-gray-600">{{ api_key.last_used or 'N/A' }}</td>
                                 <td class="px-4 py-3 text-sm">
                                     <div class="flex space-x-3">
                                         <button data-key="{{ api_key.key }}"
                                             onclick="resetUsage(this.getAttribute('data-key'))"
-                                            class="text-green-500 hover:text-green-700 transition-colors" title="Reset Usage">
+                                            class="text-green-500 hover:text-green-700 transition-colors"
+                                            title="Reset Usage">
                                             <i class="fas fa-redo"></i>
                                         </button>
                                         <button data-key="{{ api_key.key }}" data-limit="{{ api_key.limit }}"
                                             onclick="showEditLimit(this.getAttribute('data-key'), this.getAttribute('data-limit'))"
-                                            class="text-indigo-500 hover:text-indigo-700 transition-colors" title="Edit Limit">
+                                            class="text-indigo-500 hover:text-indigo-700 transition-colors"
+                                            title="Edit Limit">
                                             <i class="fas fa-edit"></i>
                                         </button>
                                         <button data-key="{{ api_key.key }}"
                                             onclick="revokeKey(this.getAttribute('data-key'))"
-                                            class="text-red-500 hover:text-red-700 transition-colors" title="Revoke Key">
+                                            class="text-red-500 hover:text-red-700 transition-colors"
+                                            title="Revoke Key">
                                             <i class="fas fa-trash"></i>
                                         </button>
                                     </div>
@@ -496,30 +509,34 @@
                 <div class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-600 mb-2">Server URL</label>
-                        <input type="text" id="serverUrl" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
+                        <input type="text" id="serverUrl"
+                            class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
                             placeholder="https://api.example.com">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-600 mb-2">Device Info</label>
-                        <input type="text" id="serverDevice" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
+                        <input type="text" id="serverDevice"
+                            class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
                             placeholder="GPU/CPU info">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-600 mb-2">API Key (optional)</label>
-                        <input type="text" id="serverApiKey" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
+                        <input type="text" id="serverApiKey"
+                            class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
                             placeholder="Optional API key">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-600 mb-2">Models (JSON format)</label>
-                        <textarea id="serverModels" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200" rows="4"
+                        <textarea id="serverModels"
+                            class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
+                            rows="4"
                             placeholder='{"public-model-name": {"name": "actual-model-name", "reqs": 0, "status": true}}'></textarea>
                     </div>
                 </div>
                 <div class="flex justify-end space-x-3 mt-6">
                     <button onclick="closeAddServerModal()"
                         class="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium">Cancel</button>
-                    <button onclick="addServer()"
-                        class="btn-primary">Add Server</button>
+                    <button onclick="addServer()" class="btn-primary">Add Server</button>
                 </div>
             </div>
         </div>
@@ -534,25 +551,28 @@
                     <input type="hidden" id="editServerUrl">
                     <div>
                         <label class="block text-sm font-medium text-gray-600 mb-2">Device Info</label>
-                        <input type="text" id="editServerDevice" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        <input type="text" id="editServerDevice"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                             placeholder="GPU/CPU info">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-600 mb-2">API Key (optional)</label>
-                        <input type="text" id="editServerApiKey" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        <input type="text" id="editServerApiKey"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                             placeholder="Optional API key">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-600 mb-2">Models (JSON format)</label>
-                        <textarea id="editServerModels" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" rows="4"
+                        <textarea id="editServerModels"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            rows="4"
                             placeholder='{"public-model-name": {"name": "actual-model-name", "reqs": 0, "status": true}}'></textarea>
                     </div>
                 </div>
                 <div class="flex justify-end space-x-3 mt-6">
                     <button onclick="closeEditServerModal()"
                         class="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium">Cancel</button>
-                    <button onclick="updateServer()"
-                        class="btn-primary">Save Changes</button>
+                    <button onclick="updateServer()" class="btn-primary">Save Changes</button>
                 </div>
             </div>
         </div>
@@ -580,13 +600,14 @@
         <div class="modal-content w-full max-w-sm">
             <div class="p-6">
                 <h3 class="text-lg font-semibold text-gray-800 mb-4">Edit Token Limit</h3>
-                <input type="number" id="newLimit" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent mb-4"
+                <input type="number" id="newLimit"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent mb-4"
                     placeholder="Enter new limit">
                 <input type="hidden" id="currentApiKey">
                 <div class="flex justify-end space-x-3">
-                    <button onclick="closeEditModal()" class="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium">Cancel</button>
-                    <button onclick="updateLimit()"
-                        class="btn-primary">Save Limit</button>
+                    <button onclick="closeEditModal()"
+                        class="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium">Cancel</button>
+                    <button onclick="updateLimit()" class="btn-primary">Save Limit</button>
                 </div>
             </div>
         </div>
@@ -595,25 +616,31 @@
     <!-- Dashboard JavaScript -->
     <script src="/static/js/dashboard.js"></script>
     <script>
+        // Pass API keys data to JavaScript
+        window.apiKeysData = [];
+        {% if api_keys %}
+        window.apiKeysData = {{ api_keys | tojson | safe }};
+        {% endif %}
+
         // Initialize all progress bars after page load
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             // Initialize usage distribution bars
             document.querySelectorAll('.usage-distribution').forEach(container => {
                 const value = parseInt(container.dataset.value);
                 const total = parseInt(container.dataset.total);
                 const percentage = total > 0 ? (value / total * 100) : 0;
-                
+
                 const bar = container.querySelector('.progress-bar-fill');
-                bar.style.width = `${percentage}%`;
+                bar.style.width = percentage + '%';
             });
-            
+
             // Initialize API key usage bars
             document.querySelectorAll('.api-key-usage').forEach(bar => {
                 const usage = parseInt(bar.dataset.usage);
                 const limit = parseInt(bar.dataset.limit);
                 const percentage = limit > 0 ? (usage / limit * 100) : 0;
-                
-                bar.style.width = `${percentage}%`;
+
+                bar.style.width = percentage + '%';
             });
         });
     </script>

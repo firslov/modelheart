@@ -304,3 +304,78 @@ async function revokeKey(apiKey) {
         alert('Error revoking API key: ' + error.message);
     }
 }
+
+// Model Usage Functions
+function toggleModelUsage(apiKey) {
+    const container = document.querySelector(`.model-usage-container[data-key="${apiKey}"]`);
+    const existingDetails = container.querySelector('.model-usage-details');
+
+    if (existingDetails) {
+        existingDetails.remove();
+        return;
+    }
+
+    // Get model usage data from the current page data
+    const apiKeys = JSON.parse(document.getElementById('apiKeysData').textContent);
+    const currentKey = apiKeys.find(key => key.key === apiKey);
+
+    if (!currentKey || !currentKey.model_usage) {
+        return;
+    }
+
+    const details = createModelUsageDetails(currentKey.model_usage);
+    container.appendChild(details);
+}
+
+function createModelUsageDetails(modelUsage) {
+    const details = document.createElement('div');
+    details.className = 'model-usage-details mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200';
+
+    const table = document.createElement('table');
+    table.className = 'w-full text-sm';
+
+    const header = document.createElement('thead');
+    header.innerHTML = `
+        <tr class="bg-gray-100">
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Model</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Requests</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tokens</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Tokens/Req</th>
+        </tr>
+    `;
+
+    const body = document.createElement('tbody');
+    body.className = 'bg-white divide-y divide-gray-200';
+
+    Object.entries(modelUsage).forEach(([model, usage]) => {
+        const row = document.createElement('tr');
+        const avgTokens = usage.requests > 0 ? (usage.tokens / usage.requests).toFixed(1) : '0';
+
+        row.innerHTML = `
+            <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">${model}</td>
+            <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${usage.requests}</td>
+            <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${usage.tokens.toFixed(0)}</td>
+            <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${avgTokens}</td>
+        `;
+        body.appendChild(row);
+    });
+
+    table.appendChild(header);
+    table.appendChild(body);
+    details.appendChild(table);
+
+    return details;
+}
+
+// Initialize model usage data
+document.addEventListener('DOMContentLoaded', function () {
+    // Store API keys data for model usage
+    // Data will be passed from the template via a global variable
+    if (typeof window.apiKeysData !== 'undefined') {
+        const dataElement = document.createElement('div');
+        dataElement.id = 'apiKeysData';
+        dataElement.style.display = 'none';
+        dataElement.textContent = JSON.stringify(window.apiKeysData);
+        document.body.appendChild(dataElement);
+    }
+});

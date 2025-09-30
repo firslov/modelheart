@@ -4,6 +4,13 @@ from datetime import datetime
 from collections import defaultdict
 
 
+class ModelUsage(BaseModel):
+    """模型使用详情模型"""
+
+    requests: int = Field(default=0, description="请求次数")
+    tokens: float = Field(default=0, description="token使用量")
+
+
 class ApiKeyUsage(BaseModel):
     """API密钥使用情况模型"""
 
@@ -13,6 +20,11 @@ class ApiKeyUsage(BaseModel):
     created_at: Optional[str] = Field(default=None, description="创建时间")
     last_used: Optional[str] = Field(default=None, description="最后使用时间")
     phone: Optional[str] = Field(default=None, description="手机号")
+    model_usage: Dict[str, ModelUsage] = Field(
+        default_factory=dict, description="各模型使用详情"
+    )
+
+    model_config = {"protected_namespaces": ()}
 
 
 class LLMServer(BaseModel):

@@ -292,6 +292,13 @@ async def usage_dashboard(request: Request):
             "reqs": info.reqs,
             "created_at": info.created_at,
             "last_used": info.last_used if hasattr(info, "last_used") else "N/A",
+            "model_usage": {
+                model_name: {
+                    "requests": model_usage.requests,
+                    "tokens": model_usage.tokens,
+                }
+                for model_name, model_usage in info.model_usage.items()
+            },
         }
         for key, info in api_service.api_usage.items()
     ]
@@ -336,7 +343,7 @@ async def proxy_handler_chat(request: Request):
     target = f"{target_server}{request.url.path.replace('/v1', '', 1)}"
 
     # 更新初始用量
-    api_service.update_usage(api_key, req_data)
+    api_service.update_usage(api_key, req_data, model)
 
     # 构造请求头
     headers = llm_service.get_auth_header(model, api_key)

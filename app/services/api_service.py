@@ -59,12 +59,13 @@ class ApiService:
         )
         return new_key
 
-    def update_usage(self, api_key: str, request_data: Dict) -> None:
+    def update_usage(self, api_key: str, request_data: Dict, model: str = None) -> None:
         """更新API使用情况，优化token计算
 
         Args:
             api_key: API密钥
             request_data: 请求数据
+            model: 模型名称
         """
         usage = self.api_usage[api_key]
         usage.last_used = get_current_time()
@@ -85,6 +86,16 @@ class ApiService:
                     total_tokens += token_count
 
         usage.usage += total_tokens
+
+        # 更新模型使用统计
+        if model:
+            if model not in usage.model_usage:
+                from app.models.api_models import ModelUsage
+
+                usage.model_usage[model] = ModelUsage()
+
+            usage.model_usage[model].requests += 1
+            usage.model_usage[model].tokens += total_tokens
 
         # 限制缓存大小
         if len(self._token_cache) > 1000:
