@@ -1,34 +1,26 @@
 # API Service
 
-一个轻量化的API请求中转系统。
+轻量化的LLM API请求中转系统，支持多模型接入和用量管理。
 
-## 功能特点
+## 核心功能
 
-- 支持多种LLM模型接入
-- 基于手机号的API密钥管理
-- 实时用量统计和限制
-- 支持流式响应
+- 🚀 多LLM模型统一接入
+- 🔑 基于手机号的API密钥管理  
+- 📊 实时用量统计和限制
+- 💬 支持流式对话响应
+- 🌐 配套对话网站：[https://chat.aihao.world/](https://chat.aihao.world/)
 
 ## 快速开始
 
-1. 安装依赖
-
 ```bash
+# 安装依赖
 pip install -r requirements.txt
-```
 
-2. 配置环境变量
-
-```bash
-export ENV=production  # 生产环境必须
-export SESSION_SECRET_KEY=your-secure-key  # 生产环境必须
-```
-
-3. 运行服务
-
-```bash
+# 运行服务
 python -m app.main
 ```
+
+服务将在 <http://localhost:8087> 启动
 
 ## 性能测试
 
@@ -78,56 +70,47 @@ Successful requests: 98/100
 Time elapsed: 4.18s
 ```
 
-## API文档
+## API接口
 
 ### 管理接口
 
-- `GET /` - 首页,生成API密钥
-![index](./src/index.jpg)
-
-- `GET /get-usage` - 信息管理
-![dashboard](./src/dashboard1.jpg)
-![dashboard](./src/dashboard2.jpg)
-
-- `GET /models` - 获取模型列表
+- `GET /` - 首页，生成API密钥
+- `GET /get-usage` - 用量统计和管理面板
+- `GET /models` - 获取可用模型列表
 
 ### LLM接口
 
-- `POST [/v1]/chat/completions` - 聊天补全
-- `POST [/v1]/completions` - 文本补全
-- `POST [/v1]/embeddings` - 文本向量化
+- `POST /v1/chat/completions` - 聊天补全（兼容OpenAI格式）
+- `POST /v1/completions` - 文本补全
+- `POST /v1/embeddings` - 文本向量化
 
-## 配置文件
+## 配置说明
 
-1. api_keys_usage.json - API密钥配置
+### API密钥配置 (api_keys_usage.json)
 
 ```json
 {
   "api-key": {
     "usage": 0,
-    "limit": 300000,
+    "limit": 1000000,
     "reqs": 0,
     "created_at": "2024-02-04 12:00:00",
-    "last_used": null,
     "phone": "139xxxxxxxx"
   }
 }
 ```
 
-2. llm_servers_list.json - LLM服务器配置
+### 模型服务器配置 (llm_servers_list.json)
 
 ```json
 {
   "server-url": {
     "model": {
-      "public-model-name": {
+      "model-name": {
         "name": "actual-model-name",
-        "reqs": 0,
         "status": true
       }
-    },
-    "device": "device-info",
-    "apikey": "optional-api-key"
+    }
   }
 }
 ```

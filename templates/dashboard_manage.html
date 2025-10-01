@@ -441,7 +441,18 @@
                         <tbody>
                             {% for api_key in api_keys %}
                             <tr class="table-row">
-                                <td class="px-4 py-3 text-sm font-medium text-gray-800">{{ api_key.key[-6:] }}</td>
+                                <td class="px-4 py-3 text-sm text-gray-800">
+                                    <div class="flex items-center">
+                                        <span
+                                            class="font-mono text-xs bg-gray-100 px-2 py-1 rounded border break-all max-w-xs">{{
+                                            api_key.key }}</span>
+                                        <button onclick="copyToClipboard('{{ api_key.key }}')"
+                                            class="ml-2 text-gray-400 hover:text-indigo-600 transition-colors"
+                                            title="Copy full key">
+                                            <i class="fas fa-copy text-xs"></i>
+                                        </button>
+                                    </div>
+                                </td>
                                 <td class="px-4 py-3 text-sm text-gray-600">{{ api_key.phone or 'N/A' }}</td>
                                 <td class="px-4 py-3 text-sm text-gray-600">
                                     <div class="flex flex-col">
@@ -616,33 +627,22 @@
     <!-- Dashboard JavaScript -->
     <script src="/static/js/dashboard.js"></script>
     <script>
-        // Pass API keys data to JavaScript
-        window.apiKeysData = [];
-        /* {% if api_keys %} */
-        window.apiKeysData = {{ api_keys | tojson | safe }};
-        /* {% endif %} */
+        // Copy to clipboard function
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                // Show success message
+                const message = document.createElement('div');
+                message.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 fade-in';
+                message.textContent = 'Copied to clipboard!';
+                document.body.appendChild(message);
 
-        // Initialize all progress bars after page load
-        document.addEventListener('DOMContentLoaded', function () {
-            // Initialize usage distribution bars
-            document.querySelectorAll('.usage-distribution').forEach(container => {
-                const value = parseInt(container.dataset.value);
-                const total = parseInt(container.dataset.total);
-                const percentage = total > 0 ? (value / total * 100) : 0;
-
-                const bar = container.querySelector('.progress-bar-fill');
-                bar.style.width = percentage + '%';
+                setTimeout(() => {
+                    message.remove();
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
             });
-
-            // Initialize API key usage bars
-            document.querySelectorAll('.api-key-usage').forEach(bar => {
-                const usage = parseInt(bar.dataset.usage);
-                const limit = parseInt(bar.dataset.limit);
-                const percentage = limit > 0 ? (usage / limit * 100) : 0;
-
-                bar.style.width = percentage + '%';
-            });
-        });
+        }
     </script>
 </body>
 
