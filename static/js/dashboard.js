@@ -278,7 +278,8 @@ async function resetUsage(apiKey) {
         if (!response.ok) {
             throw new Error('Failed to reset usage');
         }
-        document.getElementById(`usage_${apiKey}`).textContent = '0';
+        // Refresh the page to update all usage data
+        window.location.reload();
     } catch (error) {
         alert('Error resetting usage: ' + error.message);
     }
