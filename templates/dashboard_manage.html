@@ -625,7 +625,6 @@
     </div>
 
     <!-- Dashboard JavaScript -->
-    <script src="/static/js/dashboard.js"></script>
     <script>
         // Copy to clipboard function
         function copyToClipboard(text) {
@@ -643,6 +642,18 @@
                 console.error('Failed to copy: ', err);
             });
         }
+    </script>
+    <script src="/static/js/dashboard.js"></script>
+    <script>
+        // Initialize API keys data after dashboard.js is loaded
+        document.addEventListener('DOMContentLoaded', function () {
+            // Create hidden element with API keys data
+            const dataElement = document.createElement('div');
+            dataElement.id = 'apiKeysData';
+            dataElement.style.display = 'none';
+            dataElement.textContent = '{{ api_keys | tojson | safe }}';
+            document.body.appendChild(dataElement);
+        });
     </script>
 </body>
 

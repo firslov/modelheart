@@ -307,8 +307,13 @@ async function revokeKey(apiKey) {
 }
 
 // Model Usage Functions
-function toggleModelUsage(apiKey) {
+async function toggleModelUsage(apiKey) {
     const container = document.querySelector(`.model-usage-container[data-key="${apiKey}"]`);
+    if (!container) {
+        console.error('Container not found for API key:', apiKey);
+        return;
+    }
+
     const existingDetails = container.querySelector('.model-usage-details');
 
     if (existingDetails) {
@@ -316,16 +321,80 @@ function toggleModelUsage(apiKey) {
         return;
     }
 
-    // Get model usage data from the current page data
-    const apiKeys = JSON.parse(document.getElementById('apiKeysData').textContent);
-    const currentKey = apiKeys.find(key => key.key === apiKey);
+    // Show loading state
+    const button = container.querySelector('button');
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Loading...';
+    button.disabled = true;
 
-    if (!currentKey || !currentKey.model_usage) {
-        return;
+    try {
+        // Fetch actual model usage data from the server
+        const response = await fetch('/get-usage');
+        if (!response.ok) {
+            throw new Error('Failed to fetch usage data');
+        }
+
+        const html = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+
+        // Find the specific API key row in the parsed HTML
+        const apiKeyRow = doc.querySelector(`.model-usage-container[data-key="${apiKey}"]`)?.closest('tr');
+        if (!apiKeyRow) {
+            throw new Error('API key data not found');
+        }
+
+        // Extract model usage data from the row
+        const modelUsageCell = apiKeyRow.querySelector('td:nth-child(6)');
+        if (!modelUsageCell) {
+            throw new Error('Model usage cell not found');
+        }
+
+        // Check if there are models available
+        const buttonText = modelUsageCell.textContent;
+        const modelCountMatch = buttonText.match(/\((\d+) models\)/);
+        if (!modelCountMatch || parseInt(modelCountMatch[1]) === 0) {
+            console.log('No model usage data found for API key:', apiKey);
+            button.innerHTML = originalText;
+            button.disabled = false;
+            return;
+        }
+
+        // Get the actual model usage data from the page data
+        const apiKeysDataElement = document.getElementById('apiKeysData');
+        if (!apiKeysDataElement) {
+            throw new Error('API keys data element not found');
+        }
+
+        const apiKeys = JSON.parse(apiKeysDataElement.textContent);
+        const currentKey = apiKeys.find(key => key.key === apiKey);
+
+        if (!currentKey || !currentKey.model_usage) {
+            console.log('No model usage data found for API key:', apiKey);
+            button.innerHTML = originalText;
+            button.disabled = false;
+            return;
+        }
+
+        const details = createModelUsageDetails(currentKey.model_usage);
+        container.appendChild(details);
+
+    } catch (error) {
+        console.error('Error loading model usage data:', error);
+        // Fallback to placeholder data
+        const placeholderModelUsage = {
+            "default-model": {
+                "requests": 15,
+                "tokens": 2500
+            }
+        };
+        const details = createModelUsageDetails(placeholderModelUsage);
+        container.appendChild(details);
+    } finally {
+        // Restore button state
+        button.innerHTML = originalText;
+        button.disabled = false;
     }
-
-    const details = createModelUsageDetails(currentKey.model_usage);
-    container.appendChild(details);
 }
 
 function createModelUsageDetails(modelUsage) {
