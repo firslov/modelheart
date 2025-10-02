@@ -402,6 +402,7 @@
                             <tr class="table-header">
                                 <th class="px-4 py-3 text-left">Server URL</th>
                                 <th class="px-4 py-3 text-left">Device</th>
+                                <th class="px-4 py-3 text-left">API Key</th>
                                 <th class="px-4 py-3 text-left">Models</th>
                                 <th class="px-4 py-3 text-left">Actions</th>
                             </tr>
@@ -514,34 +515,54 @@
 
     <!-- Add Server Modal -->
     <div id="addServerModal" class="fixed inset-0 z-50 modal hidden items-center justify-center p-4">
-        <div class="modal-content w-full max-w-md">
+        <div class="modal-content w-full max-w-4xl">
             <div class="p-6">
                 <h3 class="text-lg font-semibold text-gray-800 mb-4">Add LLM Server</h3>
                 <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-600 mb-2">Server URL</label>
-                        <input type="text" id="serverUrl"
-                            class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
-                            placeholder="https://api.example.com">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-600 mb-2">Device Info</label>
-                        <input type="text" id="serverDevice"
-                            class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
-                            placeholder="GPU/CPU info">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-2">Server URL</label>
+                            <input type="text" id="serverUrl"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                placeholder="https://api.example.com">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-2">Device Info</label>
+                            <input type="text" id="serverDevice"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                placeholder="GPU/CPU info">
+                        </div>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-600 mb-2">API Key (optional)</label>
                         <input type="text" id="serverApiKey"
-                            class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                             placeholder="Optional API key">
                     </div>
+                    
+                    <!-- Models Table -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-600 mb-2">Models (JSON format)</label>
-                        <textarea id="serverModels"
-                            class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
-                            rows="4"
-                            placeholder='{"public-model-name": {"name": "actual-model-name", "reqs": 0, "status": true}}'></textarea>
+                        <div class="flex justify-between items-center mb-4">
+                            <label class="block text-sm font-medium text-gray-600">Models Configuration</label>
+                            <button onclick="addNewModelRow('addServer')" class="btn-primary text-sm py-1 px-3">
+                                <i class="fas fa-plus mr-1"></i> Add Model
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto custom-scrollbar">
+                            <table class="w-full border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-50">
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border">Frontend Model Name</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border">Backend Model Name</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border">Status</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="addServerModelsTable" class="bg-white divide-y divide-gray-200">
+                                    <!-- Will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
                 <div class="flex justify-end space-x-3 mt-6">
@@ -555,29 +576,49 @@
 
     <!-- Edit Server Modal -->
     <div id="editServerModal" class="fixed inset-0 z-50 modal hidden items-center justify-center p-4">
-        <div class="modal-content w-full max-w-md">
+        <div class="modal-content w-full max-w-4xl">
             <div class="p-6">
                 <h3 class="text-lg font-semibold text-gray-800 mb-4">Edit LLM Server</h3>
                 <div class="space-y-4">
                     <input type="hidden" id="editServerUrl">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-600 mb-2">Device Info</label>
-                        <input type="text" id="editServerDevice"
-                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                            placeholder="GPU/CPU info">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-2">Device Info</label>
+                            <input type="text" id="editServerDevice"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                placeholder="GPU/CPU info">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-2">API Key (optional)</label>
+                            <input type="text" id="editServerApiKey"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                placeholder="Optional API key">
+                        </div>
                     </div>
+                    
+                    <!-- Models Table -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-600 mb-2">API Key (optional)</label>
-                        <input type="text" id="editServerApiKey"
-                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                            placeholder="Optional API key">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-600 mb-2">Models (JSON format)</label>
-                        <textarea id="editServerModels"
-                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                            rows="4"
-                            placeholder='{"public-model-name": {"name": "actual-model-name", "reqs": 0, "status": true}}'></textarea>
+                        <div class="flex justify-between items-center mb-4">
+                            <label class="block text-sm font-medium text-gray-600">Models Configuration</label>
+                            <button onclick="addNewModelRow()" class="btn-primary text-sm py-1 px-3">
+                                <i class="fas fa-plus mr-1"></i> Add Model
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto custom-scrollbar">
+                            <table class="w-full border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-50">
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border">Frontend Model Name</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border">Backend Model Name</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border">Status</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="editServerModelsTable" class="bg-white divide-y divide-gray-200">
+                                    <!-- Will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
                 <div class="flex justify-end space-x-3 mt-6">
@@ -653,7 +694,65 @@
             dataElement.style.display = 'none';
             dataElement.textContent = '{{ api_keys | tojson | safe }}';
             document.body.appendChild(dataElement);
+
+            // Initialize usage progress bars
+            initializeUsageProgressBars();
         });
+
+        // Initialize usage progress bars with animation
+        function initializeUsageProgressBars() {
+            const progressBars = document.querySelectorAll('.api-key-usage');
+            
+            progressBars.forEach(bar => {
+                const usage = parseFloat(bar.getAttribute('data-usage')) || 0;
+                const limit = parseFloat(bar.getAttribute('data-limit')) || 1;
+                
+                // Calculate percentage (cap at 100%)
+                let percentage = (usage / limit) * 100;
+                percentage = Math.min(percentage, 100);
+                
+                // Set initial width to 0 for animation
+                bar.style.width = '0%';
+                
+                // Animate to actual percentage after a short delay
+                setTimeout(() => {
+                    bar.style.width = percentage + '%';
+                    
+                    // Add color classes based on usage level
+                    if (percentage >= 90) {
+                        bar.classList.add('bg-red-500');
+                        bar.classList.remove('bg-indigo-500', 'bg-yellow-500');
+                    } else if (percentage >= 70) {
+                        bar.classList.add('bg-yellow-500');
+                        bar.classList.remove('bg-indigo-500', 'bg-red-500');
+                    } else {
+                        bar.classList.add('bg-indigo-500');
+                        bar.classList.remove('bg-yellow-500', 'bg-red-500');
+                    }
+                }, 100);
+            });
+
+            // Initialize usage distribution progress bars
+            const distributionBars = document.querySelectorAll('.usage-distribution');
+            
+            distributionBars.forEach(container => {
+                const value = parseInt(container.getAttribute('data-value')) || 0;
+                const total = parseInt(container.getAttribute('data-total')) || 1;
+                const progressBar = container.querySelector('.progress-bar-fill');
+                
+                if (progressBar) {
+                    const percentage = (value / total) * 100;
+                    
+                    // Set initial width to 0 for animation
+                    progressBar.style.width = '0%';
+                    
+                    // Animate to actual percentage
+                    setTimeout(() => {
+                        progressBar.style.width = percentage + '%';
+                    }, 300);
+                }
+            });
+        }
     </script>
 </body>
 

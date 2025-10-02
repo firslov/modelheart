@@ -10,6 +10,10 @@ from fastapi import HTTPException
 from app.config.settings import settings
 from app.models.api_models import AppState
 from app.utils.helpers import logger
+from app.database.database import get_db_session
+from app.database.models import LLMServer, ServerModel
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 
 class LLMService:
@@ -97,6 +101,38 @@ class LLMService:
         """清理资源"""
         if self.http_client:
             await self.http_client.aclose()
+
+    async def init_llm_resources_from_db(self, session: AsyncSession) -> None:
+        """从数据库初始化LLM资源
+
+        Args:
+            session: 数据库会话
+        """
+        from sqlalchemy.orm import selectinload
+        
+        # 从数据库加载服务器配置，使用selectinload预加载模型关系
+        result = await session.execute(
+            select(LLMServer).options(selectinload(LLMServer.models))
+        )
+        servers = result.scalars().all()
+        
+        servers_data = {}
+        for server in servers:
+            # 手动构建服务器配置，避免异步延迟加载问题
+            server_config = {
+                "server_url": server.server_url,
+                "model": {},
+                "apikey": server.apikey,
+                "enabled": True  # 默认启用
+            }
+            
+            # 手动构建模型映射 - 现在key是前端使用的模型名称，value是实际后端模型名称
+            for model in server.models:
+                server_config["model"][model.actual_model_name] = model.client_model_name
+            
+            servers_data[server.server_url] = server_config
+        
+        self.init_llm_resources(servers_data)
 
     def init_llm_resources(self, servers_data: Dict) -> None:
         """初始化LLM资源

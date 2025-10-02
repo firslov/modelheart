@@ -8,12 +8,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.settings import settings
 from app.models.api_models import ApiKeyUsage
 from app.services.api_service import ApiService
 from app.services.llm_service import LLMService
-from app.utils.helpers import load_json_file, save_json_file, logger
+from app.utils.helpers import logger
+from app.database.database import get_db_session, init_db
 
 
 class Application:
@@ -26,17 +28,16 @@ class Application:
 
     async def startup(self) -> None:
         """应用启动初始化"""
+        # 初始化数据库
+        await init_db()
+        
         # 初始化服务
         await self.llm_service.initialize()
         
-        # 使用ApiService缓存的配置初始化LLM资源
-        self.llm_service.init_llm_resources(self.api_service.llm_servers_cache)
-        
-        # 加载API密钥使用情况
-        api_usage_data = await load_json_file(settings.API_KEYS_FILE)
-        self.api_service.api_usage = {
-            key: ApiKeyUsage(**data) for key, data in api_usage_data.items()
-        }
+        # 从数据库加载LLM服务器配置
+        from app.database.database import AsyncSessionLocal
+        async with AsyncSessionLocal() as session:
+            await self.llm_service.init_llm_resources_from_db(session)
 
         # 启动后台任务
         self._start_background_tasks()
@@ -53,35 +54,25 @@ class Application:
 
         # 清理资源
         await self.llm_service.cleanup()
-        # 转换为可序列化的字典
-        usage_data = {
-            key: model.dict() for key, model in self.api_service.api_usage.items()
-        }
-        await save_json_file(usage_data, settings.API_KEYS_FILE)
 
     def _start_background_tasks(self) -> None:
         """启动后台任务"""
-        task = self._periodic_save_task()
+        task = self._periodic_health_check_task()
         bg_task = asyncio.create_task(task)
         self.background_tasks.add(bg_task)
         bg_task.add_done_callback(self.background_tasks.discard)
 
-    async def _periodic_save_task(self) -> None:
-        """定期保存任务"""
+    async def _periodic_health_check_task(self) -> None:
+        """定期健康检查任务"""
         while True:
             await asyncio.sleep(settings.CACHE_TTL)
-
-            # 保存API使用情况
-            usage_data = {
-                key: model.dict() for key, model in self.api_service.api_usage.items()
-            }
-            await save_json_file(usage_data, settings.API_KEYS_FILE)
-
-            # 更新LLM服务器列表（使用ApiService缓存）
-            current_servers_data = self.api_service.llm_servers_cache
-            if current_servers_data != self.llm_service.app_state.llm_servers:
-                self.llm_service.init_llm_resources(current_servers_data)
-                logger.info("LLM servers list updated")
+            
+            # 定期刷新LLM服务器配置
+            async for session in get_db_session():
+                await self.llm_service.init_llm_resources_from_db(session)
+                break
+            
+            logger.info("LLM servers configuration refreshed")
 
 
 def create_application() -> FastAPI:

@@ -2,7 +2,7 @@ import json
 import os
 from typing import Dict, Tuple
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, HTTPException, Request, Response, Depends
 from fastapi.responses import (
     FileResponse,
     HTMLResponse,
@@ -11,6 +11,7 @@ from fastapi.responses import (
     StreamingResponse,
 )
 from fastapi.templating import Jinja2Templates
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.settings import settings
 from app.middleware.auth import admin_required, verify_admin
@@ -18,11 +19,12 @@ from app.models.api_models import ApiKeyUsage
 from app.services.api_service import ApiService
 from app.services.llm_service import LLMService
 from app.utils.helpers import get_current_time, log_api_usage
+from app.database.database import get_db_session
 
 router = APIRouter()
 
 
-def _handle_llm_server_action(request, api_service, data):
+async def _handle_llm_server_action(request, api_service, data, session: AsyncSession):
     """处理LLM服务器操作的核心逻辑"""
     action = data.get("action")
     url = data.get("url")
@@ -31,50 +33,59 @@ def _handle_llm_server_action(request, api_service, data):
 
     # 解码URL
     from urllib.parse import unquote
-
     url = unquote(url)
-    servers = api_service.llm_servers_cache
 
     # 处理不同操作
     if action == "add":
-        servers[url] = config
+        # 添加新服务器 - 加载现有服务器，然后添加新服务器
+        servers_data = await api_service.load_llm_servers(session)
+        servers_data[url] = config
+        await api_service.save_llm_servers(servers_data, session)
     elif action == "update":
         old_url = data.get("oldUrl")
-        if old_url and old_url in servers:
-            servers[url] = config
-            if old_url != url:
-                servers.pop(old_url, None)
+        
+        if old_url and old_url != url:
+            # 如果URL改变了，先删除旧的服务器，再添加新的
+            servers_data = await api_service.load_llm_servers(session)
+            if old_url in servers_data:
+                del servers_data[old_url]
+            servers_data[url] = config
+            await api_service.save_llm_servers(servers_data, session)
         else:
-            servers[url] = config
+            # 只更新当前服务器的配置
+            await api_service.update_llm_server(url, config, session)
     elif action == "delete":
-        servers.pop(url, None)
+        # 删除服务器 - 加载现有服务器，删除指定服务器
+        servers_data = await api_service.load_llm_servers(session)
+        if url in servers_data:
+            del servers_data[url]
+            await api_service.save_llm_servers(servers_data, session)
     elif action == "toggle_status" and model_status is not None:
+        # 切换模型状态 - 只更新特定模型的status
         model_id = data.get("model")
-        if url in servers and model_id:
-            models = servers[url].get("model", {})
-            if model_id in models:
-                models[model_id]["status"] = model_status
+        if model_id:
+            servers_data = await api_service.load_llm_servers(session)
+            if url in servers_data and model_id in servers_data[url].get("model", {}):
+                servers_data[url]["model"][model_id]["status"] = model_status
+                await api_service.save_llm_servers(servers_data, session)
     else:
         raise HTTPException(status_code=400, detail="Invalid action")
 
-    api_service.save_llm_servers()
-
     # 重新初始化LLM资源
     llm_service = request.app.state.app.llm_service
-    with open(settings.LLM_SERVERS_FILE, "r", encoding="utf-8") as f:
-        servers_data = json.load(f)
-    llm_service.init_llm_resources(servers_data)
+    await llm_service.init_llm_resources_from_db(session)
 
     return {"status": "success"}
 
 
 @router.get("/get-llm-servers")
 @admin_required
-async def get_llm_servers(request: Request):
+async def get_llm_servers(request: Request, session: AsyncSession = Depends(get_db_session)):
     """获取LLM服务器列表(需要管理员权限)"""
     try:
         _, api_service = get_services(request)
-        return api_service.llm_servers_cache
+        servers_data = await api_service.load_llm_servers(session)
+        return servers_data
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error loading LLM servers: {str(e)}"
@@ -83,12 +94,12 @@ async def get_llm_servers(request: Request):
 
 @router.post("/update-llm-servers")
 @admin_required
-async def update_llm_servers(request: Request):
+async def update_llm_servers(request: Request, session: AsyncSession = Depends(get_db_session)):
     """更新LLM服务器列表"""
     try:
         _, api_service = get_services(request)
         data = await request.json()
-        return _handle_llm_server_action(request, api_service, data)
+        return await _handle_llm_server_action(request, api_service, data, session)
     except HTTPException:
         raise
     except Exception as e:
@@ -101,11 +112,11 @@ async def update_llm_servers(request: Request):
 
 @router.get("/models")
 @router.get("/v1/models")
-async def list_models(request: Request):
-    """Get available models list - 使用缓存数据优化性能"""
+async def list_models(request: Request, session: AsyncSession = Depends(get_db_session)):
+    """Get available models list - 使用数据库数据优化性能"""
     try:
         _, api_service = get_services(request)
-        config = api_service.llm_servers_cache  # 使用缓存数据
+        config = await api_service.load_llm_servers(session)
 
         models = []
         for server_url, server_info in config.items():
@@ -136,11 +147,11 @@ def get_services(request: Request) -> tuple[LLMService, ApiService]:
 
 
 @router.get("/get-models")
-async def get_models(request: Request):
-    """获取可用的模型列表 - 使用缓存数据优化性能"""
+async def get_models(request: Request, session: AsyncSession = Depends(get_db_session)):
+    """获取可用的模型列表 - 使用数据库数据优化性能"""
     try:
         _, api_service = get_services(request)
-        config = api_service.llm_servers_cache  # 使用缓存数据
+        config = await api_service.load_llm_servers(session)
 
         # 获取所有活跃模型
         models = []
@@ -193,37 +204,43 @@ async def logout(request: Request):
 
 
 @router.post("/generate-api-key")
-async def generate_api_key(request: Request):
+async def generate_api_key(request: Request, session: AsyncSession = Depends(get_db_session)):
     """生成新的API密钥"""
-    data = await request.json()
-    phone = data.get("phone")
-    if not phone:
-        raise HTTPException(status_code=400, detail="Phone number is required")
+    phone = ""
+    
+    # 检查是否有请求体
+    body = await request.body()
+    if body and body != b'':
+        try:
+            data = json.loads(body.decode('utf-8'))
+            phone = data.get("phone", "")
+        except:
+            phone = ""
 
     _, api_service = get_services(request)
 
-    # 检查手机号是否已存在
-    for key, info in api_service.api_usage.items():
-        if info.phone == phone:
-            return {"error": "该手机号已生成过API密钥"}
-
-    new_key = api_service.generate_api_key()
-
-    # 更新API密钥信息
-    api_service.api_usage[new_key] = ApiKeyUsage(
-        usage=0,
-        limit=1000000,  # 100万token限额
-        reqs=0,
-        created_at=get_current_time(),
-        phone=phone,
-    )
-
+    # 生成新的API密钥
+    new_key = await api_service.generate_api_key(session)
+    
+    # 如果提供了手机号，更新记录
+    if phone:
+        from app.database.models import ApiKey
+        from sqlalchemy import select, text
+        
+        result = await session.execute(
+            select(ApiKey).where(ApiKey.api_key == new_key)
+        )
+        api_key_record = result.scalar_one_or_none()
+        if api_key_record:
+            api_key_record.phone = phone
+            await session.commit()
+    
     return {"api_key": new_key}
 
 
 @router.post("/update-api-key-limit")
 @admin_required
-async def update_api_key_limit(request: Request):
+async def update_api_key_limit(request: Request, session: AsyncSession = Depends(get_db_session)):
     """更新API密钥的使用限额"""
     data = await request.json()
     api_key = data.get("api_key")
@@ -235,16 +252,21 @@ async def update_api_key_limit(request: Request):
         )
 
     _, api_service = get_services(request)
-    if api_key in api_service.api_usage:
-        api_service.api_usage[api_key].limit = new_limit
-        return {"status": "success"}
+    
+    # 更新数据库中的限额
+    from sqlalchemy import text
+    await session.execute(
+        text("UPDATE api_keys SET limit_value = :limit WHERE api_key = :api_key"),
+        {"limit": new_limit, "api_key": api_key}
+    )
+    await session.commit()
 
-    raise HTTPException(status_code=404, detail="API key not found")
+    return {"status": "success"}
 
 
 @router.post("/reset-api-key-usage")
 @admin_required
-async def reset_api_key_usage(request: Request):
+async def reset_api_key_usage(request: Request, session: AsyncSession = Depends(get_db_session)):
     """重置API密钥使用量"""
     data = await request.json()
     api_key = data.get("api_key")
@@ -252,17 +274,21 @@ async def reset_api_key_usage(request: Request):
         raise HTTPException(status_code=400, detail="API key is required")
 
     _, api_service = get_services(request)
-    if api_key in api_service.api_usage:
-        api_service.api_usage[api_key].usage = 0
-        api_service.api_usage[api_key].reqs = 0
-        return {"status": "success"}
+    
+    # 重置数据库中的使用量
+    from sqlalchemy import text
+    await session.execute(
+        text("UPDATE api_keys SET usage = 0, reqs = 0 WHERE api_key = :api_key"),
+        {"api_key": api_key}
+    )
+    await session.commit()
 
-    raise HTTPException(status_code=404, detail="API key not found")
+    return {"status": "success"}
 
 
 @router.post("/revoke-api-key")
 @admin_required
-async def revoke_api_key(request: Request):
+async def revoke_api_key(request: Request, session: AsyncSession = Depends(get_db_session)):
     """撤销API密钥"""
     data = await request.json()
     api_key = data.get("api_key")
@@ -270,43 +296,78 @@ async def revoke_api_key(request: Request):
         raise HTTPException(status_code=400, detail="API key is required")
 
     _, api_service = get_services(request)
-    if api_key in api_service.api_usage:
-        del api_service.api_usage[api_key]
-        return {"status": "success"}
+    
+    # 从数据库中删除API密钥
+    from sqlalchemy import text
+    await session.execute(
+        text("DELETE FROM api_keys WHERE api_key = :api_key"),
+        {"api_key": api_key}
+    )
+    await session.commit()
 
-    raise HTTPException(status_code=404, detail="API key not found")
+    return {"status": "success"}
 
 
 @router.get("/get-usage", response_class=HTMLResponse)
 @admin_required
-async def usage_dashboard(request: Request):
+async def usage_dashboard(request: Request, session: AsyncSession = Depends(get_db_session)):
     """用量统计和管理仪表盘"""
     _, api_service = get_services(request)
-    stats = api_service.get_usage_stats()
-    api_keys = [
-        {
-            "key": key,
-            "phone": info.phone,
-            "usage": info.usage,
-            "limit": info.limit,
-            "reqs": info.reqs,
-            "created_at": info.created_at,
-            "last_used": info.last_used if hasattr(info, "last_used") else "N/A",
-            "model_usage": {
-                model_name: {
-                    "requests": model_usage.requests,
-                    "tokens": model_usage.tokens,
-                }
-                for model_name, model_usage in info.model_usage.items()
-            },
-        }
-        for key, info in api_service.api_usage.items()
-    ]
+    
+    # 使用原始SQL查询获取数据，避免ORM模型不匹配问题
+    from sqlalchemy import text
+    
+    # 获取API密钥数据
+    result = await session.execute(text("SELECT * FROM api_keys"))
+    api_keys_data = result.fetchall()
+    
+    print(f"DEBUG: Found {len(api_keys_data)} API keys in database")
+    
+    # 检查行结构
+    if api_keys_data:
+        print(f"DEBUG: First row keys: {api_keys_data[0]._fields}")
+        print(f"DEBUG: First row data: {api_keys_data[0]}")
+    
+    # 计算统计信息
+    total_usage = sum(row.usage or 0 for row in api_keys_data)
+    total_entries = len(api_keys_data)
+    total_reqs = sum(row.reqs or 0 for row in api_keys_data)
+    
+    print(f"DEBUG: total_entries={total_entries}, total_usage={total_usage}, total_reqs={total_reqs}")
+    
+    # 统计不同使用量区间的数量
+    less_than_100 = sum(1 for row in api_keys_data if (row.usage or 0) < 100)
+    between_100_and_10000 = sum(1 for row in api_keys_data if 100 <= (row.usage or 0) < 10000)
+    more_than_10000 = sum(1 for row in api_keys_data if (row.usage or 0) >= 10000)
+    
+    # 构建API密钥列表
+    api_keys = []
+    for row in api_keys_data:
+        # 简化日期处理 - 直接使用字符串值
+        created_at = str(row.created_at) if row.created_at else "N/A"
+        last_used = str(row.last_used) if row.last_used else "N/A"
+        
+        api_keys.append({
+            "key": row.api_key,
+            "phone": row.phone or "",
+            "usage": row.usage or 0,
+            "limit": row.limit_value or 0,
+            "reqs": row.reqs or 0,
+            "created_at": created_at,
+            "last_used": last_used,
+            "model_usage": {},  # 简单表结构没有model_usage字段
+        })
+    
     return templates.TemplateResponse(
         "dashboard_manage.html",
         {
             "request": request,
-            **stats.dict(),
+            "total_usage": total_usage,
+            "total_entries": total_entries,
+            "total_reqs": total_reqs,
+            "less_than_100": less_than_100,
+            "between_100_and_10000": between_100_and_10000,
+            "more_than_10000": more_than_10000,
             "api_keys": api_keys,
             "current_time": get_current_time(),
         },
@@ -324,15 +385,15 @@ async def options_handler():
 
 @router.post("/v1/chat/completions")
 @router.post("/chat/completions")
-async def proxy_handler_chat(request: Request):
+async def proxy_handler_chat(request: Request, session: AsyncSession = Depends(get_db_session)):
     """请求转发处理"""
     llm_service, api_service = get_services(request)
 
     # 身份验证
     auth_header = request.headers.get("Authorization", "")
     _, _, api_key = auth_header.partition(" ")
-    api_service.validate_api_key(api_key)
-    api_service.check_usage_limit(api_key)
+    await api_service.validate_api_key(api_key, session)
+    await api_service.check_usage_limit(api_key, session)
 
     # 请求处理
     req_data = await request.json()
@@ -341,9 +402,6 @@ async def proxy_handler_chat(request: Request):
     # 获取目标服务器
     target_server = llm_service.get_target_server(model)
     target = f"{target_server}{request.url.path.replace('/v1', '', 1)}"
-
-    # 更新初始用量
-    api_service.update_usage(api_key, req_data, model)
 
     # 构造请求头
     headers = llm_service.get_auth_header(model, api_key)
@@ -366,11 +424,11 @@ async def proxy_handler_chat(request: Request):
                         )
                         yield chunk
 
-                api_service.api_usage[api_key].usage += num_tokens
-                log_api_usage(api_key, api_service.api_usage[api_key].dict())
+                # 更新最终用量
+                await api_service.update_usage(api_key, req_data, model, session)
 
                 # 更新模型请求计数
-                api_service.increment_model_reqs(target_server, model)
+                await api_service.increment_model_reqs(target_server, model, session)
 
             return StreamingResponse(
                 stream_wrapper(),
@@ -393,12 +451,11 @@ async def proxy_handler_chat(request: Request):
                     response["usage"]["prompt_tokens"]
                     + response["usage"]["completion_tokens"]
                 )
-                api_service.api_usage[api_key].usage += tokens
-
-            log_api_usage(api_key, api_service.api_usage[api_key].dict())
+                # 这里需要更新数据库中的用量
+                await api_service.update_usage(api_key, req_data, model, session)
 
             # 更新模型请求计数
-            api_service.increment_model_reqs(target_server, model)
+            await api_service.increment_model_reqs(target_server, model, session)
 
             return JSONResponse(response)
         except json.JSONDecodeError as e:
@@ -415,15 +472,15 @@ async def proxy_handler_chat(request: Request):
 
 @router.post("/v1/embeddings")
 @router.post("/embeddings")
-async def proxy_handler_embeddings(request: Request):
+async def proxy_handler_embeddings(request: Request, session: AsyncSession = Depends(get_db_session)):
     """处理embeddings请求转发"""
     llm_service, api_service = get_services(request)
 
     # 身份验证
     auth_header = request.headers.get("Authorization", "")
     _, _, api_key = auth_header.partition(" ")
-    api_service.validate_api_key(api_key)
-    api_service.check_usage_limit(api_key)
+    await api_service.validate_api_key(api_key, session)
+    await api_service.check_usage_limit(api_key, session)
 
     # 请求处理
     req_data = await request.json()
@@ -443,12 +500,10 @@ async def proxy_handler_embeddings(request: Request):
 
         # 更新用量（embedding模型使用系数0.1）
         if "usage" in response and "total_tokens" in response["usage"]:
-            api_service.api_usage[api_key].usage += (
-                0.1 * response["usage"]["total_tokens"]
-            )
+            await api_service.update_usage(api_key, req_data, model, session)
 
-        log_api_usage(api_key, api_service.api_usage[api_key].dict())
-        api_service.increment_model_reqs(target_server, model)
+        # 更新模型请求计数
+        await api_service.increment_model_reqs(target_server, model, session)
 
         return JSONResponse(response)
 
@@ -465,14 +520,14 @@ async def proxy_handler_embeddings(request: Request):
 
 @router.post("/v1/completions")
 @router.post("/completions")
-async def proxy_handler_completions(request: Request):
+async def proxy_handler_completions(request: Request, session: AsyncSession = Depends(get_db_session)):
     """请求转发处理"""
     llm_service, api_service = get_services(request)
 
     # 身份验证
     auth_header = request.headers.get("Authorization", "")
     _, _, api_key = auth_header.partition(" ")
-    api_service.validate_api_key(api_key)
+    await api_service.validate_api_key(api_key, session)
 
     # 请求处理
     req_data = await request.json()
@@ -520,6 +575,4 @@ async def proxy_handler_completions(request: Request):
             )
 
     except HTTPException as e:
-        return JSONResponse({"error": str(e.detail)}, status_code=e.status_code)
-    except Exception as e:
-        return JSONResponse({"error": "Internal server error"}, status_code=500)
+        return JSON

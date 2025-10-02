@@ -15,7 +15,7 @@ async function loadConfigs() {
                 const statusClick = `toggleModelStatus('${encodeURIComponent(url)}','${encodeURIComponent(k)}',${v.status})`;
                 return [
                     '<div class="flex items-center justify-between py-1">',
-                    '<span>' + k + '→' + v.name + '</span>',
+                    '<span>' + k + '</span>',
                     '<div class="flex items-center space-x-2">',
                     '<span class="text-xs text-gray-500">' + v.reqs.toString() + ' reqs</span>',
                     '<i class="fas ' + statusIcon + ' ' + statusClass + '" title="' + statusTitle.toString() + '" onclick="' + statusClick + '"></i>',
@@ -27,6 +27,11 @@ async function loadConfigs() {
             row.className = 'hover:bg-gray-50 transition-colors';
             row.innerHTML = '<td class="px-2 md:px-4 py-2 md:py-3 text-xs md:text-sm text-gray-700">' + url + '</td>' +
                 '<td class="px-2 md:px-4 py-2 md:py-3 text-xs md:text-sm text-gray-700">' + (config.device || 'N/A') + '</td>' +
+                '<td class="px-2 md:px-4 py-2 md:py-3 text-xs md:text-sm text-gray-700">' +
+                '<div class="flex items-center">' +
+                '<span class="font-mono text-xs bg-gray-100 px-2 py-1 rounded border break-all max-w-xs">' + (config.apikey || 'No API Key') + '</span>' +
+                (config.apikey ? '<button onclick="copyToClipboard(\'' + config.apikey + '\')" class="ml-2 text-gray-400 hover:text-indigo-600 transition-colors" title="Copy API Key"><i class="fas fa-copy text-xs"></i></button>' : '') +
+                '</div></td>' +
                 '<td class="px-2 md:px-4 py-2 md:py-3 text-xs md:text-sm text-gray-700"><div class="space-y-1">' + models + '</div></td>' +
                 '<td class="px-2 md:px-4 py-2 md:py-3 text-xs md:text-sm space-x-2">' +
                 '<button onclick="showEditServerModal(\'' + encodeURIComponent(url) + '\')" class="text-indigo-600 hover:text-indigo-800" title="Edit">' +
@@ -43,21 +48,57 @@ async function loadConfigs() {
 
 // Server management functions
 function showAddServerModal() {
+    // Clear the models table and add one empty row
+    const tableBody = document.getElementById('addServerModelsTable');
+    tableBody.innerHTML = '';
+    addNewModelRow('addServer');
+    
     document.getElementById('addServerModal').style.display = 'flex';
 }
 
 function closeAddServerModal() {
     document.getElementById('addServerModal').style.display = 'none';
+    // Clear form fields
+    document.getElementById('serverUrl').value = '';
+    document.getElementById('serverDevice').value = '';
+    document.getElementById('serverApiKey').value = '';
+    document.getElementById('addServerModelsTable').innerHTML = '';
 }
 
 async function addServer() {
     const url = document.getElementById('serverUrl').value;
     const device = document.getElementById('serverDevice').value;
     const apiKey = document.getElementById('serverApiKey').value;
-    const models = document.getElementById('serverModels').value;
 
-    if (!url || !device || !models) {
-        alert('URL, Device and Models are required');
+    if (!url || !device) {
+        alert('URL and Device are required');
+        return;
+    }
+
+    // Collect models from table
+    const models = {};
+    const rows = document.querySelectorAll('#addServerModelsTable tr');
+    
+    for (const row of rows) {
+        const frontendInput = row.querySelector('.model-frontend');
+        const backendInput = row.querySelector('.model-backend');
+        const statusSelect = row.querySelector('.model-status');
+        
+        const frontendModel = frontendInput.value.trim();
+        const backendModel = backendInput.value.trim();
+        const status = statusSelect.value === 'true';
+        
+        if (frontendModel && backendModel) {
+            models[frontendModel] = {
+                name: backendModel,
+                status: status,
+                reqs: 0
+            };
+        }
+    }
+
+    if (Object.keys(models).length === 0) {
+        alert('At least one model configuration is required');
         return;
     }
 
@@ -73,7 +114,7 @@ async function addServer() {
                 config: {
                     device,
                     apikey: apiKey || undefined,
-                    model: JSON.parse(models)
+                    model: models
                 }
             }),
         });
@@ -116,7 +157,7 @@ async function deleteServer(url) {
     }
 }
 
-// Edit Server Modal
+// Edit Server Modal - New Table-based Interface
 function showEditServerModal(url) {
     document.getElementById('editServerUrl').value = url;
     fetch('/get-llm-servers')
@@ -131,7 +172,9 @@ function showEditServerModal(url) {
 
             document.getElementById('editServerDevice').value = config.device || '';
             document.getElementById('editServerApiKey').value = config.apikey || '';
-            document.getElementById('editServerModels').value = JSON.stringify(config.model || {}, null, 2);
+            
+            // Populate models table instead of JSON textarea
+            populateModelsTable(config.model || {});
             document.getElementById('editServerModal').style.display = 'flex';
         })
         .catch(error => {
@@ -144,15 +187,108 @@ function closeEditServerModal() {
     document.getElementById('editServerModal').style.display = 'none';
 }
 
+function populateModelsTable(models) {
+    const tableBody = document.getElementById('editServerModelsTable');
+    tableBody.innerHTML = '';
+    
+    for (const [frontendModel, modelConfig] of Object.entries(models)) {
+        addModelRow(frontendModel, modelConfig.name, modelConfig.status, modelConfig.reqs || 0);
+    }
+}
+
+function addModelRow(frontendModel = '', backendModel = '', status = true, reqs = 0, target = 'editServer') {
+    const tableBody = document.getElementById(target === 'addServer' ? 'addServerModelsTable' : 'editServerModelsTable');
+    const row = document.createElement('tr');
+    row.className = 'border-b hover:bg-gray-50';
+    
+    row.innerHTML = `
+        <td class="px-4 py-2 border">
+            <input type="text" class="w-full px-2 py-1 border rounded model-frontend" 
+                   value="${frontendModel}" placeholder="Frontend model name">
+        </td>
+        <td class="px-4 py-2 border">
+            <input type="text" class="w-full px-2 py-1 border rounded model-backend" 
+                   value="${backendModel}" placeholder="Backend model name">
+        </td>
+        <td class="px-4 py-2 border">
+            <select class="w-full px-2 py-1 border rounded model-status">
+                <option value="true" ${status ? 'selected' : ''}>Active</option>
+                <option value="false" ${!status ? 'selected' : ''}>Inactive</option>
+            </select>
+        </td>
+        <td class="px-4 py-2 border">
+            <div class="flex items-center space-x-2">
+                <span class="text-xs text-gray-500">${reqs} reqs</span>
+                <button onclick="this.closest('tr').remove()" 
+                        class="text-red-500 hover:text-red-700 transition-colors" title="Remove">
+                    <i class="fas fa-trash text-xs"></i>
+                </button>
+            </div>
+        </td>
+    `;
+    
+    tableBody.appendChild(row);
+}
+
+function addNewModelRow(target = 'editServer') {
+    addModelRow('', '', true, 0, target);
+}
+
 async function updateServer() {
-    const oldUrl = document.getElementById('editServerUrl').value;
-    const newUrl = document.getElementById('editServerUrl').value; // Same URL for now
+    const oldUrl = decodeURIComponent(document.getElementById('editServerUrl').value);
+    const newUrl = decodeURIComponent(document.getElementById('editServerUrl').value); // Same URL for now
     const device = document.getElementById('editServerDevice').value;
     const apiKey = document.getElementById('editServerApiKey').value;
-    const models = document.getElementById('editServerModels').value;
 
-    if (!newUrl || !device || !models) {
-        alert('URL, Device and Models are required');
+    if (!newUrl || !device) {
+        alert('URL and Device are required');
+        return;
+    }
+
+    // Collect models from table
+    const models = {};
+    const rows = document.querySelectorAll('#editServerModelsTable tr');
+    
+    // Get current server data once to avoid multiple API calls
+    let currentServerData = null;
+    try {
+        const serversResponse = await fetch('/get-llm-servers');
+        const servers = await serversResponse.json();
+        currentServerData = servers[oldUrl];
+    } catch (error) {
+        console.warn('Could not fetch current server data:', error);
+    }
+    
+    for (const row of rows) {
+        const frontendInput = row.querySelector('.model-frontend');
+        const backendInput = row.querySelector('.model-backend');
+        const statusSelect = row.querySelector('.model-status');
+        
+        const frontendModel = frontendInput.value.trim();
+        const backendModel = backendInput.value.trim();
+        const status = statusSelect.value === 'true';
+        
+        if (frontendModel && backendModel) {
+            // Get current reqs value from existing data
+            let reqs = 0;
+            if (currentServerData && currentServerData.model) {
+                // Try to find the model by frontend name
+                const existingModel = currentServerData.model[frontendModel];
+                if (existingModel) {
+                    reqs = existingModel.reqs || 0;
+                }
+            }
+            
+            models[frontendModel] = {
+                name: backendModel,
+                status: status,
+                reqs: reqs
+            };
+        }
+    }
+
+    if (Object.keys(models).length === 0) {
+        alert('At least one model configuration is required');
         return;
     }
 
@@ -169,18 +305,21 @@ async function updateServer() {
                 config: {
                     device,
                     apikey: apiKey || undefined,
-                    model: JSON.parse(models)
+                    model: models
                 }
             }),
         });
 
         if (!response.ok) {
-            throw new Error('Failed to update server');
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Failed to update server');
         }
 
+        console.log('Update successful');
         closeEditServerModal();
         loadConfigs();
     } catch (error) {
+        console.error('Error updating server:', error);
         alert('Error updating server: ' + error.message);
     }
 }
@@ -256,7 +395,41 @@ async function updateLimit() {
             throw new Error('Failed to update limit');
         }
 
+        // Update the limit text
         document.getElementById(`limit_${apiKey}`).textContent = newLimit;
+        
+        // Find the corresponding progress bar and update it
+        const row = document.querySelector(`[data-key="${apiKey}"]`).closest('tr');
+        if (row) {
+            const usageCell = row.querySelector('td:nth-child(3)');
+            const usageSpan = usageCell.querySelector('span');
+            const usageText = usageSpan.textContent;
+            const currentUsage = parseInt(usageText.split('/')[0]);
+            
+            // Update the usage text label
+            usageSpan.textContent = `${currentUsage}/${newLimit}`;
+            
+            // Update the progress bar data attributes
+            const progressBar = usageCell.querySelector('.api-key-usage');
+            progressBar.setAttribute('data-limit', newLimit);
+            
+            // Recalculate and update the progress bar
+            const percentage = Math.min((currentUsage / newLimit) * 100, 100);
+            
+            // Update color based on new percentage
+            progressBar.classList.remove('bg-indigo-500', 'bg-yellow-500', 'bg-red-500');
+            if (percentage >= 90) {
+                progressBar.classList.add('bg-red-500');
+            } else if (percentage >= 70) {
+                progressBar.classList.add('bg-yellow-500');
+            } else {
+                progressBar.classList.add('bg-indigo-500');
+            }
+            
+            // Update the progress bar width
+            progressBar.style.width = percentage + '%';
+        }
+        
         closeEditModal();
     } catch (error) {
         alert('Error updating limit: ' + error.message);

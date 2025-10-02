@@ -7,3 +7,5 @@ static/contact-qr.jpg
 tmp.py
 templates/dashboard_manage_clean.html
 templates/test_media_query.css
+app/database/myapi.db
+app/database/api_keys.db
