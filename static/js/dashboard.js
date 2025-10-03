@@ -7,43 +7,118 @@ async function loadConfigs() {
         const serversTable = document.getElementById('llmServersTable');
         serversTable.innerHTML = '';
 
+        // Check if we're on mobile
+        const isMobile = window.innerWidth <= 768;
+
         for (const [url, config] of Object.entries(servers)) {
-            const models = Object.entries(config.model || {}).map(([k, v]) => {
-                const statusClass = v.status ? 'text-green-500' : 'text-red-500';
-                const statusIcon = v.status ? 'fa-check-circle' : 'fa-times-circle';
-                const statusTitle = v.status ? 'Active' : 'Inactive';
-                const statusClick = `toggleModelStatus('${encodeURIComponent(url)}','${encodeURIComponent(k)}',${v.status})`;
-                return [
-                    '<div class="flex items-center justify-between py-1">',
-                    '<span>' + k + '</span>',
-                    '<div class="flex items-center space-x-2">',
-                    '<span class="text-xs text-gray-500">' + v.reqs.toString() + ' reqs</span>',
-                    '<i class="fas ' + statusIcon + ' ' + statusClass + '" title="' + statusTitle.toString() + '" onclick="' + statusClick + '"></i>',
-                    '</div>',
-                    '</div>'
-                ].join('');
-            }).join('');
-            const row = document.createElement('tr');
-            row.className = 'hover:bg-gray-50 transition-colors';
-            row.innerHTML = '<td class="px-2 md:px-4 py-2 md:py-3 text-xs md:text-sm text-gray-700">' + url + '</td>' +
-                '<td class="px-2 md:px-4 py-2 md:py-3 text-xs md:text-sm text-gray-700">' + (config.device || 'N/A') + '</td>' +
-                '<td class="px-2 md:px-4 py-2 md:py-3 text-xs md:text-sm text-gray-700">' +
-                '<div class="flex items-center">' +
-                '<span class="font-mono text-xs bg-gray-100 px-2 py-1 rounded border break-all max-w-xs">' + (config.apikey || 'No API Key') + '</span>' +
-                (config.apikey ? '<button onclick="copyToClipboard(\'' + config.apikey + '\')" class="ml-2 text-gray-400 hover:text-indigo-600 transition-colors" title="Copy API Key"><i class="fas fa-copy text-xs"></i></button>' : '') +
-                '</div></td>' +
-                '<td class="px-2 md:px-4 py-2 md:py-3 text-xs md:text-sm text-gray-700"><div class="space-y-1">' + models + '</div></td>' +
-                '<td class="px-2 md:px-4 py-2 md:py-3 text-xs md:text-sm space-x-2">' +
-                '<button onclick="showEditServerModal(\'' + encodeURIComponent(url) + '\')" class="text-indigo-600 hover:text-indigo-800" title="Edit">' +
-                '<i class="fas fa-edit"></i></button>' +
-                '<button onclick="deleteServer(\'' + encodeURIComponent(url) + '\')" class="text-red-600 hover:text-red-800" title="Delete">' +
-                '<i class="fas fa-trash"></i></button></td>';
-            serversTable.appendChild(row);
+            if (isMobile) {
+                // Mobile: Use card layout
+                const card = createServerCard(url, config);
+                serversTable.appendChild(card);
+            } else {
+                // Desktop: Use table layout
+                const row = createServerTableRow(url, config);
+                serversTable.appendChild(row);
+            }
         }
 
     } catch (error) {
         console.error('Error loading configs:', error);
     }
+}
+
+// Create server card for mobile view
+function createServerCard(url, config) {
+    const card = document.createElement('div');
+    card.className = 'llm-server-card';
+    
+    // Count active and inactive models
+    const models = config.model || {};
+    const activeModels = Object.values(models).filter(m => m.status).length;
+    const totalModels = Object.keys(models).length;
+    
+    // Create models list HTML
+    const modelsList = Object.entries(models).map(([modelName, modelConfig]) => {
+        const statusClass = modelConfig.status ? '' : 'inactive';
+        return `<span class="llm-server-model-tag ${statusClass}">${modelName}</span>`;
+    }).join('');
+    
+    card.innerHTML = `
+        <div class="llm-server-header">
+            <div class="llm-server-url">${url}</div>
+            <div class="llm-server-actions">
+                <button onclick="showEditServerModal('${encodeURIComponent(url)}')" 
+                        class="text-indigo-600 hover:text-indigo-800" title="Edit">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button onclick="deleteServer('${encodeURIComponent(url)}')" 
+                        class="text-red-600 hover:text-red-800" title="Delete">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        </div>
+        <div class="llm-server-info">
+            <div class="llm-server-info-item">
+                <span class="llm-server-info-label">Device</span>
+                <span class="llm-server-info-value">${config.device || 'N/A'}</span>
+            </div>
+            <div class="llm-server-info-item">
+                <span class="llm-server-info-label">API Key</span>
+                <span class="llm-server-info-value">${config.apikey ? 'Set' : 'Not Set'}</span>
+            </div>
+            <div class="llm-server-info-item">
+                <span class="llm-server-info-label">Models</span>
+                <span class="llm-server-info-value">${activeModels}/${totalModels} Active</span>
+            </div>
+            <div class="llm-server-info-item">
+                <span class="llm-server-info-label">Total Reqs</span>
+                <span class="llm-server-info-value">${Object.values(models).reduce((sum, m) => sum + (m.reqs || 0), 0)}</span>
+            </div>
+        </div>
+        <div class="llm-server-models">
+            <div class="llm-server-models-label">Available Models</div>
+            <div class="llm-server-models-list">${modelsList}</div>
+        </div>
+    `;
+    
+    return card;
+}
+
+// Create server table row for desktop view
+function createServerTableRow(url, config) {
+    const models = Object.entries(config.model || {}).map(([k, v]) => {
+        const statusClass = v.status ? 'text-green-500' : 'text-red-500';
+        const statusIcon = v.status ? 'fa-check-circle' : 'fa-times-circle';
+        const statusTitle = v.status ? 'Active' : 'Inactive';
+        const statusClick = `toggleModelStatus('${encodeURIComponent(url)}','${encodeURIComponent(k)}',${v.status})`;
+        return [
+            '<div class="flex items-center justify-between py-1">',
+            '<span>' + k + '</span>',
+            '<div class="flex items-center space-x-2">',
+            '<span class="text-xs text-gray-500">' + v.reqs.toString() + ' reqs</span>',
+            '<i class="fas ' + statusIcon + ' ' + statusClass + '" title="' + statusTitle.toString() + '" onclick="' + statusClick + '"></i>',
+            '</div>',
+            '</div>'
+        ].join('');
+    }).join('');
+    
+    const row = document.createElement('tr');
+    row.className = 'hover:bg-gray-50 transition-colors';
+    row.innerHTML = '<td class="px-2 md:px-4 py-2 md:py-3 text-xs md:text-sm text-gray-700">' + url + '</td>' +
+        '<td class="px-2 md:px-4 py-2 md:py-3 text-xs md:text-sm text-gray-700">' + (config.device || 'N/A') + '</td>' +
+        '<td class="px-2 md:px-4 py-2 md:py-3 text-xs md:text-sm text-gray-700">' +
+        '<div class="flex items-center">' +
+        '<span class="font-mono text-xs bg-gray-100 px-2 py-1 rounded border break-all max-w-xs">' + (config.apikey || 'No API Key') + '</span>' +
+        (config.apikey ? '<button onclick="copyToClipboard(\'' + config.apikey + '\')" class="ml-2 text-gray-400 hover:text-indigo-600 transition-colors" title="Copy API Key"><i class="fas fa-copy text-xs"></i></button>' : '') +
+        '</div></td>' +
+        '<td class="px-2 md:px-4 py-2 md:py-3 text-xs md:text-sm text-gray-700"><div class="space-y-1">' + models + '</div></td>' +
+        '<td class="px-2 md:px-4 py-2 md:py-3 text-xs md:text-sm space-x-2">' +
+        '<button onclick="showEditServerModal(\'' + encodeURIComponent(url) + '\')" class="text-indigo-600 hover:text-indigo-800" title="Edit">' +
+        '<i class="fas fa-edit"></i></button>' +
+        '<button onclick="deleteServer(\'' + encodeURIComponent(url) + '\')" class="text-red-600 hover:text-red-800" title="Delete">' +
+        '<i class="fas fa-trash"></i></button></td>';
+    
+    return row;
 }
 
 // Server management functions
@@ -356,8 +431,18 @@ async function toggleModelStatus(serverUrl, modelId, currentStatus) {
 }
 
 
+// Handle window resize for responsive layout
+function handleResize() {
+    // Reload configs to switch between table and card layout
+    loadConfigs();
+}
+
 // Initialize on page load
-document.addEventListener('DOMContentLoaded', loadConfigs);
+document.addEventListener('DOMContentLoaded', function() {
+    loadConfigs();
+    // Add resize listener
+    window.addEventListener('resize', handleResize);
+});
 
 // Original functions
 function showEditLimit(apiKey, currentLimit) {

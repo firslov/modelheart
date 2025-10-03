@@ -321,19 +321,17 @@ async def usage_dashboard(request: Request, session: AsyncSession = Depends(get_
     result = await session.execute(text("SELECT * FROM api_keys"))
     api_keys_data = result.fetchall()
     
-    print(f"DEBUG: Found {len(api_keys_data)} API keys in database")
+    # Found {len(api_keys_data)} API keys in database
     
     # 检查行结构
-    if api_keys_data:
-        print(f"DEBUG: First row keys: {api_keys_data[0]._fields}")
-        print(f"DEBUG: First row data: {api_keys_data[0]}")
+    # Check row structure for debugging
     
     # 计算统计信息
     total_usage = sum(row.usage or 0 for row in api_keys_data)
     total_entries = len(api_keys_data)
     total_reqs = sum(row.reqs or 0 for row in api_keys_data)
     
-    print(f"DEBUG: total_entries={total_entries}, total_usage={total_usage}, total_reqs={total_reqs}")
+    # Statistics: total_entries={total_entries}, total_usage={total_usage}, total_reqs={total_reqs}
     
     # 统计不同使用量区间的数量
     less_than_100 = sum(1 for row in api_keys_data if (row.usage or 0) < 100)

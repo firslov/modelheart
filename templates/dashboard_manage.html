@@ -231,6 +231,93 @@
             .grid-cols-1.md\\:grid-cols-3 > div {
                 margin-bottom: 0.5rem;
             }
+
+            /* LLM Servers 移动端优化 */
+            .llm-server-card {
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                padding: 1rem;
+                margin-bottom: 1rem;
+                background: var(--card);
+                box-shadow: var(--shadow-sm);
+            }
+
+            .llm-server-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                margin-bottom: 0.75rem;
+            }
+
+            .llm-server-url {
+                font-weight: 600;
+                color: var(--text-primary);
+                font-size: 0.9rem;
+                word-break: break-all;
+                flex: 1;
+                margin-right: 0.5rem;
+            }
+
+            .llm-server-actions {
+                display: flex;
+                gap: 0.5rem;
+            }
+
+            .llm-server-info {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 0.75rem;
+                margin-bottom: 0.75rem;
+            }
+
+            .llm-server-info-item {
+                display: flex;
+                flex-direction: column;
+            }
+
+            .llm-server-info-label {
+                font-size: 0.75rem;
+                color: var(--text-secondary);
+                font-weight: 500;
+                margin-bottom: 0.25rem;
+            }
+
+            .llm-server-info-value {
+                font-size: 0.875rem;
+                color: var(--text-primary);
+                font-weight: 600;
+            }
+
+            .llm-server-models {
+                margin-top: 0.75rem;
+            }
+
+            .llm-server-models-label {
+                font-size: 0.75rem;
+                color: var(--text-secondary);
+                font-weight: 500;
+                margin-bottom: 0.5rem;
+            }
+
+            .llm-server-models-list {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+
+            .llm-server-model-tag {
+                background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
+                color: white;
+                padding: 0.25rem 0.5rem;
+                border-radius: 6px;
+                font-size: 0.7rem;
+                font-weight: 500;
+            }
+
+            .llm-server-model-tag.inactive {
+                background: var(--border);
+                color: var(--text-secondary);
+            }
         }
 
         @media only screen and (max-width: 640px) {
@@ -298,6 +385,65 @@
             /* 文本截断优化 */
             .max-w-xs {
                 max-width: 200px;
+            }
+
+            /* LLM Servers 小屏幕优化 */
+            .llm-server-info {
+                grid-template-columns: 1fr;
+                gap: 0.5rem;
+            }
+
+            .llm-server-header {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .llm-server-actions {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .llm-server-url {
+                margin-right: 0;
+            }
+        }
+
+        @media only screen and (max-width: 480px) {
+            body {
+                padding: 0.5rem;
+            }
+
+            .card-header {
+                padding: 1rem;
+            }
+
+            .card-body {
+                padding: 1rem;
+            }
+
+            .btn-primary {
+                width: 100%;
+                justify-content: center;
+            }
+
+            /* 统计数字字体大小调整 */
+            .text-2xl {
+                font-size: 1.5rem;
+            }
+
+            /* 导航标题调整 */
+            .text-2xl.md\\:text-3xl {
+                font-size: 1.5rem;
+            }
+
+            /* LLM Servers 超小屏幕优化 */
+            .llm-server-models-list {
+                justify-content: center;
+            }
+
+            .llm-server-model-tag {
+                font-size: 0.65rem;
+                padding: 0.2rem 0.4rem;
             }
         }
 
