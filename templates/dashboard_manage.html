@@ -16,19 +16,14 @@
             --primary-light: #818cf8;
             --primary-dark: #4f46e5;
             --secondary: #10b981;
-            --accent: #f59e0b;
             --background: #f8fafc;
             --card: #ffffff;
             --text-primary: #1e293b;
             --text-secondary: #64748b;
             --border: #e2e8f0;
-            --success: #10b981;
-            --warning: #f59e0b;
-            --danger: #ef4444;
             --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
             --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
             --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
         }
 
         body {
@@ -71,44 +66,26 @@
             animation: slideIn 0.4s ease-out;
         }
 
-        /* 现代化卡片设计 */
+        /* 现代化卡片设计 - 简化版 */
         .card {
-            background: linear-gradient(135deg, var(--card) 0%, #fafbfc 100%);
-            border-radius: 16px;
+            background: var(--card);
+            border-radius: 12px;
             box-shadow: var(--shadow-md);
             border: 1px solid var(--border);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            overflow: hidden;
-            position: relative;
-        }
-
-        .card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, var(--primary), var(--secondary));
-            opacity: 0;
-            transition: opacity 0.3s ease;
+            transition: all 0.2s ease;
         }
 
         .card:hover {
-            box-shadow: var(--shadow-xl);
-            transform: translateY(-4px);
-        }
-
-        .card:hover::before {
-            opacity: 1;
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
         }
 
         .scalable-card {
-            transition: transform 0.3s ease;
+            transition: transform 0.2s ease;
         }
 
         .scalable-card:hover {
-            transform: translateY(-2px) scale(1.01);
+            transform: translateY(-1px);
         }
 
         .card-header {
@@ -237,11 +214,37 @@
                 padding: 0.875rem 1.25rem;
                 font-size: 0.9rem;
             }
+
+            /* 统计卡片网格布局优化 */
+            .grid-cols-1.md\\:grid-cols-3 {
+                grid-template-columns: 1fr;
+                gap: 0.75rem;
+            }
+
+            /* 导航栏优化 */
+            .flex-col.md\\:flex-row {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            /* 使用分布卡片优化 */
+            .grid-cols-1.md\\:grid-cols-3 > div {
+                margin-bottom: 0.5rem;
+            }
         }
 
         @media only screen and (max-width: 640px) {
             .card {
                 border-radius: 10px;
+                margin: 0.25rem;
+            }
+
+            /* 表格移动端适配 */
+            .table-responsive {
+                display: block;
+                width: 100%;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
             }
 
             .table-row {
@@ -250,10 +253,13 @@
                 border: 1px solid var(--border);
                 border-radius: 8px;
                 padding: 1rem;
+                background: var(--card);
             }
 
             .table-row td {
-                display: block;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
                 padding: 0.5rem 0;
                 border: none;
             }
@@ -263,6 +269,64 @@
                 font-weight: 600;
                 color: var(--text-secondary);
                 margin-right: 0.5rem;
+                min-width: 100px;
+            }
+
+            /* 隐藏表头在移动端 */
+            .table-header {
+                display: none;
+            }
+
+            /* 按钮组优化 */
+            .flex.space-x-3 {
+                justify-content: space-around;
+                width: 100%;
+            }
+
+            /* 模态框优化 */
+            .modal-content {
+                margin: 1rem;
+                max-height: calc(100vh - 2rem);
+                overflow-y: auto;
+            }
+
+            /* 进度条优化 */
+            .progress-bar {
+                height: 6px;
+            }
+
+            /* 文本截断优化 */
+            .max-w-xs {
+                max-width: 200px;
+            }
+        }
+
+        @media only screen and (max-width: 480px) {
+            body {
+                padding: 0.5rem;
+            }
+
+            .card-header {
+                padding: 1rem;
+            }
+
+            .card-body {
+                padding: 1rem;
+            }
+
+            .btn-primary {
+                width: 100%;
+                justify-content: center;
+            }
+
+            /* 统计数字字体大小调整 */
+            .text-2xl {
+                font-size: 1.5rem;
+            }
+
+            /* 导航标题调整 */
+            .text-2xl.md\\:text-3xl {
+                font-size: 1.5rem;
             }
         }
     </style>

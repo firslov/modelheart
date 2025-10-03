@@ -131,25 +131,20 @@
     </script>
 
     <style>
-        /* 现代化设计系统 */
+        /* 现代化设计系统 - 简化版 */
         :root {
             --primary: #6366f1;
             --primary-light: #818cf8;
             --primary-dark: #4f46e5;
             --secondary: #10b981;
-            --accent: #f59e0b;
             --background: #f8fafc;
             --card: #ffffff;
             --text-primary: #1e293b;
             --text-secondary: #64748b;
             --border: #e2e8f0;
-            --success: #10b981;
-            --warning: #f59e0b;
-            --danger: #ef4444;
             --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
             --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
             --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
         }
 
         /* 动画效果 */
@@ -201,36 +196,18 @@
             animation: pulse 2s infinite;
         }
 
-        /* 现代化卡片设计 */
+        /* 现代化卡片设计 - 简化版 */
         .card {
-            background: linear-gradient(135deg, var(--card) 0%, #fafbfc 100%);
-            border-radius: 16px;
+            background: var(--card);
+            border-radius: 12px;
             box-shadow: var(--shadow-md);
             border: 1px solid var(--border);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            overflow: hidden;
-            position: relative;
-        }
-
-        .card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, var(--primary), var(--secondary));
-            opacity: 0;
-            transition: opacity 0.3s ease;
+            transition: all 0.2s ease;
         }
 
         .card:hover {
-            box-shadow: var(--shadow-xl);
-            transform: translateY(-4px);
-        }
-
-        .card:hover::before {
-            opacity: 1;
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
         }
 
         /* 现代化按钮 */
