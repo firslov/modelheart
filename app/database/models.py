@@ -89,6 +89,8 @@ class ServerModel(Base):
     actual_model_name = Column(String(100), nullable=False)  # 前端使用的模型名称
     reqs = Column(Integer, default=0)
     status = Column(Boolean, default=True)
+    input_token_weight = Column(Float, default=1.0)  # input token权重
+    output_token_weight = Column(Float, default=1.0)  # output token权重
 
     # 关系
     server = relationship("LLMServer", back_populates="models")
@@ -98,5 +100,7 @@ class ServerModel(Base):
         return {
             "name": self.client_model_name,  # 现在返回实际后端模型名称
             "reqs": self.reqs,
-            "status": self.status
+            "status": self.status,
+            "input_token_weight": self.input_token_weight,
+            "output_token_weight": self.output_token_weight
         }

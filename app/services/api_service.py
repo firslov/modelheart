@@ -95,7 +95,7 @@ class ApiService:
         return new_key
 
     async def update_usage(self, api_key: str, request_data: Dict, model: str = None, session: AsyncSession = None) -> None:
-        """更新API使用情况，优化token计算
+        """更新API使用情况，根据模型权重计算token
 
         Args:
             api_key: API密钥
@@ -126,21 +126,66 @@ class ApiService:
         api_key_record.last_used_str = get_current_time()
         api_key_record.reqs += 1
 
-        # 优化token计算：使用缓存
-        total_tokens = 0
-        for m in request_data.get("messages", []):
-            content = m.get("content", "")
-            if isinstance(content, str):
-                # 使用缓存避免重复计算
-                cache_key = hash(content)
-                if cache_key in self._token_cache:
-                    total_tokens += self._token_cache[cache_key]
+        # 获取模型权重
+        input_weight = 1.0
+        output_weight = 1.0
+        
+        if model:
+            # 从数据库获取模型权重配置
+            from sqlalchemy.orm import selectinload
+            result = await session.execute(
+                select(ServerModel)
+                .where(ServerModel.actual_model_name == model)
+                .options(selectinload(ServerModel.server))
+            )
+            server_models = result.scalars().all()
+            
+            # 如果有多个匹配的模型，使用第一个启用的模型
+            if server_models:
+                # 优先选择启用的模型
+                enabled_models = [m for m in server_models if m.status]
+                if enabled_models:
+                    server_model = enabled_models[0]
                 else:
-                    token_count = len(self.encoding.encode(content))
-                    self._token_cache[cache_key] = token_count
-                    total_tokens += token_count
+                    server_model = server_models[0]  # 如果没有启用的，使用第一个
+                
+                input_weight = server_model.input_token_weight
+                output_weight = server_model.output_token_weight
 
-        api_key_record.usage += total_tokens
+        # 计算加权token数量
+        weighted_tokens = 0
+        
+        # 从响应中获取实际的input和output token数量
+        if "usage" in request_data:
+            # 如果请求数据中已经包含usage信息（来自上游响应）
+            usage_data = request_data["usage"]
+            prompt_tokens = usage_data.get("prompt_tokens", 0)
+            completion_tokens = usage_data.get("completion_tokens", 0)
+            
+            # 应用权重计算
+            weighted_tokens = (prompt_tokens * input_weight) + (completion_tokens * output_weight)
+        else:
+            # 回退到基于消息内容的估算
+            prompt_tokens = 0
+            for m in request_data.get("messages", []):
+                content = m.get("content", "")
+                if isinstance(content, str):
+                    # 使用缓存避免重复计算
+                    cache_key = hash(content)
+                    if cache_key in self._token_cache:
+                        prompt_tokens += self._token_cache[cache_key]
+                    else:
+                        token_count = len(self.encoding.encode(content))
+                        self._token_cache[cache_key] = token_count
+                        prompt_tokens += token_count
+            
+            # 估算output tokens（假设为input tokens的1/3）
+            completion_tokens = max(1, int(prompt_tokens * 0.33))
+            
+            # 应用权重计算
+            weighted_tokens = (prompt_tokens * input_weight) + (completion_tokens * output_weight)
+
+        api_key_record.usage += weighted_tokens
 
         # 更新模型使用统计
         if model:
@@ -165,7 +210,7 @@ class ApiService:
                 session.add(model_usage)
             
             model_usage.requests += 1
-            model_usage.tokens += total_tokens
+            model_usage.tokens += weighted_tokens
 
         # 限制缓存大小
         if len(self._token_cache) > 1000:
@@ -289,7 +334,9 @@ class ApiService:
                 server_config["model"][model.actual_model_name] = {
                     "name": model.client_model_name,  # 实际后端模型名称
                     "reqs": model.reqs,
-                    "status": model.status
+                    "status": model.status,
+                    "input_token_weight": model.input_token_weight,
+                    "output_token_weight": model.output_token_weight
                 }
             
             servers_dict[server.server_url] = server_config
@@ -322,7 +369,9 @@ class ApiService:
                     client_model_name=model_data.get('name', actual_model_name),  # 实际后端模型名称
                     actual_model_name=actual_model_name,  # 前端使用的模型名称
                     reqs=model_data.get('reqs', 0),
-                    status=model_data.get('status', True)
+                    status=model_data.get('status', True),
+                    input_token_weight=model_data.get('input_token_weight', 1.0),
+                    output_token_weight=model_data.get('output_token_weight', 1.0)
                 )
                 llm_server.models.append(server_model)
             
@@ -381,6 +430,8 @@ class ApiService:
                     existing_model = existing_models_map[actual_model_name]
                     existing_model.client_model_name = model_data.get('name', actual_model_name)  # 更新实际后端模型名称
                     existing_model.status = model_data.get('status', True)
+                    existing_model.input_token_weight = model_data.get('input_token_weight', 1.0)
+                    existing_model.output_token_weight = model_data.get('output_token_weight', 1.0)
                     # 保留原有的请求计数，除非明确指定新的值
                     if 'reqs' in model_data:
                         existing_model.reqs = model_data.get('reqs', 0)
@@ -392,7 +443,9 @@ class ApiService:
                         client_model_name=model_data.get('name', actual_model_name),  # 实际后端模型名称
                         actual_model_name=actual_model_name,  # 前端使用的模型名称
                         reqs=model_data.get('reqs', 0),
-                        status=model_data.get('status', True)
+                        status=model_data.get('status', True),
+                        input_token_weight=model_data.get('input_token_weight', 1.0),
+                        output_token_weight=model_data.get('output_token_weight', 1.0)
                     )
                     existing_server.models.append(server_model)
         else:

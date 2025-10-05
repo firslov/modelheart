@@ -314,47 +314,34 @@ async def usage_dashboard(request: Request, session: AsyncSession = Depends(get_
     """用量统计和管理仪表盘"""
     _, api_service = get_services(request)
     
-    # 使用原始SQL查询获取数据，避免ORM模型不匹配问题
-    from sqlalchemy import text
+    # 使用ORM查询获取数据，包括模型使用统计
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+    from app.database.models import ApiKey, ModelUsage
     
-    # 获取API密钥数据
-    result = await session.execute(text("SELECT * FROM api_keys"))
-    api_keys_data = result.fetchall()
-    
-    # Found {len(api_keys_data)} API keys in database
-    
-    # 检查行结构
-    # Check row structure for debugging
+    # 获取API密钥数据，包括模型使用统计
+    result = await session.execute(
+        select(ApiKey).options(selectinload(ApiKey.model_usages))
+    )
+    api_keys_data = result.scalars().all()
     
     # 计算统计信息
-    total_usage = sum(row.usage or 0 for row in api_keys_data)
+    total_usage = sum(key.usage or 0 for key in api_keys_data)
     total_entries = len(api_keys_data)
-    total_reqs = sum(row.reqs or 0 for row in api_keys_data)
-    
-    # Statistics: total_entries={total_entries}, total_usage={total_usage}, total_reqs={total_reqs}
+    total_reqs = sum(key.reqs or 0 for key in api_keys_data)
     
     # 统计不同使用量区间的数量
-    less_than_100 = sum(1 for row in api_keys_data if (row.usage or 0) < 100)
-    between_100_and_10000 = sum(1 for row in api_keys_data if 100 <= (row.usage or 0) < 10000)
-    more_than_10000 = sum(1 for row in api_keys_data if (row.usage or 0) >= 10000)
+    less_than_100 = sum(1 for key in api_keys_data if (key.usage or 0) < 100)
+    between_100_and_10000 = sum(1 for key in api_keys_data if 100 <= (key.usage or 0) < 10000)
+    more_than_10000 = sum(1 for key in api_keys_data if (key.usage or 0) >= 10000)
     
     # 构建API密钥列表
     api_keys = []
-    for row in api_keys_data:
-        # 简化日期处理 - 直接使用字符串值
-        created_at = str(row.created_at) if row.created_at else "N/A"
-        last_used = str(row.last_used) if row.last_used else "N/A"
-        
-        api_keys.append({
-            "key": row.api_key,
-            "phone": row.phone or "",
-            "usage": row.usage or 0,
-            "limit": row.limit_value or 0,
-            "reqs": row.reqs or 0,
-            "created_at": created_at,
-            "last_used": last_used,
-            "model_usage": {},  # 简单表结构没有model_usage字段
-        })
+    for key in api_keys_data:
+        # 使用to_dict方法获取完整数据，包括model_usage
+        key_data = key.to_dict()
+        key_data["key"] = key.api_key
+        api_keys.append(key_data)
     
     return templates.TemplateResponse(
         "dashboard_manage.html",

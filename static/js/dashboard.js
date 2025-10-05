@@ -157,17 +157,23 @@ async function addServer() {
     for (const row of rows) {
         const frontendInput = row.querySelector('.model-frontend');
         const backendInput = row.querySelector('.model-backend');
+        const inputWeightInput = row.querySelector('.model-input-weight');
+        const outputWeightInput = row.querySelector('.model-output-weight');
         const statusSelect = row.querySelector('.model-status');
         
         const frontendModel = frontendInput.value.trim();
         const backendModel = backendInput.value.trim();
+        const inputWeight = parseFloat(inputWeightInput.value) || 1.0;
+        const outputWeight = parseFloat(outputWeightInput.value) || 1.0;
         const status = statusSelect.value === 'true';
         
         if (frontendModel && backendModel) {
             models[frontendModel] = {
                 name: backendModel,
                 status: status,
-                reqs: 0
+                reqs: 0,
+                input_token_weight: inputWeight,
+                output_token_weight: outputWeight
             };
         }
     }
@@ -267,11 +273,18 @@ function populateModelsTable(models) {
     tableBody.innerHTML = '';
     
     for (const [frontendModel, modelConfig] of Object.entries(models)) {
-        addModelRow(frontendModel, modelConfig.name, modelConfig.status, modelConfig.reqs || 0);
+        addModelRow(
+            frontendModel, 
+            modelConfig.name, 
+            modelConfig.status, 
+            modelConfig.reqs || 0,
+            modelConfig.input_token_weight || 1.0,
+            modelConfig.output_token_weight || 1.0
+        );
     }
 }
 
-function addModelRow(frontendModel = '', backendModel = '', status = true, reqs = 0, target = 'editServer') {
+function addModelRow(frontendModel = '', backendModel = '', status = true, reqs = 0, inputWeight = 1.0, outputWeight = 1.0, target = 'editServer') {
     const tableBody = document.getElementById(target === 'addServer' ? 'addServerModelsTable' : 'editServerModelsTable');
     const row = document.createElement('tr');
     row.className = 'border-b hover:bg-gray-50';
@@ -284,6 +297,14 @@ function addModelRow(frontendModel = '', backendModel = '', status = true, reqs 
         <td class="px-4 py-2 border">
             <input type="text" class="w-full px-2 py-1 border rounded model-backend" 
                    value="${backendModel}" placeholder="Backend model name">
+        </td>
+        <td class="px-4 py-2 border">
+            <input type="number" class="w-full px-2 py-1 border rounded model-input-weight" 
+                   value="${inputWeight}" placeholder="1.0" step="0.1" min="0" title="Input token weight">
+        </td>
+        <td class="px-4 py-2 border">
+            <input type="number" class="w-full px-2 py-1 border rounded model-output-weight" 
+                   value="${outputWeight}" placeholder="1.0" step="0.1" min="0" title="Output token weight">
         </td>
         <td class="px-4 py-2 border">
             <select class="w-full px-2 py-1 border rounded model-status">
@@ -337,10 +358,14 @@ async function updateServer() {
     for (const row of rows) {
         const frontendInput = row.querySelector('.model-frontend');
         const backendInput = row.querySelector('.model-backend');
+        const inputWeightInput = row.querySelector('.model-input-weight');
+        const outputWeightInput = row.querySelector('.model-output-weight');
         const statusSelect = row.querySelector('.model-status');
         
         const frontendModel = frontendInput.value.trim();
         const backendModel = backendInput.value.trim();
+        const inputWeight = parseFloat(inputWeightInput.value) || 1.0;
+        const outputWeight = parseFloat(outputWeightInput.value) || 1.0;
         const status = statusSelect.value === 'true';
         
         if (frontendModel && backendModel) {
@@ -357,7 +382,9 @@ async function updateServer() {
             models[frontendModel] = {
                 name: backendModel,
                 status: status,
-                reqs: reqs
+                reqs: reqs,
+                input_token_weight: inputWeight,
+                output_token_weight: outputWeight
             };
         }
     }
