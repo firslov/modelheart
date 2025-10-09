@@ -6,31 +6,41 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Model Heart</title>
     <link rel="icon" href="static/favicon.ico" type="image/x-icon">
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.loli.net/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
     <script>
         async function generateApiKey() {
             const phone = document.getElementById('phone_input').value;
-            if (!phone) {
-                showMessage('请输入手机号', true);
+            const password = document.getElementById('password_input').value;
+            
+            if (!phone || !password) {
+                showMessage('请输入手机号和密码', true);
                 return;
             }
             if (!/^1[3-9]\d{9}$/.test(phone)) {
                 showMessage('请输入有效的手机号', true);
                 return;
             }
+            if (password.length < 6) {
+                showMessage('密码长度至少6位', true);
+                return;
+            }
+            
             try {
                 const response = await fetch('/generate-api-key', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ phone }),
+                    body: JSON.stringify({ phone, password }),
                 });
+                
                 if (!response.ok) {
-                    throw new Error(`Server response error: ${response.status}`);
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `Server response error: ${response.status}`);
                 }
+                
                 const data = await response.json();
                 if (data.error) {
                     showMessage(data.error, true);
@@ -43,6 +53,85 @@
                 console.error('Generating API key failed:', error);
                 showMessage('生成API密钥失败: ' + error.message, true);
             }
+        }
+
+        async function checkUsage() {
+            const phone = document.getElementById('phone_input').value;
+            const password = document.getElementById('password_input').value;
+            
+            if (!phone || !password) {
+                showMessage('请输入手机号和密码', true);
+                return;
+            }
+            if (!/^1[3-9]\d{9}$/.test(phone)) {
+                showMessage('请输入有效的手机号', true);
+                return;
+            }
+            
+            try {
+                const response = await fetch('/check-usage', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ phone, password }),
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `Server response error: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                if (data.error) {
+                    showMessage(data.error, true);
+                } else {
+                    const apiKey = data.api_key;
+                    const usage = data.usage;
+                    const limit = data.limit;
+                    const remaining = data.remaining;
+                    
+                    // 在查询结果区域显示完整的API密钥和额度信息
+                    document.getElementById('usage_result').innerHTML = `
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <h4 class="font-semibold text-blue-800 mb-3">API密钥和额度信息</h4>
+                                <div class="grid grid-cols-2 gap-3 text-sm">
+                                    <div class="text-gray-600">API密钥:</div>
+                                    <div class="font-medium text-gray-800 truncate" title="${apiKey}">${apiKey}</div>
+                                    <div class="text-gray-600">已使用:</div>
+                                    <div class="font-medium text-gray-800">${usage.toLocaleString()} credits</div>
+                                    <div class="text-gray-600">限额:</div>
+                                    <div class="font-medium text-gray-800">${limit.toLocaleString()} credits</div>
+                                    <div class="text-gray-600">剩余:</div>
+                                    <div class="font-medium text-green-600">${remaining.toLocaleString()} credits</div>
+                                </div>
+                            </div>
+                            <div class="flex flex-col space-y-2 ml-4">
+                                <button onclick="copyToClipboardText('${apiKey}')" class="btn-icon" title="复制API密钥">
+                                    <i class="fas fa-copy text-white"></i>
+                                </button>
+                                <button onclick="hideUsageResult()" class="text-blue-500 hover:text-blue-700">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // 显示查询结果区域
+                    document.getElementById('usage_result').classList.remove('hidden');
+                    
+                    // 显示成功消息
+                    showMessage('查询成功！API密钥和额度信息已显示在下方');
+                }
+            } catch (error) {
+                console.error('Checking usage failed:', error);
+                showMessage('查询额度失败: ' + error.message, true);
+            }
+        }
+
+        function hideUsageResult() {
+            document.getElementById('usage_result').classList.add('hidden');
         }
 
 
@@ -59,16 +148,36 @@
             showMessage("Copied to clipboard!");
         }
 
+        function copyToClipboardText(text) {
+            var dummy = document.createElement("textarea");
+            dummy.style.position = 'absolute';
+            dummy.style.left = '-9999px';
+            document.body.appendChild(dummy);
+            dummy.value = text;
+            dummy.select();
+            document.execCommand("copy");
+            document.body.removeChild(dummy);
+            showMessage("API密钥已复制到剪贴板!");
+        }
+
         function showMessage(message, isError) {
             const messageArea = document.getElementById('message_area');
             messageArea.textContent = message;
-            messageArea.className = isError ? 'bg-red-100 text-red-700 p-4 rounded' : 'bg-green-100 text-green-700 p-4 rounded';
+            
+            if (isError) {
+                messageArea.className = 'bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-md mb-4 fade-in';
+            } else {
+                messageArea.className = 'bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded-lg shadow-md mb-4 fade-in';
+            }
+            
             messageArea.style.display = 'block';
-            messageArea.classList.add('fade-in');
+            
+            // 滚动到消息区域
+            messageArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
             setTimeout(() => {
                 messageArea.style.display = 'none';
-                messageArea.classList.remove('fade-in');
-            }, 3000);
+            }, 5000);
         }
 
         async function loadModels() {
@@ -118,11 +227,34 @@
             modal.classList.remove('fade-in');
         }
 
+        function showUpgradeModal() {
+            const modal = document.getElementById('upgradeModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('fade-in');
+        }
+
+        function hideUpgradeModal() {
+            const modal = document.getElementById('upgradeModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('fade-in');
+        }
+
+        function showPaymentQR() {
+            const paymentSection = document.getElementById('paymentSection');
+            paymentSection.classList.remove('hidden');
+            paymentSection.classList.add('fade-in');
+        }
+
         // Close modal when clicking outside
         document.addEventListener('click', function (event) {
-            const modal = document.getElementById('contactModal');
-            if (event.target === modal) {
+            const contactModal = document.getElementById('contactModal');
+            const upgradeModal = document.getElementById('upgradeModal');
+            
+            if (event.target === contactModal) {
                 hideContactModal();
+            }
+            if (event.target === upgradeModal) {
+                hideUpgradeModal();
             }
         });
 
@@ -421,7 +553,8 @@
             }
         }
 
-        #contactModal.fade-in {
+        #contactModal.fade-in,
+        #upgradeModal.fade-in {
             animation: modalFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
@@ -489,8 +622,13 @@
                 <a href="https://chat.aihao.world/" target="_blank"
                     class="btn flex items-center bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-600 hover:from-purple-600 hover:via-pink-600 hover:to-indigo-700 shadow-lg transform hover:scale-105 transition-all duration-300">
                     <i class="fas fa-comments mr-2"></i>
-                    <span class="font-bold">HaoAI Chat</span>
+                    <span class="font-bold">开启对话</span>
                 </a>
+                <button onclick="showUpgradeModal()"
+                    class="btn flex items-center bg-gradient-to-r from-green-500 via-emerald-500 to-teal-600 hover:from-green-600 hover:via-emerald-600 hover:to-teal-700 shadow-lg transform hover:scale-105 transition-all duration-300">
+                    <i class="fas fa-arrow-up mr-2"></i>
+                    <span class="font-bold">提升额度</span>
+                </button>
             </div>
         </div>
 
@@ -501,13 +639,47 @@
                     <i class="fas fa-key text-indigo-600 text-lg mr-2"></i>
                     获取API密钥
                 </h2>
-                <div class="flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-4">
-                    <input type="tel" id="phone_input" class="input-modern flex-grow w-full md:w-auto"
-                        placeholder="请输入手机号">
-                    <button onclick="generateApiKey()" class="btn w-full md:w-auto">
-                        <i class="fas fa-key mr-2"></i>
-                        获取API密钥
-                    </button>
+                
+                <!-- 消息提示区域 - 移动到组件内部顶部 -->
+                <div id="message_area" class="mb-4 hidden"></div>
+                
+                <div class="space-y-4">
+                    <div class="flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-4">
+                        <input type="tel" id="phone_input" class="input-modern flex-grow w-full md:w-auto"
+                            placeholder="请输入手机号">
+                        <input type="password" id="password_input" class="input-modern flex-grow w-full md:w-auto"
+                            placeholder="请输入密码">
+                    </div>
+                    <div class="flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-4">
+                        <button onclick="generateApiKey()" class="btn w-full md:w-auto">
+                            <i class="fas fa-key mr-2"></i>
+                            获取API密钥
+                        </button>
+                        <button onclick="checkUsage()" class="btn w-full md:w-auto bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 hover:from-blue-600 hover:via-indigo-600 hover:to-purple-700">
+                            <i class="fas fa-chart-line mr-2"></i>
+                            查询额度
+                        </button>
+                    </div>
+                    
+                    <!-- 查询结果显示区域 -->
+                    <div id="usage_result" class="hidden mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <h4 class="font-semibold text-blue-800 mb-2">额度信息</h4>
+                                <div class="grid grid-cols-2 gap-2 text-sm">
+                                    <div class="text-gray-600">已使用:</div>
+                                    <div id="usage_value" class="font-medium text-gray-800">0 tokens</div>
+                                    <div class="text-gray-600">限额:</div>
+                                    <div id="limit_value" class="font-medium text-gray-800">1,000,000 credits</div>
+                                    <div class="text-gray-600">剩余:</div>
+                                    <div id="remaining_value" class="font-medium text-green-600">1,000,000 credits</div>
+                                </div>
+                            </div>
+                            <button onclick="hideUsageResult()" class="text-blue-500 hover:text-blue-700 ml-4">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -575,15 +747,12 @@
                         <h3 class="text-lg font-semibold text-gray-800">使用限额</h3>
                     </div>
                     <div class="flex-1 flex items-center justify-between">
-                        <span class="text-gray-700">每个API密钥限额（模型定价存在差异）</span>
-                        <span class="text-green-600 font-semibold">1,000,000 tokens</span>
+                        <span class="text-gray-700">每个API密钥免费额度</span>
+                        <span class="text-green-600 font-semibold">1,000,000 credits</span>
                     </div>
                 </div>
             </div>
         </div>
-
-        <!-- 消息提示区域 -->
-        <div id="message_area" class="mt-4 hidden"></div>
 
         <!-- Footer -->
         <div class="mt-8 flex justify-center space-x-6">
@@ -619,6 +788,62 @@
                 <h3 class="text-xl font-bold text-gray-800 mb-4">联系作者</h3>
                 <img src="/static/contact-qr.jpg" alt="Contact QR Code" class="mx-auto w-64 h-64 object-contain">
                 <p class="mt-4 text-gray-600">扫描二维码联系作者</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upgrade Modal -->
+    <div id="upgradeModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4 relative">
+            <button onclick="hideUpgradeModal()" class="absolute top-2 right-2 text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+            <div class="text-center">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">提升额度</h3>
+                <div class="text-left mb-6">
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4 rounded">
+                        <p class="text-gray-700 text-sm">额度说明：1,000,000 credits / 1 元</p>
+                    </div>
+                    <div class="space-y-3 text-sm text-gray-600">
+                        <p class="flex items-start">
+                            <i class="fas fa-check text-green-500 mt-1 mr-2"></i>
+                            <span>Claude、gpt5等模型费率较高，如需更多额度可扫码支付</span>
+                        </p>
+                        <p class="flex items-start">
+                            <i class="fas fa-check text-green-500 mt-1 mr-2"></i>
+                            <span>本平台仅在官方定价基础上收取极低手续费用于运营</span>
+                        </p>
+                        <p class="flex items-start">
+                            <i class="fas fa-check text-green-500 mt-1 mr-2"></i>
+                            <span>额度按照credits计费，不同模型根据实际定价进行折算</span>
+                        </p>
+                        <p class="flex items-start">
+                            <i class="fas fa-check text-green-500 mt-1 mr-2"></i>
+                            <span>扫码时请标明注册手机号，确认付款后5-15分钟内生效</span>
+                        </p>
+                    </div>
+                </div>
+                <button onclick="showPaymentQR()" 
+                    class="btn flex items-center justify-center bg-gradient-to-r from-green-500 via-emerald-500 to-teal-600 hover:from-green-600 hover:via-emerald-600 hover:to-teal-700 shadow-lg transform hover:scale-105 transition-all duration-300 w-full">
+                    <i class="fas fa-qrcode mr-2"></i>
+                    <span class="font-bold">显示付款码</span>
+                </button>
+                
+                <!-- Payment QR Section -->
+                <div id="paymentSection" class="hidden mt-6 fade-in">
+                    <div class="border-t pt-4">
+                        <h4 class="text-lg font-semibold text-gray-800 mb-3">付款务必备注手机号</h4>
+                        <div class="bg-gray-100 p-4 rounded-lg">
+                            <div class="text-center">
+                                <div class="bg-white p-4 rounded-lg inline-block">
+                                    <img src="/static/wxtrade.jpg" alt="微信支付二维码" class="w-48 h-48 object-contain rounded">
+                                </div>
+                                <p class="mt-3 text-sm text-gray-600">请扫描上方二维码完成付款</p>
+                                <p class="text-xs text-gray-500 mt-2">付款后请稍等5-15分钟生效</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

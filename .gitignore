@@ -9,3 +9,8 @@ templates/dashboard_manage_clean.html
 templates/test_media_query.css
 app/database/myapi.db
 app/database/api_keys.db
+app/database/database.db
+app/database/api_service.db
+database.db
+app/database.db
+cookies.txt

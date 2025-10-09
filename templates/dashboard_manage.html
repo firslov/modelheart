@@ -707,6 +707,12 @@
                                             <i class="fas fa-edit"></i>
                                         </button>
                                         <button data-key="{{ api_key.key }}"
+                                            onclick="showChangePasswordModal(this.getAttribute('data-key'))"
+                                            class="text-blue-500 hover:text-blue-700 transition-colors"
+                                            title="Change Password">
+                                            <i class="fas fa-key"></i>
+                                        </button>
+                                        <button data-key="{{ api_key.key }}"
                                             onclick="revokeKey(this.getAttribute('data-key'))"
                                             class="text-red-500 hover:text-red-700 transition-colors"
                                             title="Revoke Key">
@@ -879,6 +885,28 @@
         </div>
     </div>
 
+    <!-- Change Password Modal -->
+    <div id="changePasswordModal" class="fixed inset-0 z-50 modal hidden items-center justify-center p-4">
+        <div class="modal-content w-full max-w-sm">
+            <div class="p-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">修改用户密码</h3>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-600 mb-2">新密码</label>
+                    <input type="password" id="newPassword"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        placeholder="请输入新密码（至少6位）">
+                    <p class="text-xs text-gray-500 mt-1">密码长度6-72个字符</p>
+                </div>
+                <input type="hidden" id="currentApiKeyForPassword">
+                <div class="flex justify-end space-x-3">
+                    <button onclick="closeChangePasswordModal()"
+                        class="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium">取消</button>
+                    <button onclick="changePassword()" class="btn-primary">修改密码</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Dashboard JavaScript -->
     <script>
         // Copy to clipboard function
@@ -898,7 +926,7 @@
             });
         }
     </script>
-    <script src="/static/js/dashboard.js"></script>
+    <script src="/static/js/dashboard.js?v=2"></script>
     <script>
         // Initialize API keys data after dashboard.js is loaded
         document.addEventListener('DOMContentLoaded', function () {

@@ -13,9 +13,6 @@ class Settings(BaseSettings):
 
     # 文件路径配置
     BASE_DIR: str = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    API_KEYS_FILE: str = os.path.join(BASE_DIR, "api_keys_usage.json")
-    LLM_SERVERS_FILE: str = os.path.join(BASE_DIR, "llm_servers_list.json")
-    SERVE_MODELS_FILE: str = os.path.join(BASE_DIR, "serve_models_list.json")
     STATIC_DIR: str = os.path.join(BASE_DIR, "static")
     TEMPLATES_DIR: str = os.path.join(BASE_DIR, "templates")
 

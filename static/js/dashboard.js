@@ -591,6 +591,64 @@ async function revokeKey(apiKey) {
     }
 }
 
+// Password Change Functions
+function showChangePasswordModal(apiKey) {
+    document.getElementById('changePasswordModal').style.display = 'flex';
+    document.getElementById('currentApiKeyForPassword').value = apiKey;
+    document.getElementById('newPassword').value = '';
+}
+
+function closeChangePasswordModal() {
+    document.getElementById('changePasswordModal').style.display = 'none';
+}
+
+async function changePassword() {
+    const apiKey = document.getElementById('currentApiKeyForPassword').value;
+    const newPassword = document.getElementById('newPassword').value;
+
+    if (!newPassword) {
+        alert('请输入新密码');
+        return;
+    }
+
+    if (newPassword.length < 6) {
+        alert('密码长度至少6位');
+        return;
+    }
+
+    if (newPassword.length > 72) {
+        alert('密码长度不能超过72个字符');
+        return;
+    }
+
+    if (!confirm('确定要修改该用户的密码吗？')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/change-user-password', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                api_key: apiKey,
+                new_password: newPassword
+            }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || '修改密码失败');
+        }
+
+        alert('密码修改成功');
+        closeChangePasswordModal();
+    } catch (error) {
+        alert('修改密码失败: ' + error.message);
+    }
+}
+
 // Model Usage Functions
 async function toggleModelUsage(apiKey) {
     const container = document.querySelector(`.model-usage-container[data-key="${apiKey}"]`);

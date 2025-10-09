@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from typing import Dict, Tuple
 
 from fastapi import APIRouter, HTTPException, Request, Response, Depends
@@ -20,6 +21,7 @@ from app.services.api_service import ApiService
 from app.services.llm_service import LLMService
 from app.utils.helpers import get_current_time, log_api_usage
 from app.database.database import get_db_session
+import bcrypt
 
 router = APIRouter()
 
@@ -205,37 +207,117 @@ async def logout(request: Request):
 
 @router.post("/generate-api-key")
 async def generate_api_key(request: Request, session: AsyncSession = Depends(get_db_session)):
-    """生成新的API密钥"""
-    phone = ""
-    
-    # 检查是否有请求体
-    body = await request.body()
-    if body and body != b'':
-        try:
-            data = json.loads(body.decode('utf-8'))
-            phone = data.get("phone", "")
-        except:
-            phone = ""
+    """生成新的API密钥 - 支持手机号和密码验证"""
+    try:
+        data = await request.json()
+        phone = data.get("phone", "")
+        password = data.get("password", "")
+        
+        if not phone or not password:
+            raise HTTPException(status_code=400, detail="手机号和密码不能为空")
+        
+        if not re.match(r'^1[3-9]\d{9}$', phone):
+            raise HTTPException(status_code=400, detail="请输入有效的手机号")
+        
+        if len(password) < 6:
+            raise HTTPException(status_code=400, detail="密码长度至少6位")
+        if len(password) > 72:
+            raise HTTPException(status_code=400, detail="密码长度不能超过72个字符")
 
-    _, api_service = get_services(request)
-
-    # 生成新的API密钥
-    new_key = await api_service.generate_api_key(session)
-    
-    # 如果提供了手机号，更新记录
-    if phone:
+        _, api_service = get_services(request)
+        
+        # 检查是否已存在该手机号
         from app.database.models import ApiKey
-        from sqlalchemy import select, text
+        from sqlalchemy import select
         
         result = await session.execute(
-            select(ApiKey).where(ApiKey.api_key == new_key)
+            select(ApiKey).where(ApiKey.phone == phone)
         )
-        api_key_record = result.scalar_one_or_none()
-        if api_key_record:
-            api_key_record.phone = phone
-            await session.commit()
-    
-    return {"api_key": new_key}
+        existing_key = result.scalar_one_or_none()
+        
+        if existing_key:
+            # 如果手机号已存在，提示用户已注册
+            return JSONResponse(
+                status_code=400,
+                content={"detail": "用户已注册"}
+            )
+        else:
+            # 生成新的API密钥
+            new_key = await api_service.generate_api_key(session)
+            
+            # 更新记录，添加手机号和密码
+            result = await session.execute(
+                select(ApiKey).where(ApiKey.api_key == new_key)
+            )
+            api_key_record = result.scalar_one_or_none()
+            if api_key_record:
+                api_key_record.phone = phone
+                api_key_record.password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+                await session.commit()
+            
+            return {"api_key": new_key}
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"生成API密钥失败: {str(e)}")
+
+
+@router.post("/check-usage")
+async def check_usage(request: Request, session: AsyncSession = Depends(get_db_session)):
+    """查询API密钥使用额度"""
+    try:
+        data = await request.json()
+        phone = data.get("phone", "")
+        password = data.get("password", "")
+        
+        if not phone or not password:
+            raise HTTPException(status_code=400, detail="手机号和密码不能为空")
+        
+        if not re.match(r'^1[3-9]\d{9}$', phone):
+            raise HTTPException(status_code=400, detail="请输入有效的手机号")
+
+        # 检查是否已存在该手机号
+        from app.database.models import ApiKey
+        from sqlalchemy import select
+        
+        result = await session.execute(
+            select(ApiKey).where(ApiKey.phone == phone)
+        )
+        existing_key = result.scalar_one_or_none()
+        
+        if not existing_key:
+            raise HTTPException(status_code=404, detail="未找到该手机号对应的账户")
+        
+        # 验证密码 - 使用bcrypt验证
+        try:
+            if not bcrypt.checkpw(password.encode(), existing_key.password_hash.encode()):
+                return JSONResponse(
+                    status_code=401,
+                    content={"error": "密码错误", "detail": "密码错误"}
+                )
+        except Exception:
+            return JSONResponse(
+                status_code=401,
+                content={"error": "密码错误", "detail": "密码错误"}
+            )
+        
+        # 返回使用额度信息
+        usage = existing_key.usage or 0
+        limit = existing_key.limit_value or 1000000  # 默认限额1,000,000 tokens
+        remaining = max(0, limit - usage)
+        
+        return {
+            "api_key": existing_key.api_key,
+            "usage": usage,
+            "limit": limit,
+            "remaining": remaining
+        }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"查询额度失败: {str(e)}")
 
 
 @router.post("/update-api-key-limit")
@@ -306,6 +388,47 @@ async def revoke_api_key(request: Request, session: AsyncSession = Depends(get_d
     await session.commit()
 
     return {"status": "success"}
+
+
+@router.post("/change-user-password")
+@admin_required
+async def change_user_password(request: Request, session: AsyncSession = Depends(get_db_session)):
+    """管理员修改用户密码"""
+    try:
+        data = await request.json()
+        api_key = data.get("api_key")
+        new_password = data.get("new_password")
+        
+        if not api_key or not new_password:
+            raise HTTPException(status_code=400, detail="API key and new password are required")
+        
+        if len(new_password) < 6:
+            raise HTTPException(status_code=400, detail="密码长度至少6位")
+        if len(new_password) > 72:
+            raise HTTPException(status_code=400, detail="密码长度不能超过72个字符")
+
+        # 检查API密钥是否存在
+        from app.database.models import ApiKey
+        from sqlalchemy import select
+        
+        result = await session.execute(
+            select(ApiKey).where(ApiKey.api_key == api_key)
+        )
+        api_key_record = result.scalar_one_or_none()
+        
+        if not api_key_record:
+            raise HTTPException(status_code=404, detail="未找到该API密钥对应的用户")
+        
+        # 更新密码哈希
+        api_key_record.password_hash = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+        await session.commit()
+        
+        return {"status": "success", "message": "密码修改成功"}
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"修改密码失败: {str(e)}")
 
 
 @router.get("/get-usage", response_class=HTMLResponse)

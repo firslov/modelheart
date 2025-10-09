@@ -18,6 +18,7 @@ class ApiKey(Base):
     created_at = Column(DateTime, default=datetime.now)
     last_used = Column(DateTime, nullable=True)
     phone = Column(String(20), nullable=True)
+    password_hash = Column(String(255), nullable=True)  # 密码哈希值
     created_at_str = Column(String(20), nullable=True)
     last_used_str = Column(String(20), nullable=True)
 
