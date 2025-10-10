@@ -476,7 +476,7 @@ class ApiService:
 
         Args:
             server_url: 服务器URL
-            model_name: 模型名称
+            model_name: 模型名称（前端使用的模型名称）
             session: 数据库会话
         """
         from sqlalchemy.orm import selectinload
@@ -490,9 +490,9 @@ class ApiService:
         server = result.scalar_one_or_none()
         
         if server:
-            # 查找模型
+            # 查找模型 - 使用actual_model_name（前端模型名称）来匹配
             for server_model in server.models:
-                if server_model.client_model_name == model_name:
+                if server_model.actual_model_name == model_name:
                     server_model.reqs += 1
                     await session.commit()
                     break

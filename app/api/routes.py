@@ -518,7 +518,7 @@ async def proxy_handler_chat(request: Request, session: AsyncSession = Depends(g
         # 流式响应处理
         if req_data.get("stream", False):
             # 对于流式响应，立即释放数据库会话，避免长时间占用
-            await session.commit()
+            await session.close()
             
             async def stream_wrapper():
                 num_tokens = 0
@@ -536,10 +536,12 @@ async def proxy_handler_chat(request: Request, session: AsyncSession = Depends(g
                 # 流式响应结束后，创建新的数据库会话来更新用量
                 from app.database.database import AsyncSessionLocal
                 async with AsyncSessionLocal() as new_session:
+                    # 重新获取服务实例
+                    _, new_api_service = get_services(request)
                     # 更新最终用量
-                    await api_service.update_usage(api_key, req_data, model, new_session)
+                    await new_api_service.update_usage(api_key, req_data, model, new_session)
                     # 更新模型请求计数
-                    await api_service.increment_model_reqs(target_server, model, new_session)
+                    await new_api_service.increment_model_reqs(target_server, model, new_session)
                     await new_session.commit()
 
             return StreamingResponse(
@@ -668,7 +670,7 @@ async def proxy_handler_completions(request: Request, session: AsyncSession = De
         # 流式响应处理
         if req_data.get("stream", False):
             # 对于流式响应，立即释放数据库会话，避免长时间占用
-            await session.commit()
+            await session.close()
             
             async def stream_wrapper():
                 client_stream = await llm_service.forward_request(
