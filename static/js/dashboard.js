@@ -1,25 +1,25 @@
+// Format API Key for display (show first 8 and last 4 characters)
+function formatApiKey(apiKey) {
+    if (!apiKey || apiKey.length <= 12) {
+        return apiKey;
+    }
+    const firstPart = apiKey.substring(0, 8);
+    const lastPart = apiKey.substring(apiKey.length - 4);
+    return `${firstPart}...${lastPart}`;
+}
+
 // Load and display LLM servers and models
 async function loadConfigs() {
     try {
         // Load LLM servers
         const serversResponse = await fetch('/get-llm-servers');
         const servers = await serversResponse.json();
-        const serversTable = document.getElementById('llmServersTable');
-        serversTable.innerHTML = '';
-
-        // Check if we're on mobile
-        const isMobile = window.innerWidth <= 768;
+        const serversCards = document.getElementById('llmServersCards');
+        serversCards.innerHTML = '';
 
         for (const [url, config] of Object.entries(servers)) {
-            if (isMobile) {
-                // Mobile: Use card layout
-                const card = createServerCard(url, config);
-                serversTable.appendChild(card);
-            } else {
-                // Desktop: Use table layout
-                const row = createServerTableRow(url, config);
-                serversTable.appendChild(row);
-            }
+            const card = createServerCard(url, config);
+            serversCards.appendChild(card);
         }
 
     } catch (error) {
@@ -27,98 +27,97 @@ async function loadConfigs() {
     }
 }
 
-// Create server card for mobile view
+// Create server card for all screen sizes
 function createServerCard(url, config) {
     const card = document.createElement('div');
-    card.className = 'llm-server-card';
+    card.className = 'bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 p-4';
     
     // Count active and inactive models
     const models = config.model || {};
     const activeModels = Object.values(models).filter(m => m.status).length;
     const totalModels = Object.keys(models).length;
+    const totalRequests = Object.values(models).reduce((sum, m) => sum + (m.reqs || 0), 0);
     
     // Create models list HTML
     const modelsList = Object.entries(models).map(([modelName, modelConfig]) => {
-        const statusClass = modelConfig.status ? '' : 'inactive';
-        return `<span class="llm-server-model-tag ${statusClass}">${modelName}</span>`;
+        const statusClass = modelConfig.status ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600';
+        const statusIcon = modelConfig.status ? 'fa-check-circle' : 'fa-times-circle';
+        return `
+            <div class="flex items-center justify-between text-xs py-1 px-2 rounded ${statusClass}">
+                <span>${modelName}</span>
+                <div class="flex items-center space-x-2">
+                    <span class="text-gray-500">${modelConfig.reqs || 0} reqs</span>
+                    <i class="fas ${statusIcon} text-xs cursor-pointer" 
+                       onclick="toggleModelStatus('${encodeURIComponent(url)}','${encodeURIComponent(modelName)}',${modelConfig.status})"
+                       title="${modelConfig.status ? 'Active' : 'Inactive'}"></i>
+                </div>
+            </div>
+        `;
     }).join('');
     
     card.innerHTML = `
-        <div class="llm-server-header">
-            <div class="llm-server-url">${url}</div>
-            <div class="llm-server-actions">
-                <button onclick="showEditServerModal('${encodeURIComponent(url)}')" 
-                        class="text-indigo-600 hover:text-indigo-800" title="Edit">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button onclick="deleteServer('${encodeURIComponent(url)}')" 
-                        class="text-red-600 hover:text-red-800" title="Delete">
-                    <i class="fas fa-trash"></i>
-                </button>
+        <!-- Header -->
+        <div class="flex justify-between items-start mb-3">
+            <div class="flex-1">
+                <div class="flex items-center">
+                    <span class="font-mono text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded border break-all">${url}</span>
+                    <button onclick="copyToClipboard('${url}')"
+                        class="ml-2 text-gray-400 hover:text-indigo-600 transition-colors"
+                        title="Copy URL">
+                        <i class="fas fa-copy text-xs"></i>
+                    </button>
+                </div>
+                <div class="mt-1 text-xs text-gray-500">${config.device || 'N/A'}</div>
             </div>
         </div>
-        <div class="llm-server-info">
-            <div class="llm-server-info-item">
-                <span class="llm-server-info-label">Device</span>
-                <span class="llm-server-info-value">${config.device || 'N/A'}</span>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-2 gap-3 mb-4">
+            <div class="text-center p-2 bg-gray-50 rounded-lg">
+                <div class="text-sm font-semibold text-gray-600">Models</div>
+                <div class="text-lg font-bold text-indigo-600">${activeModels}/${totalModels}</div>
+                <div class="text-xs text-gray-500">Active</div>
             </div>
-            <div class="llm-server-info-item">
-                <span class="llm-server-info-label">API Key</span>
-                <span class="llm-server-info-value">${config.apikey ? 'Set' : 'Not Set'}</span>
-            </div>
-            <div class="llm-server-info-item">
-                <span class="llm-server-info-label">Models</span>
-                <span class="llm-server-info-value">${activeModels}/${totalModels} Active</span>
-            </div>
-            <div class="llm-server-info-item">
-                <span class="llm-server-info-label">Total Reqs</span>
-                <span class="llm-server-info-value">${Object.values(models).reduce((sum, m) => sum + (m.reqs || 0), 0)}</span>
+            <div class="text-center p-2 bg-gray-50 rounded-lg">
+                <div class="text-sm font-semibold text-gray-600">Requests</div>
+                <div class="text-lg font-bold text-indigo-600">${totalRequests}</div>
+                <div class="text-xs text-gray-500">Total</div>
             </div>
         </div>
-        <div class="llm-server-models">
-            <div class="llm-server-models-label">Available Models</div>
-            <div class="llm-server-models-list">${modelsList}</div>
+
+        <!-- API Key Status -->
+        <div class="flex items-center justify-between text-xs mb-3 p-2 bg-gray-50 rounded">
+            <span class="text-gray-600">API Key</span>
+            <div class="flex items-center">
+                <span class="font-mono text-xs bg-gray-100 px-2 py-1 rounded border" title="${config.apikey || 'Not Set'}">${config.apikey ? formatApiKey(config.apikey) : 'Not Set'}</span>
+                ${config.apikey ? `<button onclick="copyToClipboard('${config.apikey}')" class="ml-1 text-gray-400 hover:text-indigo-600 transition-colors flex-shrink-0" title="Copy API Key"><i class="fas fa-copy text-xs"></i></button>` : ''}
+            </div>
+        </div>
+
+        <!-- Models List -->
+        <div class="mb-4">
+            <div class="text-xs font-medium text-gray-600 mb-2">Available Models</div>
+            <div class="space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
+                ${modelsList}
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex justify-between items-center pt-3 border-t border-gray-100">
+            <button onclick="showEditServerModal('${encodeURIComponent(url)}')" 
+                    class="text-indigo-600 hover:text-indigo-800 transition-colors p-1 rounded hover:bg-indigo-50"
+                    title="Edit Server">
+                <i class="fas fa-edit text-xs"></i>
+            </button>
+            <button onclick="deleteServer('${encodeURIComponent(url)}')" 
+                    class="text-red-600 hover:text-red-800 transition-colors p-1 rounded hover:bg-red-50"
+                    title="Delete Server">
+                <i class="fas fa-trash text-xs"></i>
+            </button>
         </div>
     `;
     
     return card;
-}
-
-// Create server table row for desktop view
-function createServerTableRow(url, config) {
-    const models = Object.entries(config.model || {}).map(([k, v]) => {
-        const statusClass = v.status ? 'text-green-500' : 'text-red-500';
-        const statusIcon = v.status ? 'fa-check-circle' : 'fa-times-circle';
-        const statusTitle = v.status ? 'Active' : 'Inactive';
-        const statusClick = `toggleModelStatus('${encodeURIComponent(url)}','${encodeURIComponent(k)}',${v.status})`;
-        return [
-            '<div class="flex items-center justify-between py-1">',
-            '<span>' + k + '</span>',
-            '<div class="flex items-center space-x-2">',
-            '<span class="text-xs text-gray-500">' + v.reqs.toString() + ' reqs</span>',
-            '<i class="fas ' + statusIcon + ' ' + statusClass + '" title="' + statusTitle.toString() + '" onclick="' + statusClick + '"></i>',
-            '</div>',
-            '</div>'
-        ].join('');
-    }).join('');
-    
-    const row = document.createElement('tr');
-    row.className = 'hover:bg-gray-50 transition-colors';
-    row.innerHTML = '<td class="px-2 md:px-4 py-2 md:py-3 text-xs md:text-sm text-gray-700">' + url + '</td>' +
-        '<td class="px-2 md:px-4 py-2 md:py-3 text-xs md:text-sm text-gray-700">' + (config.device || 'N/A') + '</td>' +
-        '<td class="px-2 md:px-4 py-2 md:py-3 text-xs md:text-sm text-gray-700">' +
-        '<div class="flex items-center">' +
-        '<span class="font-mono text-xs bg-gray-100 px-2 py-1 rounded border break-all max-w-xs">' + (config.apikey || 'No API Key') + '</span>' +
-        (config.apikey ? '<button onclick="copyToClipboard(\'' + config.apikey + '\')" class="ml-2 text-gray-400 hover:text-indigo-600 transition-colors" title="Copy API Key"><i class="fas fa-copy text-xs"></i></button>' : '') +
-        '</div></td>' +
-        '<td class="px-2 md:px-4 py-2 md:py-3 text-xs md:text-sm text-gray-700"><div class="space-y-1">' + models + '</div></td>' +
-        '<td class="px-2 md:px-4 py-2 md:py-3 text-xs md:text-sm space-x-2">' +
-        '<button onclick="showEditServerModal(\'' + encodeURIComponent(url) + '\')" class="text-indigo-600 hover:text-indigo-800" title="Edit">' +
-        '<i class="fas fa-edit"></i></button>' +
-        '<button onclick="deleteServer(\'' + encodeURIComponent(url) + '\')" class="text-red-600 hover:text-red-800" title="Delete">' +
-        '<i class="fas fa-trash"></i></button></td>';
-    
-    return row;
 }
 
 // Server management functions
@@ -327,7 +326,7 @@ function addModelRow(frontendModel = '', backendModel = '', status = true, reqs 
 }
 
 function addNewModelRow(target = 'editServer') {
-    addModelRow('', '', true, 0, target);
+    addModelRow('', '', true, 0, 1.0, 1.0, target);
 }
 
 async function updateServer() {
@@ -664,46 +663,19 @@ async function toggleModelUsage(apiKey) {
         return;
     }
 
-    // Show loading state
-    const button = container.querySelector('button');
+    // Show loading state - find the specific toggle button
+    const button = container.closest('.api-key-card').querySelector('button[onclick*="toggleModelUsage"]');
+    if (!button) {
+        console.error('Toggle button not found for API key:', apiKey);
+        return;
+    }
+    
     const originalText = button.innerHTML;
     button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Loading...';
     button.disabled = true;
 
     try {
-        // Fetch actual model usage data from the server
-        const response = await fetch('/get-usage');
-        if (!response.ok) {
-            throw new Error('Failed to fetch usage data');
-        }
-
-        const html = await response.text();
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-
-        // Find the specific API key row in the parsed HTML
-        const apiKeyRow = doc.querySelector(`.model-usage-container[data-key="${apiKey}"]`)?.closest('tr');
-        if (!apiKeyRow) {
-            throw new Error('API key data not found');
-        }
-
-        // Extract model usage data from the row
-        const modelUsageCell = apiKeyRow.querySelector('td:nth-child(6)');
-        if (!modelUsageCell) {
-            throw new Error('Model usage cell not found');
-        }
-
-        // Check if there are models available
-        const buttonText = modelUsageCell.textContent;
-        const modelCountMatch = buttonText.match(/\((\d+) models\)/);
-        if (!modelCountMatch || parseInt(modelCountMatch[1]) === 0) {
-            console.log('No model usage data found for API key:', apiKey);
-            button.innerHTML = originalText;
-            button.disabled = false;
-            return;
-        }
-
-        // Get the actual model usage data from the page data
+        // Get model usage data from the page data
         const apiKeysDataElement = document.getElementById('apiKeysData');
         if (!apiKeysDataElement) {
             throw new Error('API keys data element not found');
@@ -724,14 +696,15 @@ async function toggleModelUsage(apiKey) {
 
     } catch (error) {
         console.error('Error loading model usage data:', error);
-        // Fallback to placeholder data
-        const placeholderModelUsage = {
-            "default-model": {
-                "requests": 15,
-                "tokens": 2500
-            }
-        };
-        const details = createModelUsageDetails(placeholderModelUsage);
+        // Show error message
+        const details = document.createElement('div');
+        details.className = 'model-usage-details mt-3 p-4 bg-red-50 rounded-lg border border-red-200';
+        details.innerHTML = `
+            <div class="text-red-700 text-sm">
+                <i class="fas fa-exclamation-triangle mr-2"></i>
+                Failed to load model usage data
+            </div>
+        `;
         container.appendChild(details);
     } finally {
         // Restore button state
@@ -742,40 +715,68 @@ async function toggleModelUsage(apiKey) {
 
 function createModelUsageDetails(modelUsage) {
     const details = document.createElement('div');
-    details.className = 'model-usage-details mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200';
+    details.className = 'model-usage-details mt-3 bg-gray-50 rounded-lg border border-gray-200';
+
+    // Create a scrollable container for the table
+    const tableContainer = document.createElement('div');
+    tableContainer.className = 'overflow-x-auto max-h-64 custom-scrollbar';
 
     const table = document.createElement('table');
-    table.className = 'w-full text-sm';
+    table.className = 'w-full text-xs min-w-full';
 
     const header = document.createElement('thead');
+    header.className = 'sticky top-0 bg-gray-100 z-10';
     header.innerHTML = `
-        <tr class="bg-gray-100">
-            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Model</th>
-            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Requests</th>
-            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tokens</th>
-            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Tokens/Req</th>
+        <tr>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider border-b">Model</th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider border-b">Requests</th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider border-b">Tokens</th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider border-b">Avg/Req</th>
         </tr>
     `;
 
     const body = document.createElement('tbody');
     body.className = 'bg-white divide-y divide-gray-200';
 
-    Object.entries(modelUsage).forEach(([model, usage]) => {
+    // Sort models by usage (highest tokens first)
+    const sortedModels = Object.entries(modelUsage).sort((a, b) => b[1].tokens - a[1].tokens);
+
+    sortedModels.forEach(([model, usage]) => {
         const row = document.createElement('tr');
         const avgTokens = usage.requests > 0 ? (usage.tokens / usage.requests).toFixed(1) : '0';
 
+        // Truncate long model names
+        const displayModel = model.length > 20 ? model.substring(0, 17) + '...' : model;
+
         row.innerHTML = `
-            <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">${model}</td>
-            <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${usage.requests}</td>
-            <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${usage.tokens.toFixed(0)}</td>
-            <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${avgTokens}</td>
+            <td class="px-2 py-1 whitespace-nowrap font-medium text-gray-900" title="${model}">${displayModel}</td>
+            <td class="px-2 py-1 whitespace-nowrap text-gray-500 text-right">${usage.requests}</td>
+            <td class="px-2 py-1 whitespace-nowrap text-gray-500 text-right">${usage.tokens.toFixed(0)}</td>
+            <td class="px-2 py-1 whitespace-nowrap text-gray-500 text-right">${avgTokens}</td>
         `;
         body.appendChild(row);
     });
 
     table.appendChild(header);
     table.appendChild(body);
-    details.appendChild(table);
+    tableContainer.appendChild(table);
+    details.appendChild(tableContainer);
+
+    // Add summary row if there are many models
+    if (sortedModels.length > 5) {
+        const totalRequests = sortedModels.reduce((sum, [_, usage]) => sum + usage.requests, 0);
+        const totalTokens = sortedModels.reduce((sum, [_, usage]) => sum + usage.tokens, 0);
+        
+        const summaryDiv = document.createElement('div');
+        summaryDiv.className = 'px-3 py-2 bg-gray-100 border-t border-gray-200 text-xs text-gray-600';
+        summaryDiv.innerHTML = `
+            <div class="flex justify-between">
+                <span>Total: ${sortedModels.length} models</span>
+                <span>${totalRequests} requests, ${totalTokens.toFixed(0)} tokens</span>
+            </div>
+        `;
+        details.appendChild(summaryDiv);
+    }
 
     return details;
 }

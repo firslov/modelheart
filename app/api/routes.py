@@ -709,3 +709,102 @@ async def proxy_handler_completions(request: Request, session: AsyncSession = De
     except Exception as e:
         await session.rollback()
         return JSONResponse({"error": "Internal server error"}, status_code=500)
+
+
+@router.options("/anthropic")
+@router.options("/anthropic/v1/messages")
+async def anthropic_options_handler():
+    """处理 /anthropic OPTIONS 请求"""
+    return Response(status_code=200)
+
+
+@router.post("/anthropic")
+@router.post("/anthropic/v1/messages")
+async def anthropic_proxy_handler(request: Request, session: AsyncSession = Depends(get_db_session)):
+    """Anthropic API转发处理 - 不记录token使用，但统计请求数量"""
+    llm_service, api_service = get_services(request)
+
+    # 身份验证 - 验证API密钥存在
+    auth_header = request.headers.get("Authorization", "")
+    _, _, api_key = auth_header.partition(" ")
+    
+    if not api_key:
+        raise HTTPException(status_code=401, detail="Invalid API Key")
+    
+    # 验证API密钥有效性
+    await api_service.validate_api_key(api_key, session)
+
+    # 请求处理
+    req_data = await request.json()
+    model = req_data.get("model")
+
+    # 获取目标服务器
+    target_server = llm_service.get_target_server(model)
+    
+    # 构建目标URL - 去掉用户路径中的/anthropic前缀
+    original_path = request.url.path
+    if original_path.startswith("/anthropic/v1/messages"):
+        target = f"{target_server}/v1/messages"
+    else:
+        target = f"{target_server}"
+
+    # 构造请求头 - 使用Anthropic格式的认证头
+    headers = {
+        "Authorization": f"Bearer {llm_service.app_state.cloud_models.get(model, api_key)}",
+        "Content-Type": "application/json",
+        "anthropic-version": "2023-06-01"  # 添加Anthropic版本头
+    }
+
+    try:
+        # 流式响应处理
+        if req_data.get("stream", False):
+            # 对于流式响应，立即释放数据库会话，避免长时间占用
+            await session.close()
+            
+            async def stream_wrapper():
+                client_stream = await llm_service.forward_request(
+                    target, req_data, headers, stream=True
+                )
+
+                async with client_stream as response:
+                    async for chunk in response.aiter_text():
+                        yield chunk
+
+            return StreamingResponse(
+                stream_wrapper(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                },
+            )
+
+        # 普通响应处理
+        response_text = await llm_service.forward_request(target, req_data, headers)
+
+        try:
+            response = json.loads(response_text)
+            
+            # 更新请求计数 - 不计算token用量，只增加reqs计数
+            await api_service.update_anthropic_usage(api_key, model, session)
+            
+            # 更新模型请求计数
+            await api_service.increment_model_reqs(target_server, model, session)
+            
+            # 提交事务
+            await session.commit()
+            
+            return JSONResponse(response)
+        except json.JSONDecodeError as e:
+            await session.rollback()
+            return JSONResponse(
+                {"error": "Invalid response from upstream server", "message": str(e)},
+                status_code=500,
+            )
+
+    except HTTPException as e:
+        await session.rollback()
+        return JSONResponse({"error": str(e.detail)}, status_code=e.status_code)
+    except Exception as e:
+        await session.rollback()
+        return JSONResponse({"error": "Internal server error"}, status_code=500)

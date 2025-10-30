@@ -471,6 +471,58 @@ class ApiService:
         
         await session.commit()
 
+    async def update_anthropic_usage(self, api_key: str, model: str, session: AsyncSession) -> None:
+        """更新Anthropic API使用情况 - 只增加请求计数，不计算token用量
+
+        Args:
+            api_key: API密钥
+            model: 模型名称
+            session: 数据库会话
+        """
+        # 获取API密钥记录
+        result = await session.execute(
+            select(ApiKey).where(ApiKey.api_key == api_key)
+        )
+        api_key_record = result.scalar_one_or_none()
+        
+        if not api_key_record:
+            return
+
+        # 更新最后使用时间
+        api_key_record.last_used = datetime.now()
+        api_key_record.last_used_str = get_current_time()
+        
+        # 只增加请求计数，不增加token用量
+        api_key_record.reqs += 1
+
+        # 更新模型使用统计 - 只增加请求计数，不增加token用量
+        if model:
+            # 查找或创建模型使用记录
+            from sqlalchemy import and_
+            result = await session.execute(
+                select(ModelUsage).where(
+                    and_(
+                        ModelUsage.api_key_id == api_key_record.id,
+                        ModelUsage.model_name == model
+                    )
+                )
+            )
+            model_usage = result.scalar_one_or_none()
+            
+            if not model_usage:
+                model_usage = ModelUsage(
+                    api_key_id=api_key_record.id,
+                    model_name=model,
+                    requests=0,
+                    tokens=0
+                )
+                session.add(model_usage)
+            
+            model_usage.requests += 1
+            # tokens保持为0，因为Anthropic路由不计算token用量
+
+        await session.commit()
+
     async def increment_model_reqs(self, server_url: str, model_name: str, session: AsyncSession) -> None:
         """增加模型请求计数
 

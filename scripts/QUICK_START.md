@@ -37,10 +37,10 @@ pgrep -f "python app/main.py"
 
 ```bash
 # 检查数据库表
-sqlite3 database.db ".tables"
+sqlite3 app/database/myapi.db ".tables"
 
 # 检查数据量
-sqlite3 database.db "
+sqlite3 app/database/myapi.db "
 SELECT 'API密钥' as 类型, COUNT(*) as 数量 FROM api_keys
 UNION ALL
 SELECT 'LLM服务器', COUNT(*) FROM llm_servers
@@ -51,8 +51,25 @@ SELECT '服务器模型', COUNT(*) FROM server_models;"
 ## 生产环境建议
 
 ```bash
-# 使用systemd服务（推荐）
-sudo cp scripts/myapi.service /etc/systemd/system/
+# 创建systemd服务文件（需要手动创建）
+sudo tee /etc/systemd/system/myapi.service > /dev/null <<EOF
+[Unit]
+Description=MyAPI LLM Service
+After=network.target
+
+[Service]
+Type=simple
+User=your_username
+WorkingDirectory=/path/to/myapi
+ExecStart=/usr/bin/python -m app.main
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# 启用并启动服务
 sudo systemctl daemon-reload
 sudo systemctl enable myapi
 sudo systemctl start myapi

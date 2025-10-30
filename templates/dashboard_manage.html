@@ -601,31 +601,18 @@
                     <i class="fas fa-server text-indigo-500 text-xl mr-3"></i>
                     <h2 class="text-lg font-semibold text-gray-800">LLM Servers</h2>
                 </div>
-                <button onclick="showAddServerModal()" class="btn-primary flex items-center">
-                    <i class="fas fa-plus mr-2"></i> Add Server
+                <button onclick="showAddServerModal()" class="btn-primary flex items-center text-xs md:text-sm py-1 px-2 md:py-2 md:px-4">
+                    <i class="fas fa-plus text-xs md:text-sm mr-1 md:mr-2"></i> Add Server
                 </button>
             </div>
             <div class="card-body">
-                <div class="overflow-x-auto custom-scrollbar">
-                    <table class="w-full">
-                        <thead>
-                            <tr class="table-header">
-                                <th class="px-4 py-3 text-left w-1/4">Server URL</th>
-                                <th class="px-4 py-3 text-left w-1/6">Device</th>
-                                <th class="px-4 py-3 text-left w-1/6">API Key</th>
-                                <th class="px-4 py-3 text-left w-1/4">Models</th>
-                                <th class="px-4 py-3 text-left w-1/6">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-200" id="llmServersTable">
-                            <!-- Will be populated by JavaScript -->
-                        </tbody>
-                    </table>
+                <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4" id="llmServersCards">
+                    <!-- Will be populated by JavaScript -->
                 </div>
             </div>
         </div>
 
-        <!-- API Keys Table -->
+        <!-- API Keys Information -->
         <div class="card fade-in scalable-card">
             <div class="card-header">
                 <div class="flex items-center">
@@ -634,96 +621,108 @@
                 </div>
             </div>
             <div class="card-body">
-                <div class="overflow-x-auto custom-scrollbar">
-                    <table class="w-full">
-                        <thead>
-                            <tr class="table-header">
-                                <th class="px-4 py-3 text-left">Key</th>
-                                <th class="px-4 py-3 text-left">Phone</th>
-                                <th class="px-4 py-3 text-left">Usage</th>
-                                <th class="px-4 py-3 text-left">Limit</th>
-                                <th class="px-4 py-3 text-left">Reqs</th>
-                                <th class="px-4 py-3 text-left">Model Usage</th>
-                                <th class="px-4 py-3 text-left">Created At</th>
-                                <th class="px-4 py-3 text-left">Last Used</th>
-                                <th class="px-4 py-3 text-left">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for api_key in api_keys %}
-                            <tr class="table-row">
-                                <td class="px-4 py-3 text-sm text-gray-800">
-                                    <div class="flex items-center">
-                                        <span
-                                            class="font-mono text-xs bg-gray-100 px-2 py-1 rounded border break-all max-w-xs">{{
-                                            api_key.key }}</span>
-                                        <button onclick="copyToClipboard('{{ api_key.key }}')"
-                                            class="ml-2 text-gray-400 hover:text-indigo-600 transition-colors"
-                                            title="Copy full key">
-                                            <i class="fas fa-copy text-xs"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                                <td class="px-4 py-3 text-sm text-gray-600">{{ api_key.phone or 'N/A' }}</td>
-                                <td class="px-4 py-3 text-sm text-gray-600">
-                                    <div class="flex flex-col">
-                                        <span class="font-medium">{{ api_key.usage }}/{{ api_key.limit }}</span>
-                                        <div class="progress-bar mt-1 w-full">
-                                            <div class="progress-bar-fill api-key-usage"
-                                                data-usage="{{ api_key.usage }}" data-limit="{{ api_key.limit }}"></div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td id="limit_{{ api_key.key }}" class="px-4 py-3 text-sm text-gray-600">{{
-                                    api_key.limit }}</td>
-                                <td class="px-4 py-3 text-sm text-gray-600">{{ api_key.reqs }}</td>
-                                <td class="px-4 py-3 text-sm text-gray-600">
-                                    {% if api_key.model_usage %}
-                                    <div class="model-usage-container" data-key="{{ api_key.key }}">
-                                        <button onclick="toggleModelUsage('{{ api_key.key }}')"
-                                            class="text-indigo-500 hover:text-indigo-700 transition-colors text-xs font-medium">
-                                            <i class="fas fa-chart-bar mr-1"></i>
-                                            View Details ({{ api_key.model_usage|length }} models)
-                                        </button>
-                                    </div>
-                                    {% else %}
-                                    <span class="text-gray-400 text-xs">No model usage</span>
-                                    {% endif %}
-                                </td>
-                                <td class="px-4 py-3 text-sm text-gray-600">{{ api_key.created_at or 'N/A' }}</td>
-                                <td class="px-4 py-3 text-sm text-gray-600">{{ api_key.last_used or 'N/A' }}</td>
-                                <td class="px-4 py-3 text-sm">
-                                    <div class="flex space-x-3">
-                                        <button data-key="{{ api_key.key }}"
-                                            onclick="resetUsage(this.getAttribute('data-key'))"
-                                            class="text-green-500 hover:text-green-700 transition-colors"
-                                            title="Reset Usage">
-                                            <i class="fas fa-redo"></i>
-                                        </button>
-                                        <button data-key="{{ api_key.key }}" data-limit="{{ api_key.limit }}"
-                                            onclick="showEditLimit(this.getAttribute('data-key'), this.getAttribute('data-limit'))"
-                                            class="text-indigo-500 hover:text-indigo-700 transition-colors"
-                                            title="Edit Limit">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        <button data-key="{{ api_key.key }}"
-                                            onclick="showChangePasswordModal(this.getAttribute('data-key'))"
-                                            class="text-blue-500 hover:text-blue-700 transition-colors"
-                                            title="Change Password">
-                                            <i class="fas fa-key"></i>
-                                        </button>
-                                        <button data-key="{{ api_key.key }}"
-                                            onclick="revokeKey(this.getAttribute('data-key'))"
-                                            class="text-red-500 hover:text-red-700 transition-colors"
-                                            title="Revoke Key">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="apiKeysCards">
+                    {% for api_key in api_keys %}
+                    <div class="api-key-card bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 p-4">
+                        <!-- Header -->
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="flex-1">
+                                <div class="flex items-center">
+                                    <span class="font-mono text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded border break-all max-w-xs">{{ api_key.key }}</span>
+                                    <button onclick="copyToClipboard('{{ api_key.key }}')"
+                                        class="ml-2 text-gray-400 hover:text-indigo-600 transition-colors"
+                                        title="Copy full key">
+                                        <i class="fas fa-copy text-xs"></i>
+                                    </button>
+                                </div>
+                                <div class="mt-1 text-xs text-gray-500">{{ api_key.phone or 'N/A' }}</div>
+                            </div>
+                        </div>
+
+                        <!-- Usage Stats -->
+                        <div class="space-y-3 mb-4">
+                            <!-- Usage Progress -->
+                            <div>
+                                <div class="flex justify-between text-xs text-gray-600 mb-1">
+                                    <span>Usage</span>
+                                    <span>{{ api_key.usage }}/{{ api_key.limit }}</span>
+                                </div>
+                                <div class="progress-bar w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div class="progress-bar-fill api-key-usage h-2 rounded-full"
+                                        data-usage="{{ api_key.usage }}" data-limit="{{ api_key.limit }}"></div>
+                                </div>
+                            </div>
+
+                            <!-- Requests -->
+                            <div class="flex justify-between text-xs">
+                                <span class="text-gray-600">Requests</span>
+                                <span class="font-medium">{{ api_key.reqs }}</span>
+                            </div>
+
+                            <!-- Model Usage -->
+                            <div class="flex justify-between text-xs">
+                                <span class="text-gray-600">Models Used</span>
+                                {% if api_key.model_usage %}
+                                <button onclick="toggleModelUsage(`{{ api_key.key }}`)"
+                                    class="text-indigo-500 hover:text-indigo-700 transition-colors font-medium">
+                                    {{ api_key.model_usage|length }} models
+                                </button>
+                                {% else %}
+                                <span class="text-gray-400">None</span>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Metadata -->
+                        <div class="text-xs text-gray-500 space-y-1 mb-4">
+                            <div class="flex justify-between">
+                                <span>Created</span>
+                                <span>{{ api_key.created_at or 'N/A' }}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Last Used</span>
+                                <span>{{ api_key.last_used or 'N/A' }}</span>
+                            </div>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="flex justify-between items-center pt-3 border-t border-gray-100">
+                            <div class="flex space-x-1">
+                                <button data-key="{{ api_key.key }}"
+                                    onclick="resetUsage(this.getAttribute('data-key'))"
+                                    class="text-green-500 hover:text-green-700 transition-colors p-1 rounded hover:bg-green-50"
+                                    title="Reset Usage">
+                                    <i class="fas fa-redo text-xs"></i>
+                                </button>
+                                <button data-key="{{ api_key.key }}" data-limit="{{ api_key.limit }}"
+                                    onclick="showEditLimit(this.getAttribute('data-key'), this.getAttribute('data-limit'))"
+                                    class="text-indigo-500 hover:text-indigo-700 transition-colors p-1 rounded hover:bg-indigo-50"
+                                    title="Edit Limit">
+                                    <i class="fas fa-edit text-xs"></i>
+                                </button>
+                            </div>
+                            <div class="flex space-x-1">
+                                <button data-key="{{ api_key.key }}"
+                                    onclick="showChangePasswordModal(this.getAttribute('data-key'))"
+                                    class="text-blue-500 hover:text-blue-700 transition-colors p-1 rounded hover:bg-blue-50"
+                                    title="Change Password">
+                                    <i class="fas fa-key text-xs"></i>
+                                </button>
+                                <button data-key="{{ api_key.key }}"
+                                    onclick="revokeKey(this.getAttribute('data-key'))"
+                                    class="text-red-500 hover:text-red-700 transition-colors p-1 rounded hover:bg-red-50"
+                                    title="Revoke Key">
+                                    <i class="fas fa-trash text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Model Usage Details -->
+                        {% if api_key.model_usage %}
+                        <div class="model-usage-container" data-key="{{ api_key.key }}"></div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
                 </div>
             </div>
         </div>

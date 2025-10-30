@@ -1,116 +1,119 @@
-# API Service
+# MyAPI - LLM API 中转服务
 
 轻量化的LLM API请求中转系统，支持多模型接入和用量管理。
 
-## 核心功能
+## 🚀 核心功能
 
-- 🚀 多LLM模型统一接入
-- 🔑 基于手机号的API密钥管理  
-- 📊 实时用量统计和限制
-- 💬 支持流式对话响应
-- 🌐 配套对话网站：[https://chat.aihao.world/](https://chat.aihao.world/)
+- **多模型支持** - 统一接入多种LLM模型，自动负载均衡
+- **API密钥管理** - 基于手机号的密钥生成和安全认证
+- **用量监控** - 实时统计、限额管理和使用分析
+- **流式响应** - 支持流式对话，提升用户体验
+- **管理面板** - 可视化仪表板，便于管理和监控
 
-## 快速开始
+## 🛠️ 快速开始
 
+### 环境要求
+- Python 3.8+
+- SQLite数据库
+
+### 安装运行
 ```bash
 # 安装依赖
 pip install -r requirements.txt
 
-# 运行服务
+# 初始化数据库
+python scripts/init_database.py
+
+# 启动服务
 python -m app.main
 ```
 
-服务将在 <http://localhost:8087> 启动
+服务启动后访问：http://localhost:8087
 
-## 性能测试
-
-`scripts/llm_benchmark.py` 提供了LLM API的性能测试工具，可以测量延迟和吞吐量。
-
-### 测试方法
-
-1. 安装额外依赖 (如果尚未安装):
-
+### 生产部署
 ```bash
-pip install httpx
+# 使用systemd服务
+sudo cp scripts/myapi.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable myapi
+sudo systemctl start myapi
 ```
 
-2. 运行基准测试:
-
-```bash
-python scripts/llm_benchmark.py \
-  --base-url http://your-api-server \
-  --api-key your-api-key \
-  --model your-model-name
-```
-
-3. 可选参数:
-
-- `--latency-requests`: 延迟测试请求数 (默认: 10)
-- `--throughput-requests`: 吞吐量测试总请求数 (默认: 100)
-- `--concurrency`: 吞吐量测试并发数 (默认: 10)
-- `--timeout`: 请求超时时间(秒) (默认: 30)
-- `--connect-timeout`: 连接超时时间(秒) (默认: 10)
-
-### 结果解读
-
-- **延迟测试**: 测量连续请求的平均/最小/最大响应时间
-- **吞吐量测试**: 测量并发请求的处理能力(请求数/秒)
-
-测试完成后会输出类似结果:
+## 📁 项目结构
 
 ```
-=== Running Latency Test ===
-Average latency: 0.4523s
-Min latency: 0.4011s  
-Max latency: 0.5214s
-
-=== Running Throughput Test ===  
-Requests per second: 23.45
-Successful requests: 98/100
-Time elapsed: 4.18s
+myapi/
+├── app/                    # 应用核心
+│   ├── api/               # API路由
+│   ├── config/            # 配置管理
+│   ├── core/              # 核心逻辑
+│   ├── database/          # 数据库操作
+│   ├── middleware/        # 中间件
+│   ├── models/            # 数据模型
+│   ├── services/          # 业务服务
+│   └── utils/             # 工具函数
+├── scripts/               # 脚本文件
+├── static/                # 静态资源
+├── templates/             # HTML模板
+└── requirements.txt       # 依赖列表
 ```
 
-## API接口
+## 🔌 API接口
 
 ### 管理接口
-
 - `GET /` - 首页，生成API密钥
 - `GET /get-usage` - 用量统计和管理面板
 - `GET /models` - 获取可用模型列表
+- `POST /generate-api-key` - 生成API密钥
 
 ### LLM接口
-
-- `POST /v1/chat/completions` - 聊天补全（兼容OpenAI格式）
+- `POST /v1/chat/completions` - 聊天补全（兼容OpenAI）
 - `POST /v1/completions` - 文本补全
 - `POST /v1/embeddings` - 文本向量化
+- `POST /anthropic/v1/messages` - Anthropic API转发
 
-## 配置说明
+## ⚙️ 配置说明
 
-### API密钥配置 (api_keys_usage.json)
-
-```json
-{
-  "api-key": {
-    "usage": 0,
-    "limit": 1000000,
-    "reqs": 0,
-    "created_at": "2024-02-04 12:00:00",
-    "phone": "139xxxxxxxx"
-  }
-}
+### 环境变量
+```bash
+export SESSION_SECRET_KEY="your-secret-key"
+export DEFAULT_LIMIT=1000000
 ```
 
-### 模型服务器配置 (llm_servers_list.json)
+### 数据库配置
+项目使用SQLite数据库，所有配置数据存储在数据库中，无需JSON文件。
 
-```json
-{
-  "server-url": {
-    "model": {
-      "model-name": {
-        "name": "actual-model-name",
-        "status": true
-      }
-    }
-  }
-}
-```
+## 📊 功能特性
+
+### 用量管理
+- 基于token的精确用量计算
+- 模型权重配置支持
+- 实时限额检查和统计
+
+### 安全认证
+- API密钥验证
+- 手机号+密码双重认证
+- 会话管理和权限控制
+
+### 多模型支持
+- 统一API接口
+- 自动负载均衡
+- 服务器健康检查
+
+## 🔧 开发说明
+
+### 添加新模型
+1. 通过管理面板添加服务器配置
+2. 配置模型映射和权重
+3. 启用模型状态
+
+### 自定义配置
+修改 `app/config/settings.py` 中的配置项。
+
+## 📖 详细文档
+
+- [快速启动指南](scripts/QUICK_START.md) - 详细的部署和运维说明
+
+## 📄 许可证
+
+MIT License
