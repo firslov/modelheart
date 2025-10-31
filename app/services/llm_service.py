@@ -26,35 +26,38 @@ class LLMService:
         self._server_counters = defaultdict(int)
 
     async def initialize(self) -> None:
-        """初始化HTTP客户端"""
+        """初始化HTTP客户端 - 针对云服务器环境优化"""
         self.http_client = httpx.AsyncClient(
             limits=httpx.Limits(
-                max_connections=1000,
-                max_keepalive_connections=100,
-                keepalive_expiry=300,
+                max_connections=500,  # 减少最大连接数，避免云服务器资源限制
+                max_keepalive_connections=50,  # 减少保持连接数
+                keepalive_expiry=180,  # 缩短保持连接时间
             ),
             timeout=httpx.Timeout(
-                connect=10.0,  # 连接超时10秒
+                connect=5.0,  # 连接超时5秒（云服务器网络更快）
                 read=300.0,  # 读取超时300秒
-                write=10.0,  # 写入超时10秒
-                pool=10.0,  # 连接池超时10秒
+                write=5.0,  # 写入超时5秒
+                pool=5.0,  # 连接池超时5秒
             ),
             transport=httpx.AsyncHTTPTransport(
-                retries=3,  # 自动重试3次
+                retries=2,  # 减少重试次数，避免延迟累积
                 http2=True,  # 启用HTTP/2
                 socket_options=[
-                    (socket.IPPROTO_TCP, socket.TCP_NODELAY, 1),
-                    (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1),
+                    (socket.IPPROTO_TCP, socket.TCP_NODELAY, 1),  # 禁用Nagle算法
+                    (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1),  # 启用TCP保活
+                    (socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 30),  # 30秒后开始保活
+                    (socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 10),  # 每10秒发送保活包
+                    (socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3),  # 最多3次保活失败
                 ],
             ),
         )
         self._connection_pool_stats = {
             "last_check": time.time(),
             "active_connections": 0,
-            "max_connections": 1000,
-            "adjustment_interval": 60,  # 每60秒检查一次
+            "max_connections": 500,
+            "adjustment_interval": 30,  # 每30秒检查一次，更频繁调整
         }
-        # logger.info("HTTP client initialized with optimized settings")
+        # logger.info("HTTP client initialized with cloud-optimized settings")
 
     async def _monitor_connection_pool(self) -> None:
         """监控并动态调整连接池 - 优化性能"""
@@ -109,13 +112,13 @@ class LLMService:
             session: 数据库会话
         """
         from sqlalchemy.orm import selectinload
-        
+
         # 从数据库加载服务器配置，使用selectinload预加载模型关系
         result = await session.execute(
             select(LLMServer).options(selectinload(LLMServer.models))
         )
         servers = result.scalars().all()
-        
+
         servers_data = {}
         for server in servers:
             # 手动构建服务器配置，避免异步延迟加载问题
@@ -123,19 +126,19 @@ class LLMService:
                 "server_url": server.server_url,
                 "model": {},
                 "apikey": server.apikey,
-                "enabled": True  # 默认启用
+                "enabled": True,  # 默认启用
             }
-            
+
             # 手动构建模型映射 - 现在key是前端使用的模型名称，value是包含后端模型名称和token权重的对象
             for model in server.models:
                 server_config["model"][model.actual_model_name] = {
                     "name": model.client_model_name,
                     "input_token_weight": model.input_token_weight or 1.0,
-                    "output_token_weight": model.output_token_weight or 1.0
+                    "output_token_weight": model.output_token_weight or 1.0,
                 }
-            
+
             servers_data[server.server_url] = server_config
-        
+
         self.init_llm_resources(servers_data)
 
     def init_llm_resources(self, servers_data: Dict) -> None:
