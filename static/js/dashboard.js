@@ -31,13 +31,13 @@ async function loadConfigs() {
 function createServerCard(url, config) {
     const card = document.createElement('div');
     card.className = 'bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 p-4';
-    
+
     // Count active and inactive models
     const models = config.model || {};
     const activeModels = Object.values(models).filter(m => m.status).length;
     const totalModels = Object.keys(models).length;
     const totalRequests = Object.values(models).reduce((sum, m) => sum + (m.reqs || 0), 0);
-    
+
     // Create models list HTML
     const modelsList = Object.entries(models).map(([modelName, modelConfig]) => {
         const statusClass = modelConfig.status ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600';
@@ -54,7 +54,7 @@ function createServerCard(url, config) {
             </div>
         `;
     }).join('');
-    
+
     card.innerHTML = `
         <!-- Header -->
         <div class="flex justify-between items-start mb-3">
@@ -116,7 +116,7 @@ function createServerCard(url, config) {
             </button>
         </div>
     `;
-    
+
     return card;
 }
 
@@ -126,7 +126,7 @@ function showAddServerModal() {
     const tableBody = document.getElementById('addServerModelsTable');
     tableBody.innerHTML = '';
     addNewModelRow('addServer');
-    
+
     document.getElementById('addServerModal').style.display = 'flex';
 }
 
@@ -152,20 +152,20 @@ async function addServer() {
     // Collect models from table
     const models = {};
     const rows = document.querySelectorAll('#addServerModelsTable tr');
-    
+
     for (const row of rows) {
         const frontendInput = row.querySelector('.model-frontend');
         const backendInput = row.querySelector('.model-backend');
         const inputWeightInput = row.querySelector('.model-input-weight');
         const outputWeightInput = row.querySelector('.model-output-weight');
         const statusSelect = row.querySelector('.model-status');
-        
+
         const frontendModel = frontendInput.value.trim();
         const backendModel = backendInput.value.trim();
         const inputWeight = parseFloat(inputWeightInput.value) || 1.0;
         const outputWeight = parseFloat(outputWeightInput.value) || 1.0;
         const status = statusSelect.value === 'true';
-        
+
         if (frontendModel && backendModel) {
             models[frontendModel] = {
                 name: backendModel,
@@ -252,7 +252,7 @@ function showEditServerModal(url) {
 
             document.getElementById('editServerDevice').value = config.device || '';
             document.getElementById('editServerApiKey').value = config.apikey || '';
-            
+
             // Populate models table instead of JSON textarea
             populateModelsTable(config.model || {});
             document.getElementById('editServerModal').style.display = 'flex';
@@ -270,12 +270,12 @@ function closeEditServerModal() {
 function populateModelsTable(models) {
     const tableBody = document.getElementById('editServerModelsTable');
     tableBody.innerHTML = '';
-    
+
     for (const [frontendModel, modelConfig] of Object.entries(models)) {
         addModelRow(
-            frontendModel, 
-            modelConfig.name, 
-            modelConfig.status, 
+            frontendModel,
+            modelConfig.name,
+            modelConfig.status,
             modelConfig.reqs || 0,
             modelConfig.input_token_weight || 1.0,
             modelConfig.output_token_weight || 1.0
@@ -287,7 +287,7 @@ function addModelRow(frontendModel = '', backendModel = '', status = true, reqs 
     const tableBody = document.getElementById(target === 'addServer' ? 'addServerModelsTable' : 'editServerModelsTable');
     const row = document.createElement('tr');
     row.className = 'border-b hover:bg-gray-50';
-    
+
     row.innerHTML = `
         <td class="px-4 py-2 border">
             <input type="text" class="w-full px-2 py-1 border rounded model-frontend" 
@@ -321,7 +321,7 @@ function addModelRow(frontendModel = '', backendModel = '', status = true, reqs 
             </div>
         </td>
     `;
-    
+
     tableBody.appendChild(row);
 }
 
@@ -343,7 +343,7 @@ async function updateServer() {
     // Collect models from table
     const models = {};
     const rows = document.querySelectorAll('#editServerModelsTable tr');
-    
+
     // Get current server data once to avoid multiple API calls
     let currentServerData = null;
     try {
@@ -353,20 +353,20 @@ async function updateServer() {
     } catch (error) {
         console.warn('Could not fetch current server data:', error);
     }
-    
+
     for (const row of rows) {
         const frontendInput = row.querySelector('.model-frontend');
         const backendInput = row.querySelector('.model-backend');
         const inputWeightInput = row.querySelector('.model-input-weight');
         const outputWeightInput = row.querySelector('.model-output-weight');
         const statusSelect = row.querySelector('.model-status');
-        
+
         const frontendModel = frontendInput.value.trim();
         const backendModel = backendInput.value.trim();
         const inputWeight = parseFloat(inputWeightInput.value) || 1.0;
         const outputWeight = parseFloat(outputWeightInput.value) || 1.0;
         const status = statusSelect.value === 'true';
-        
+
         if (frontendModel && backendModel) {
             // Get current reqs value from existing data
             let reqs = 0;
@@ -377,7 +377,7 @@ async function updateServer() {
                     reqs = existingModel.reqs || 0;
                 }
             }
-            
+
             models[frontendModel] = {
                 name: backendModel,
                 status: status,
@@ -464,7 +464,7 @@ function handleResize() {
 }
 
 // Initialize on page load
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     loadConfigs();
     // Add resize listener
     window.addEventListener('resize', handleResize);
@@ -506,41 +506,46 @@ async function updateLimit() {
             throw new Error('Failed to update limit');
         }
 
-        // Update the limit text
-        document.getElementById(`limit_${apiKey}`).textContent = newLimit;
-        
-        // Find the corresponding progress bar and update it
-        const row = document.querySelector(`[data-key="${apiKey}"]`).closest('tr');
-        if (row) {
-            const usageCell = row.querySelector('td:nth-child(3)');
-            const usageSpan = usageCell.querySelector('span');
-            const usageText = usageSpan.textContent;
-            const currentUsage = parseInt(usageText.split('/')[0]);
-            
-            // Update the usage text label
-            usageSpan.textContent = `${currentUsage}/${newLimit}`;
-            
-            // Update the progress bar data attributes
-            const progressBar = usageCell.querySelector('.api-key-usage');
-            progressBar.setAttribute('data-limit', newLimit);
-            
-            // Recalculate and update the progress bar
-            const percentage = Math.min((currentUsage / newLimit) * 100, 100);
-            
-            // Update color based on new percentage
-            progressBar.classList.remove('bg-indigo-500', 'bg-yellow-500', 'bg-red-500');
-            if (percentage >= 90) {
-                progressBar.classList.add('bg-red-500');
-            } else if (percentage >= 70) {
-                progressBar.classList.add('bg-yellow-500');
-            } else {
-                progressBar.classList.add('bg-indigo-500');
+        // Find the corresponding API key card and update the limit
+        const apiKeyCard = document.querySelector(`[data-key="${apiKey}"]`).closest('.api-key-card');
+        if (apiKeyCard) {
+            // Update the usage text in the progress bar section
+            const usageTextElement = apiKeyCard.querySelector('.flex.justify-between.text-xs.text-gray-600.mb-1 span:last-child');
+            if (usageTextElement) {
+                const currentUsage = parseInt(usageTextElement.textContent.split('/')[0]);
+                usageTextElement.textContent = `${currentUsage}/${newLimit}`;
             }
-            
-            // Update the progress bar width
-            progressBar.style.width = percentage + '%';
+
+            // Update the progress bar data attributes and recalculate
+            const progressBar = apiKeyCard.querySelector('.api-key-usage');
+            if (progressBar) {
+                const currentUsage = parseFloat(progressBar.getAttribute('data-usage')) || 0;
+                progressBar.setAttribute('data-limit', newLimit);
+
+                // Recalculate and update the progress bar
+                const percentage = Math.min((currentUsage / newLimit) * 100, 100);
+
+                // Update color based on new percentage
+                progressBar.classList.remove('bg-indigo-500', 'bg-yellow-500', 'bg-red-500');
+                if (percentage >= 90) {
+                    progressBar.classList.add('bg-red-500');
+                } else if (percentage >= 70) {
+                    progressBar.classList.add('bg-yellow-500');
+                } else {
+                    progressBar.classList.add('bg-indigo-500');
+                }
+
+                // Update the progress bar width
+                progressBar.style.width = percentage + '%';
+            }
+
+            // Update the edit button data-limit attribute
+            const editButton = apiKeyCard.querySelector('button[onclick*="showEditLimit"]');
+            if (editButton) {
+                editButton.setAttribute('data-limit', newLimit);
+            }
         }
-        
+
         closeEditModal();
     } catch (error) {
         alert('Error updating limit: ' + error.message);
@@ -669,7 +674,7 @@ async function toggleModelUsage(apiKey) {
         console.error('Toggle button not found for API key:', apiKey);
         return;
     }
-    
+
     const originalText = button.innerHTML;
     button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Loading...';
     button.disabled = true;
@@ -766,7 +771,7 @@ function createModelUsageDetails(modelUsage) {
     if (sortedModels.length > 5) {
         const totalRequests = sortedModels.reduce((sum, [_, usage]) => sum + usage.requests, 0);
         const totalTokens = sortedModels.reduce((sum, [_, usage]) => sum + usage.tokens, 0);
-        
+
         const summaryDiv = document.createElement('div');
         summaryDiv.className = 'px-3 py-2 bg-gray-100 border-t border-gray-200 text-xs text-gray-600';
         summaryDiv.innerHTML = `

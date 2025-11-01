@@ -45,9 +45,6 @@ class LLMService:
                 socket_options=[
                     (socket.IPPROTO_TCP, socket.TCP_NODELAY, 1),  # 禁用Nagle算法
                     (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1),  # 启用TCP保活
-                    (socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 30),  # 30秒后开始保活
-                    (socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 10),  # 每10秒发送保活包
-                    (socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3),  # 最多3次保活失败
                 ],
             ),
         )
