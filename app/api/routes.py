@@ -544,12 +544,12 @@ async def proxy_handler_chat(
         if req_data.get("stream", False):
             # 对于流式响应，使用异步任务处理统计更新，避免阻塞流式传输
             import asyncio
-            
+
             async def stream_wrapper():
                 start_time = time.time()
                 num_tokens = 0
                 chunk_count = 0
-                
+
                 client_stream = await llm_service.forward_request(
                     target, req_data, headers, stream=True
                 )
@@ -562,8 +562,11 @@ async def proxy_handler_chat(
                             first_chunk_delay = first_chunk_time - start_time
                             # 记录第一个chunk的延迟
                             from app.utils.helpers import logger
-                            logger.info(f"Stream first chunk delay: {first_chunk_delay:.3f}s for model {model}")
-                        
+
+                            logger.info(
+                                f"Stream first chunk delay: {first_chunk_delay:.3f}s for model {model}"
+                            )
+
                         num_tokens += chunk.count(
                             'data: {"choices":[{"delta":{"content":'
                         )
@@ -572,10 +575,11 @@ async def proxy_handler_chat(
 
                 end_time = time.time()
                 total_duration = end_time - start_time
-                
+
                 # 流式响应结束后，异步更新统计信息
                 async def update_stats_async():
                     from app.database.database import AsyncSessionLocal
+
                     async with AsyncSessionLocal() as new_session:
                         # 重新获取服务实例
                         _, new_api_service = get_services(request)
@@ -588,13 +592,16 @@ async def proxy_handler_chat(
                             target_server, model, new_session
                         )
                         await new_session.commit()
-                
+
                 # 记录流式响应性能指标
                 from app.utils.helpers import logger
-                logger.info(f"Stream performance - Model: {model}, Duration: {total_duration:.3f}s, "
-                          f"Chunks: {chunk_count}, Tokens: {num_tokens}, "
-                          f"First chunk delay: {first_chunk_delay if 'first_chunk_delay' in locals() else 'N/A':.3f}s")
-                
+
+                logger.info(
+                    f"Stream performance - Model: {model}, Duration: {total_duration:.3f}s, "
+                    f"Chunks: {chunk_count}, Tokens: {num_tokens}, "
+                    f"First chunk delay: {first_chunk_delay if 'first_chunk_delay' in locals() else 'N/A':.3f}s"
+                )
+
                 # 不等待统计更新完成，立即返回流式响应
                 asyncio.create_task(update_stats_async())
 
@@ -675,9 +682,13 @@ async def proxy_handler_embeddings(
         response_text = await llm_service.forward_request(target, req_data, headers)
         response = json.loads(response_text)
 
-        # 更新用量（embedding模型使用系数0.1）
-        if "usage" in response and "total_tokens" in response["usage"]:
-            await api_service.update_usage(api_key, req_data, model, session)
+        # 更新用量
+        if "usage" in response and "prompt_tokens" in response["usage"]:
+            # 对于embeddings接口，需要将响应中的usage信息传递给update_usage方法
+            # 因为embeddings的响应格式与chat completions不同
+            req_data_with_usage = req_data.copy()
+            req_data_with_usage["usage"] = response["usage"]
+            await api_service.update_usage(api_key, req_data_with_usage, model, session)
 
         # 更新模型请求计数
         await api_service.increment_model_reqs(target_server, model, session)
@@ -730,7 +741,7 @@ async def proxy_handler_completions(
         if req_data.get("stream", False):
             # 对于流式响应，使用异步任务处理统计更新，避免阻塞流式传输
             import asyncio
-            
+
             async def stream_wrapper():
                 client_stream = await llm_service.forward_request(
                     target, req_data, headers, stream=True
@@ -743,6 +754,7 @@ async def proxy_handler_completions(
                 # 流式响应结束后，异步更新统计信息
                 async def update_stats_async():
                     from app.database.database import AsyncSessionLocal
+
                     async with AsyncSessionLocal() as new_session:
                         # 重新获取服务实例
                         _, new_api_service = get_services(request)
@@ -755,7 +767,7 @@ async def proxy_handler_completions(
                             target_server, model, new_session
                         )
                         await new_session.commit()
-                
+
                 # 不等待统计更新完成，立即返回流式响应
                 asyncio.create_task(update_stats_async())
 
@@ -841,7 +853,7 @@ async def anthropic_proxy_handler(
         if req_data.get("stream", False):
             # 对于流式响应，使用异步任务处理统计更新，避免阻塞流式传输
             import asyncio
-            
+
             async def stream_wrapper():
                 client_stream = await llm_service.forward_request(
                     target, req_data, headers, stream=True
@@ -854,6 +866,7 @@ async def anthropic_proxy_handler(
                 # 流式响应结束后，异步更新统计信息
                 async def update_stats_async():
                     from app.database.database import AsyncSessionLocal
+
                     async with AsyncSessionLocal() as new_session:
                         # 重新获取服务实例
                         _, new_api_service = get_services(request)
@@ -866,7 +879,7 @@ async def anthropic_proxy_handler(
                             target_server, model, new_session
                         )
                         await new_session.commit()
-                
+
                 # 不等待统计更新完成，立即返回流式响应
                 asyncio.create_task(update_stats_async())
 

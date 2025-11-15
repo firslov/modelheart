@@ -160,7 +160,15 @@ class ApiService:
             # 如果请求数据中已经包含usage信息（来自上游响应）
             usage_data = request_data["usage"]
             prompt_tokens = usage_data.get("prompt_tokens", 0)
-            completion_tokens = usage_data.get("completion_tokens", 0)
+            
+            # 处理embeddings接口的特殊情况（只有prompt_tokens和total_tokens）
+            if "completion_tokens" in usage_data:
+                completion_tokens = usage_data.get("completion_tokens", 0)
+            elif "total_tokens" in usage_data:
+                # embeddings接口：total_tokens = prompt_tokens
+                completion_tokens = 0
+            else:
+                completion_tokens = 0
             
             # 应用权重计算
             weighted_tokens = (prompt_tokens * input_weight) + (completion_tokens * output_weight)
