@@ -5,32 +5,91 @@
     <link rel="icon" href="static/favicon.ico" type="image/x-icon">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>API Dashboard</title>
+    <title>管理控制台 - 模型之心</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* 现代化设计系统 - 与首页保持一致 */
+        /* 与index.html相同的高级浅色系配色方案 */
         :root {
-            --primary: #6366f1;
-            --primary-light: #818cf8;
-            --primary-dark: #4f46e5;
-            --secondary: #10b981;
-            --background: #f8fafc;
-            --card: #ffffff;
-            --text-primary: #1e293b;
-            --text-secondary: #64748b;
-            --border: #e2e8f0;
+            --bg-primary: #ffffff;
+            --bg-secondary: #fafbfc;
+            --bg-tertiary: #f7f8fa;
+            --text-primary: #1a202c;
+            --text-secondary: #4a5568;
+            --text-dim: #718096;
+            --accent-green: #10b981;
+            --accent-blue: #3b82f6;
+            --accent-red: #ef4444;
+            --accent-yellow: #f59e0b;
+            --border-color: #e5e7eb;
+            --terminal-green: #059669;
+            --bg-subtle: #f9fafb;
+            --border-subtle: #f3f4f6;
+            --text-muted: #9ca3af;
+            --accent-purple: #8b5cf6;
+            --accent-indigo: #6366f1;
+
+            /* Dashboard特有变量保持兼容 */
+            --primary: var(--accent-green);
+            --primary-light: #34d399;
+            --primary-dark: #059669;
+            --secondary: var(--accent-blue);
+            --background: var(--bg-primary);
+            --card: var(--bg-primary);
+            --border: var(--border-color);
             --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
             --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
             --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
         }
 
         body {
-            font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            font-family: 'JetBrains Mono', 'PingFang SC', 'Microsoft YaHei', '微软雅黑', 'Courier New', monospace;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-subtle) 100%);
             color: var(--text-primary);
             min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* 优雅的背景装饰 */
+        body::before {
+            content: "";
+            position: fixed;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, var(--accent-green) 0%, transparent 70%);
+            opacity: 0.03;
+            animation: rotate 30s linear infinite;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        body::after {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background:
+                radial-gradient(circle at 20% 80%, var(--accent-blue) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, var(--accent-purple) 0%, transparent 50%);
+            opacity: 0.02;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        @keyframes rotate {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         /* 动画效果 */
@@ -66,18 +125,36 @@
             animation: slideIn 0.4s ease-out;
         }
 
-        /* 现代化卡片设计 - 简化版 */
+        /* 现代化卡片设计 - 与index.html保持一致 */
         .card {
             background: var(--card);
             border-radius: 12px;
             box-shadow: var(--shadow-md);
             border: 1px solid var(--border);
-            transition: all 0.2s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: linear-gradient(to bottom, var(--accent-green), var(--accent-blue));
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .card:hover {
-            box-shadow: var(--shadow-lg);
-            transform: translateY(-2px);
+            border-color: var(--accent-green);
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(16, 185, 129, 0.15), 0 6px 12px rgba(16, 185, 129, 0.1);
+        }
+
+        .card:hover::before {
+            width: 6px;
         }
 
         .scalable-card {
@@ -89,9 +166,10 @@
         }
 
         .card-header {
-            border-bottom: 1px solid var(--border);
+            border-bottom: 1px solid var(--border-subtle);
             padding: 1.5rem 2rem;
-            background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%);
+            background: linear-gradient(90deg, var(--bg-subtle) 0%, var(--bg-secondary) 100%);
+            color: var(--text-primary);
         }
 
         .card-body {
@@ -102,67 +180,154 @@
         .progress-bar {
             height: 8px;
             border-radius: 4px;
-            background-color: var(--border);
+            background-color: var(--border-color);
             overflow: hidden;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
         }
 
         .progress-bar-fill {
             height: 100%;
-            background: linear-gradient(90deg, var(--primary), var(--secondary));
-            transition: width 0.5s ease;
+            background: linear-gradient(90deg, var(--accent-green), var(--accent-blue));
+            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
             border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(90deg,
+                    transparent,
+                    rgba(255, 255, 255, 0.3),
+                    transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% {
+                transform: translateX(-100%);
+            }
+
+            100% {
+                transform: translateX(100%);
+            }
         }
 
         /* 现代化表格 */
         .table-header {
-            background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%);
+            background: linear-gradient(90deg, var(--bg-subtle) 0%, var(--bg-secondary) 100%);
             color: var(--text-primary);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             font-size: 0.75rem;
-            border-bottom: 2px solid var(--border);
+            border-bottom: 2px solid var(--border-color);
         }
 
         .table-row {
-            border-bottom: 1px solid var(--border);
-            transition: all 0.2s ease;
+            border-bottom: 1px solid var(--border-color);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .table-row::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 3px;
+            height: 100%;
+            background: var(--accent-blue);
+            transform: scaleY(0);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .table-row:hover {
-            background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%);
+            background: linear-gradient(90deg, var(--bg-subtle) 0%, var(--bg-secondary) 100%);
             transform: translateX(4px);
+        }
+
+        .table-row:hover::before {
+            transform: scaleY(1);
         }
 
         /* 现代化按钮 */
         .btn-primary {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            background: linear-gradient(135deg, var(--accent-green) 0%, var(--terminal-green) 100%);
             color: white;
-            border-radius: 12px;
-            padding: 0.75rem 1.5rem;
-            font-weight: 600;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             border: none;
+            padding: 0.75rem 1.5rem;
+            font-family: inherit;
+            font-size: 0.95rem;
+            font-weight: 600;
             cursor: pointer;
-            box-shadow: var(--shadow-md);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3), 0 2px 6px rgba(16, 185, 129, 0.2);
+            line-height: 1.5;
+            letter-spacing: 0.025em;
+        }
+
+        .btn-primary::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .btn-primary:hover::before {
+            left: 100%;
         }
 
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: var(--shadow-lg);
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4), 0 4px 10px rgba(16, 185, 129, 0.3);
+            color: white;
         }
 
         /* 现代化模态框 */
         .modal {
-            background: rgba(0, 0, 0, 0.6);
+            background: rgba(0, 0, 0, 0.5);
             backdrop-filter: blur(8px);
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 1rem;
+        }
+
+        .modal.hidden {
+            display: none;
         }
 
         .modal-content {
             background: var(--card);
-            border-radius: 20px;
-            box-shadow: var(--shadow-xl);
-            border: 1px solid var(--border);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            max-width: 90vw;
+            max-height: 85vh;
+            width: 100%;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15), 0 12px 24px rgba(0, 0, 0, 0.1);
         }
 
         /* 现代化滚动条 */
@@ -228,7 +393,7 @@
             }
 
             /* 使用分布卡片优化 */
-            .grid-cols-1.md\\:grid-cols-3 > div {
+            .grid-cols-1.md\\:grid-cols-3>div {
                 margin-bottom: 0.5rem;
             }
 
@@ -483,11 +648,12 @@
         <!-- Navigation -->
         <div class="flex flex-col md:flex-row justify-between items-center mb-6 md:mb-8 gap-4">
             <div class="flex items-center">
-                <div class="bg-indigo-100 p-2 rounded-lg mr-3">
-                    <i class="fas fa-chart-line text-indigo-600 text-xl"></i>
+                <div class="bg-green-100 p-3 rounded-lg mr-3">
+                    <i class="fas fa-chart-line text-green-600 text-xl"></i>
                 </div>
-                <h1 class="text-2xl md:text-3xl font-bold text-gray-800">
-                    API <span class="text-indigo-600">Dashboard</span>
+                <h1 class="text-2xl md:text-3xl font-bold"
+                    style="background: linear-gradient(135deg, var(--accent-green), var(--accent-blue)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));">
+                    管理<span class="text-green-600">控制台</span>
                 </h1>
             </div>
 
@@ -515,25 +681,12 @@
                 <div class="card-body">
                     <div class="flex justify-between items-center">
                         <div>
-                            <p class="text-sm font-medium text-gray-500">Total Keys</p>
-                            <h3 class="text-2xl font-bold text-gray-800 mt-1">{{ total_entries }}</h3>
+                            <p class="text-sm font-medium" style="color: var(--text-secondary);">密钥总数</p>
+                            <h3 class="text-2xl font-bold mt-1" style="color: var(--text-primary);">{{ total_entries }}
+                            </h3>
                         </div>
-                        <div class="bg-indigo-100 p-3 rounded-full">
-                            <i class="fas fa-key text-indigo-600 text-xl"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-body">
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <p class="text-sm font-medium text-gray-500">Total Requests</p>
-                            <h3 class="text-2xl font-bold text-gray-800 mt-1">{{ total_reqs }}</h3>
-                        </div>
-                        <div class="bg-indigo-100 p-3 rounded-full">
-                            <i class="fas fa-exchange-alt text-indigo-600 text-xl"></i>
+                        <div class="bg-green-100 p-3 rounded-full">
+                            <i class="fas fa-key text-green-600 text-xl"></i>
                         </div>
                     </div>
                 </div>
@@ -543,11 +696,27 @@
                 <div class="card-body">
                     <div class="flex justify-between items-center">
                         <div>
-                            <p class="text-sm font-medium text-gray-500">Total Usage</p>
-                            <h3 class="text-2xl font-bold text-gray-800 mt-1">{{ total_usage|int }}</h3>
+                            <p class="text-sm font-medium" style="color: var(--text-secondary);">请求总数</p>
+                            <h3 class="text-2xl font-bold mt-1" style="color: var(--text-primary);">{{ total_reqs }}
+                            </h3>
                         </div>
-                        <div class="bg-indigo-100 p-3 rounded-full">
-                            <i class="fas fa-chart-bar text-indigo-600 text-xl"></i>
+                        <div class="bg-blue-100 p-3 rounded-full">
+                            <i class="fas fa-exchange-alt text-blue-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p class="text-sm font-medium" style="color: var(--text-secondary);">使用总量</p>
+                            <h3 class="text-2xl font-bold mt-1" style="color: var(--text-primary);">{{ total_usage|int
+                                }}</h3>
+                        </div>
+                        <div class="bg-purple-100 p-3 rounded-full">
+                            <i class="fas fa-chart-bar text-purple-600 text-xl"></i>
                         </div>
                     </div>
                 </div>
@@ -558,36 +727,36 @@
         <div class="card fade-in mb-6 scalable-card">
             <div class="card-header">
                 <div class="flex items-center">
-                    <i class="fas fa-chart-pie text-indigo-500 text-xl mr-3"></i>
-                    <h2 class="text-lg font-semibold text-gray-800">Usage Distribution</h2>
+                    <i class="fas fa-chart-pie text-green-500 text-xl mr-3"></i>
+                    <h2 class="text-lg font-semibold" style="color: var(--text-primary);">使用分布</h2>
                 </div>
             </div>
             <div class="card-body grid grid-cols-1 md:grid-cols-3 gap-4">
                 <!-- Usage Distribution - Data Attributes -->
                 <div class="flex flex-col items-center p-4 border border-gray-200 rounded-lg usage-distribution"
                     data-value="{{ less_than_100 }}" data-total="{{ total_entries }}">
-                    <div class="text-3xl font-bold text-indigo-600 mb-2">{{ less_than_100 }}</div>
-                    <div class="text-sm font-medium text-gray-500">Under 100</div>
+                    <div class="text-3xl font-bold text-green-600 mb-2">{{ less_than_100 }}</div>
+                    <div class="text-sm font-medium" style="color: var(--text-secondary);">少于100</div>
                     <div class="mt-2 w-full bg-gray-200 rounded-full h-2.5">
-                        <div class="progress-bar-fill bg-indigo-400 h-2.5 rounded-full"></div>
+                        <div class="progress-bar-fill bg-green-400 h-2.5 rounded-full"></div>
                     </div>
                 </div>
 
                 <div class="flex flex-col items-center p-4 border border-gray-200 rounded-lg usage-distribution"
                     data-value="{{ between_100_and_10000 }}" data-total="{{ total_entries }}">
-                    <div class="text-3xl font-bold text-indigo-600 mb-2">{{ between_100_and_10000 }}</div>
-                    <div class="text-sm font-medium text-gray-500">100 to 10,000</div>
+                    <div class="text-3xl font-bold text-blue-600 mb-2">{{ between_100_and_10000 }}</div>
+                    <div class="text-sm font-medium" style="color: var(--text-secondary);">100至10,000</div>
                     <div class="mt-2 w-full bg-gray-200 rounded-full h-2.5">
-                        <div class="progress-bar-fill bg-indigo-500 h-2.5 rounded-full"></div>
+                        <div class="progress-bar-fill bg-blue-500 h-2.5 rounded-full"></div>
                     </div>
                 </div>
 
                 <div class="flex flex-col items-center p-4 border border-gray-200 rounded-lg usage-distribution"
                     data-value="{{ more_than_10000 }}" data-total="{{ total_entries }}">
-                    <div class="text-3xl font-bold text-indigo-600 mb-2">{{ more_than_10000 }}</div>
-                    <div class="text-sm font-medium text-gray-500">Over 10,000</div>
+                    <div class="text-3xl font-bold text-purple-600 mb-2">{{ more_than_10000 }}</div>
+                    <div class="text-sm font-medium" style="color: var(--text-secondary);">超过10,000</div>
                     <div class="mt-2 w-full bg-gray-200 rounded-full h-2.5">
-                        <div class="progress-bar-fill bg-indigo-600 h-2.5 rounded-full"></div>
+                        <div class="progress-bar-fill bg-purple-600 h-2.5 rounded-full"></div>
                     </div>
                 </div>
             </div>
@@ -598,11 +767,12 @@
         <div class="card fade-in mb-6">
             <div class="card-header flex justify-between items-center">
                 <div class="flex items-center">
-                    <i class="fas fa-server text-indigo-500 text-xl mr-3"></i>
-                    <h2 class="text-lg font-semibold text-gray-800">LLM Servers</h2>
+                    <i class="fas fa-server text-blue-500 text-xl mr-3"></i>
+                    <h2 class="text-lg font-semibold" style="color: var(--text-primary);">LLM 服务器</h2>
                 </div>
-                <button onclick="showAddServerModal()" class="btn-primary flex items-center text-xs md:text-sm py-1 px-2 md:py-2 md:px-4">
-                    <i class="fas fa-plus text-xs md:text-sm mr-1 md:mr-2"></i> Add Server
+                <button onclick="showAddServerModal()"
+                    class="btn-primary flex items-center text-xs md:text-sm py-1 px-2 md:py-2 md:px-4">
+                    <i class="fas fa-plus text-xs md:text-sm mr-1 md:mr-2"></i> 添加服务器
                 </button>
             </div>
             <div class="card-body">
@@ -616,19 +786,22 @@
         <div class="card fade-in scalable-card">
             <div class="card-header">
                 <div class="flex items-center">
-                    <i class="fas fa-key text-indigo-500 text-xl mr-3"></i>
-                    <h2 class="text-lg font-semibold text-gray-800">API Keys Information</h2>
+                    <i class="fas fa-key text-green-500 text-xl mr-3"></i>
+                    <h2 class="text-lg font-semibold" style="color: var(--text-primary);">API 密钥信息</h2>
                 </div>
             </div>
             <div class="card-body">
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="apiKeysCards">
                     {% for api_key in api_keys %}
-                    <div class="api-key-card bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 p-4">
+                    <div
+                        class="api-key-card bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 p-4">
                         <!-- Header -->
                         <div class="flex justify-between items-start mb-3">
                             <div class="flex-1">
                                 <div class="flex items-center">
-                                    <span class="font-mono text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded border break-all max-w-xs">{{ api_key.key }}</span>
+                                    <span
+                                        class="font-mono text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded border break-all max-w-xs">{{
+                                        api_key.key }}</span>
                                     <button onclick="copyToClipboard('{{ api_key.key }}')"
                                         class="ml-2 text-gray-400 hover:text-indigo-600 transition-colors"
                                         title="Copy full key">
@@ -688,8 +861,7 @@
                         <!-- Actions -->
                         <div class="flex justify-between items-center pt-3 border-t border-gray-100">
                             <div class="flex space-x-1">
-                                <button data-key="{{ api_key.key }}"
-                                    onclick="resetUsage(this.getAttribute('data-key'))"
+                                <button data-key="{{ api_key.key }}" onclick="resetUsage(this.getAttribute('data-key'))"
                                     class="text-green-500 hover:text-green-700 transition-colors p-1 rounded hover:bg-green-50"
                                     title="Reset Usage">
                                     <i class="fas fa-redo text-xs"></i>
@@ -708,8 +880,7 @@
                                     title="Change Password">
                                     <i class="fas fa-key text-xs"></i>
                                 </button>
-                                <button data-key="{{ api_key.key }}"
-                                    onclick="revokeKey(this.getAttribute('data-key'))"
+                                <button data-key="{{ api_key.key }}" onclick="revokeKey(this.getAttribute('data-key'))"
                                     class="text-red-500 hover:text-red-700 transition-colors p-1 rounded hover:bg-red-50"
                                     title="Revoke Key">
                                     <i class="fas fa-trash text-xs"></i>
@@ -729,50 +900,59 @@
     </div>
 
     <!-- Add Server Modal -->
-    <div id="addServerModal" class="fixed inset-0 z-50 modal hidden items-center justify-center p-4">
+    <div id="addServerModal" class="modal hidden items-center justify-center p-4">
         <div class="modal-content w-full max-w-4xl">
             <div class="p-6">
-                <h3 class="text-lg font-semibold text-gray-800 mb-4">Add LLM Server</h3>
+                <h3 class="text-lg font-semibold mb-4" style="color: var(--text-primary);">添加LLM服务器</h3>
                 <div class="space-y-4">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-600 mb-2">Server URL</label>
+                            <label class="block text-sm font-medium mb-2"
+                                style="color: var(--text-secondary);">服务器URL</label>
                             <input type="text" id="serverUrl"
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent font-mono"
                                 placeholder="https://api.example.com">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-600 mb-2">Device Info</label>
+                            <label class="block text-sm font-medium mb-2"
+                                style="color: var(--text-secondary);">设备信息</label>
                             <input type="text" id="serverDevice"
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                placeholder="GPU/CPU info">
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent font-mono"
+                                placeholder="GPU/CPU 信息">
                         </div>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-600 mb-2">API Key (optional)</label>
+                        <label class="block text-sm font-medium mb-2"
+                            style="color: var(--text-secondary);">API密钥（可选）</label>
                         <input type="text" id="serverApiKey"
-                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                            placeholder="Optional API key">
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent font-mono"
+                            placeholder="可选的API密钥">
                     </div>
-                    
+
                     <!-- Models Table -->
                     <div>
                         <div class="flex justify-between items-center mb-4">
-                            <label class="block text-sm font-medium text-gray-600">Models Configuration</label>
+                            <label class="block text-sm font-medium" style="color: var(--text-secondary);">模型配置</label>
                             <button onclick="addNewModelRow('addServer')" class="btn-primary text-sm py-1 px-3">
-                                <i class="fas fa-plus mr-1"></i> Add Model
+                                <i class="fas fa-plus mr-1"></i> 添加模型
                             </button>
                         </div>
                         <div class="overflow-x-auto custom-scrollbar">
                             <table class="w-full border-collapse">
                                 <thead>
                                     <tr class="bg-gray-50">
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border">Frontend Model Name</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border">Backend Model Name</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border">Input Token Weight</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border">Output Token Weight</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border">Status</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border">Actions</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider border"
+                                            style="color: var(--text-secondary);">前端模型名称</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider border"
+                                            style="color: var(--text-secondary);">后端模型名称</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider border"
+                                            style="color: var(--text-secondary);">输入Token权重</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider border"
+                                            style="color: var(--text-secondary);">输出Token权重</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider border"
+                                            style="color: var(--text-secondary);">状态</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider border"
+                                            style="color: var(--text-secondary);">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody id="addServerModelsTable" class="bg-white divide-y divide-gray-200">
@@ -783,54 +963,62 @@
                     </div>
                 </div>
                 <div class="flex justify-end space-x-3 mt-6">
-                    <button onclick="closeAddServerModal()"
-                        class="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium">Cancel</button>
-                    <button onclick="addServer()" class="btn-primary">Add Server</button>
+                    <button onclick="closeAddServerModal()" class="px-4 py-2 hover:text-gray-800 font-medium"
+                        style="color: var(--text-secondary);">取消</button>
+                    <button onclick="addServer()" class="btn-primary">添加服务器</button>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Edit Server Modal -->
-    <div id="editServerModal" class="fixed inset-0 z-50 modal hidden items-center justify-center p-4">
+    <div id="editServerModal" class="modal hidden items-center justify-center p-4">
         <div class="modal-content w-full max-w-4xl">
             <div class="p-6">
-                <h3 class="text-lg font-semibold text-gray-800 mb-4">Edit LLM Server</h3>
+                <h3 class="text-lg font-semibold mb-4" style="color: var(--text-primary);">编辑LLM服务器</h3>
                 <div class="space-y-4">
                     <input type="hidden" id="editServerUrl">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-600 mb-2">Device Info</label>
+                            <label class="block text-sm font-medium mb-2"
+                                style="color: var(--text-secondary);">设备信息</label>
                             <input type="text" id="editServerDevice"
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                placeholder="GPU/CPU info">
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent font-mono"
+                                placeholder="GPU/CPU 信息">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-600 mb-2">API Key (optional)</label>
+                            <label class="block text-sm font-medium mb-2"
+                                style="color: var(--text-secondary);">API密钥（可选）</label>
                             <input type="text" id="editServerApiKey"
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                placeholder="Optional API key">
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent font-mono"
+                                placeholder="可选的API密钥">
                         </div>
                     </div>
-                    
+
                     <!-- Models Table -->
                     <div>
                         <div class="flex justify-between items-center mb-4">
-                            <label class="block text-sm font-medium text-gray-600">Models Configuration</label>
+                            <label class="block text-sm font-medium" style="color: var(--text-secondary);">模型配置</label>
                             <button onclick="addNewModelRow()" class="btn-primary text-sm py-1 px-3">
-                                <i class="fas fa-plus mr-1"></i> Add Model
+                                <i class="fas fa-plus mr-1"></i> 添加模型
                             </button>
                         </div>
                         <div class="overflow-x-auto custom-scrollbar">
                             <table class="w-full border-collapse">
                                 <thead>
                                     <tr class="bg-gray-50">
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border">Frontend Model Name</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border">Backend Model Name</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border">Input Token Weight</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border">Output Token Weight</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border">Status</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border">Actions</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider border"
+                                            style="color: var(--text-secondary);">前端模型名称</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider border"
+                                            style="color: var(--text-secondary);">后端模型名称</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider border"
+                                            style="color: var(--text-secondary);">输入Token权重</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider border"
+                                            style="color: var(--text-secondary);">输出Token权重</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider border"
+                                            style="color: var(--text-secondary);">状态</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider border"
+                                            style="color: var(--text-secondary);">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody id="editServerModelsTable" class="bg-white divide-y divide-gray-200">
@@ -841,44 +1029,46 @@
                     </div>
                 </div>
                 <div class="flex justify-end space-x-3 mt-6">
-                    <button onclick="closeEditServerModal()"
-                        class="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium">Cancel</button>
-                    <button onclick="updateServer()" class="btn-primary">Save Changes</button>
+                    <button onclick="closeEditServerModal()" class="px-4 py-2 hover:text-gray-800 font-medium"
+                        style="color: var(--text-secondary);">取消</button>
+                    <button onclick="updateServer()" class="btn-primary">保存更改</button>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Add Model Modal -->
-    <div id="addModelModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center p-4">
-        <div class="bg-white rounded-lg p-6 w-full max-w-sm mx-auto">
-            <h3 class="text-lg font-semibold mb-4">Add Serve Model</h3>
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Model Name</label>
-                <input type="text" id="modelName" class="w-full px-3 py-2 border rounded" placeholder="model-name">
-            </div>
-            <div class="flex justify-end space-x-2">
-                <button onclick="closeAddModelModal()"
-                    class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
-                <button onclick="addModel()"
-                    class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Add</button>
+    <div id="addModelModal" class="modal hidden items-center justify-center p-4">
+        <div class="modal-content w-full max-w-sm">
+            <div class="p-6">
+                <h3 class="text-lg font-semibold mb-4" style="color: var(--text-primary);">添加服务模型</h3>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-1" style="color: var(--text-secondary);">模型名称</label>
+                    <input type="text" id="modelName" class="w-full px-3 py-2 border rounded font-mono"
+                        placeholder="模型名称">
+                </div>
+                <div class="flex justify-end space-x-2">
+                    <button onclick="closeAddModelModal()" class="px-4 py-2 hover:text-gray-800"
+                        style="color: var(--text-secondary);">取消</button>
+                    <button onclick="addModel()" class="btn-primary">添加</button>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Edit Limit Modal -->
-    <div id="editLimitModal" class="fixed inset-0 z-50 modal hidden items-center justify-center p-4">
+    <div id="editLimitModal" class="modal hidden items-center justify-center p-4">
         <div class="modal-content w-full max-w-sm">
             <div class="p-6">
-                <h3 class="text-lg font-semibold text-gray-800 mb-4">Edit Token Limit</h3>
+                <h3 class="text-lg font-semibold mb-4" style="color: var(--text-primary);">编辑Token限制</h3>
                 <input type="number" id="newLimit"
-                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent mb-4"
-                    placeholder="Enter new limit">
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent mb-4 font-mono"
+                    placeholder="输入新的限制">
                 <input type="hidden" id="currentApiKey">
                 <div class="flex justify-end space-x-3">
-                    <button onclick="closeEditModal()"
-                        class="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium">Cancel</button>
-                    <button onclick="updateLimit()" class="btn-primary">Save Limit</button>
+                    <button onclick="closeEditModal()" class="px-4 py-2 hover:text-gray-800 font-medium"
+                        style="color: var(--text-secondary);">取消</button>
+                    <button onclick="updateLimit()" class="btn-primary">保存限制</button>
                 </div>
             </div>
         </div>
@@ -888,18 +1078,18 @@
     <div id="changePasswordModal" class="fixed inset-0 z-50 modal hidden items-center justify-center p-4">
         <div class="modal-content w-full max-w-sm">
             <div class="p-6">
-                <h3 class="text-lg font-semibold text-gray-800 mb-4">修改用户密码</h3>
+                <h3 class="text-lg font-semibold mb-4" style="color: var(--text-primary);">修改用户密码</h3>
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-600 mb-2">新密码</label>
+                    <label class="block text-sm font-medium mb-2" style="color: var(--text-secondary);">新密码</label>
                     <input type="password" id="newPassword"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent font-mono"
                         placeholder="请输入新密码（至少6位）">
-                    <p class="text-xs text-gray-500 mt-1">密码长度6-72个字符</p>
+                    <p class="text-xs mt-1" style="color: var(--text-muted);">密码长度6-72个字符</p>
                 </div>
                 <input type="hidden" id="currentApiKeyForPassword">
                 <div class="flex justify-end space-x-3">
-                    <button onclick="closeChangePasswordModal()"
-                        class="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium">取消</button>
+                    <button onclick="closeChangePasswordModal()" class="px-4 py-2 hover:text-gray-800 font-medium"
+                        style="color: var(--text-secondary);">取消</button>
                     <button onclick="changePassword()" class="btn-primary">修改密码</button>
                 </div>
             </div>
@@ -943,22 +1133,22 @@
         // Initialize usage progress bars with animation
         function initializeUsageProgressBars() {
             const progressBars = document.querySelectorAll('.api-key-usage');
-            
+
             progressBars.forEach(bar => {
                 const usage = parseFloat(bar.getAttribute('data-usage')) || 0;
                 const limit = parseFloat(bar.getAttribute('data-limit')) || 1;
-                
+
                 // Calculate percentage (cap at 100%)
                 let percentage = (usage / limit) * 100;
                 percentage = Math.min(percentage, 100);
-                
+
                 // Set initial width to 0 for animation
                 bar.style.width = '0%';
-                
+
                 // Animate to actual percentage after a short delay
                 setTimeout(() => {
                     bar.style.width = percentage + '%';
-                    
+
                     // Add color classes based on usage level
                     if (percentage >= 90) {
                         bar.classList.add('bg-red-500');
@@ -975,18 +1165,18 @@
 
             // Initialize usage distribution progress bars
             const distributionBars = document.querySelectorAll('.usage-distribution');
-            
+
             distributionBars.forEach(container => {
                 const value = parseInt(container.getAttribute('data-value')) || 0;
                 const total = parseInt(container.getAttribute('data-total')) || 1;
                 const progressBar = container.querySelector('.progress-bar-fill');
-                
+
                 if (progressBar) {
                     const percentage = (value / total) * 100;
-                    
+
                     // Set initial width to 0 for animation
                     progressBar.style.width = '0%';
-                    
+
                     // Animate to actual percentage
                     setTimeout(() => {
                         progressBar.style.width = percentage + '%';

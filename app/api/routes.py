@@ -201,7 +201,7 @@ async def login(request: Request):
         accept = request.headers.get("accept", "")
         if "application/json" in accept:
             return {"status": "success"}
-        return RedirectResponse(url="/get-usage", status_code=303)
+        return RedirectResponse(url="/dashboard", status_code=303)
 
     raise HTTPException(status_code=401, detail="Invalid credentials")
 
@@ -450,7 +450,7 @@ async def change_user_password(
         raise HTTPException(status_code=500, detail=f"修改密码失败: {str(e)}")
 
 
-@router.get("/get-usage", response_class=HTMLResponse)
+@router.get("/dashboard", response_class=HTMLResponse)
 @admin_required
 async def usage_dashboard(
     request: Request, session: AsyncSession = Depends(get_db_session)

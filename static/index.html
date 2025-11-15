@@ -6,14 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Model Heart</title>
     <link rel="icon" href="static/favicon.ico" type="image/x-icon">
-    <link href="https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.loli.net/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
     <script>
         async function generateApiKey() {
             const phone = document.getElementById('phone_input').value;
             const password = document.getElementById('password_input').value;
-            
+
             if (!phone || !password) {
                 showMessage('请输入手机号和密码', true);
                 return;
@@ -26,7 +25,7 @@
                 showMessage('密码长度至少6位', true);
                 return;
             }
-            
+
             try {
                 const response = await fetch('/generate-api-key', {
                     method: 'POST',
@@ -35,12 +34,12 @@
                     },
                     body: JSON.stringify({ phone, password }),
                 });
-                
+
                 if (!response.ok) {
                     const errorData = await response.json();
                     throw new Error(errorData.detail || `Server response error: ${response.status}`);
                 }
-                
+
                 const data = await response.json();
                 if (data.error) {
                     showMessage(data.error, true);
@@ -58,7 +57,7 @@
         async function checkUsage() {
             const phone = document.getElementById('phone_input').value;
             const password = document.getElementById('password_input').value;
-            
+
             if (!phone || !password) {
                 showMessage('请输入手机号和密码', true);
                 return;
@@ -67,7 +66,7 @@
                 showMessage('请输入有效的手机号', true);
                 return;
             }
-            
+
             try {
                 const response = await fetch('/check-usage', {
                     method: 'POST',
@@ -76,12 +75,12 @@
                     },
                     body: JSON.stringify({ phone, password }),
                 });
-                
+
                 if (!response.ok) {
                     const errorData = await response.json();
                     throw new Error(errorData.detail || `Server response error: ${response.status}`);
                 }
-                
+
                 const data = await response.json();
                 if (data.error) {
                     showMessage(data.error, true);
@@ -90,50 +89,28 @@
                     const usage = data.usage;
                     const limit = data.limit;
                     const remaining = data.remaining;
-                    
-                    // 在查询结果区域显示完整的API密钥和额度信息
+
                     document.getElementById('usage_result').innerHTML = `
-                        <div class="flex items-center justify-between">
-                            <div class="flex-1">
-                                <h4 class="font-semibold text-blue-800 mb-3">API密钥和额度信息</h4>
-                                <div class="grid grid-cols-2 gap-3 text-sm">
-                                    <div class="text-gray-600">API密钥:</div>
-                                    <div class="font-medium text-gray-800 truncate" title="${apiKey}">${apiKey}</div>
-                                    <div class="text-gray-600">已使用:</div>
-                                    <div class="font-medium text-gray-800">${usage.toLocaleString()} credits</div>
-                                    <div class="text-gray-600">限额:</div>
-                                    <div class="font-medium text-gray-800">${limit.toLocaleString()} credits</div>
-                                    <div class="text-gray-600">剩余:</div>
-                                    <div class="font-medium text-green-600">${remaining.toLocaleString()} credits</div>
-                                </div>
-                            </div>
-                            <div class="flex flex-col space-y-2 ml-4">
-                                <button onclick="copyToClipboardText('${apiKey}')" class="btn-icon" title="复制API密钥">
-                                    <i class="fas fa-copy text-white"></i>
-                                </button>
-                                <button onclick="hideUsageResult()" class="text-blue-500 hover:text-blue-700">
-                                    <i class="fas fa-times"></i>
-                                </button>
-                            </div>
+                        <div class="terminal-output">
+                            <div class="line">> AUTH_SUCCESS: ${phone}</div>
+                            <div class="line">> API_KEY: ${apiKey}</div>
+                            <div class="line">> USAGE: ${usage.toLocaleString()} / ${limit.toLocaleString()} credits</div>
+                            <div class="line success">> REMAINING: ${remaining.toLocaleString()} credits</div>
                         </div>
                     `;
-                    
-                    // 显示查询结果区域
+
                     document.getElementById('usage_result').classList.remove('hidden');
-                    
-                    // 显示成功消息
-                    showMessage('查询成功！API密钥和额度信息已显示在下方');
+                    showMessage('ACCESS GRANTED');
                 }
             } catch (error) {
                 console.error('Checking usage failed:', error);
-                showMessage('查询额度失败: ' + error.message, true);
+                showMessage('ACCESS DENIED: ' + error.message, true);
             }
         }
 
         function hideUsageResult() {
             document.getElementById('usage_result').classList.add('hidden');
         }
-
 
         function copyToClipboard(elementId) {
             var text = document.getElementById(elementId).innerText;
@@ -145,7 +122,7 @@
             dummy.select();
             document.execCommand("copy");
             document.body.removeChild(dummy);
-            showMessage("Copied to clipboard!");
+            showMessage("DATA COPIED");
         }
 
         function copyToClipboardText(text) {
@@ -157,24 +134,17 @@
             dummy.select();
             document.execCommand("copy");
             document.body.removeChild(dummy);
-            showMessage("API密钥已复制到剪贴板!");
+            showMessage("KEY_COPIED");
         }
 
         function showMessage(message, isError) {
             const messageArea = document.getElementById('message_area');
-            messageArea.textContent = message;
-            
-            if (isError) {
-                messageArea.className = 'bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-md mb-4 fade-in';
-            } else {
-                messageArea.className = 'bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded-lg shadow-md mb-4 fade-in';
-            }
-            
+            const prefix = isError ? '[ERROR]' : '[SUCCESS]';
+            messageArea.textContent = `${prefix} ${message}`;
+
+            messageArea.className = isError ? 'message error' : 'message success';
             messageArea.style.display = 'block';
-            
-            // 滚动到消息区域
-            messageArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            
+
             setTimeout(() => {
                 messageArea.style.display = 'none';
             }, 5000);
@@ -182,74 +152,98 @@
 
         async function loadModels() {
             try {
+                const modelListContainer = document.querySelector('.model-list-container');
+                const modelList = document.getElementById('model_list');
+                const modelCount = document.querySelector('.model-count');
+
+                // 显示加载状态
+                modelList.innerHTML = '<div class="model-loading">加载模型列表...</div>';
+                modelListContainer.classList.add('expanded');
+                modelCount.textContent = '加载中...';
+
                 const response = await fetch('/get-models');
                 const data = await response.json();
-                const modelList = document.getElementById('model_list');
+
                 modelList.innerHTML = '';
 
-                data.models.forEach(model => {
-                    const div = document.createElement('div');
-                    div.className = 'model-item';
-                    div.textContent = model;
-                    modelList.appendChild(div);
-                });
+                if (data.models && data.models.length > 0) {
+                    data.models.forEach((model, index) => {
+                        const div = document.createElement('div');
+                        div.className = 'model-item';
 
-                // 修改高度计算逻辑
-                const modelCount = data.models.length;
-                const itemHeight = 48; // 每个model-item的高度（包括padding和border）
-                const maxVisibleItems = 6; // 最多显示的项目数（用于视觉显示，不限制实际内容）
-                const maxHeight = maxVisibleItems * itemHeight; // 固定显示区域的最大高度
+                        // 根据模型名称添加标签
+                        let tag = 'LLM';
+                        if (model.toLowerCase().includes('claude')) tag = 'Claude';
+                        else if (model.toLowerCase().includes('gpt')) tag = 'GPT';
+                        else if (model.toLowerCase().includes('llama')) tag = 'Llama';
+                        else if (model.toLowerCase().includes('gemini')) tag = 'Gemini';
+                        else if (model.toLowerCase().includes('embedding')) tag = 'Embed';
+                        else if (model.toLowerCase().includes('dall')) tag = 'Image';
 
-                // 设置固定的最大显示高度
-                document.documentElement.style.setProperty('--model-list-max-height', `${maxHeight}px`);
+                        div.innerHTML = `
+                            <div class="model-index">${index + 1}</div>
+                            <div class="model-name" title="${model}">${model}</div>
+                            <div class="model-tag">${tag}</div>
+                        `;
 
-                // 如果有更多项目，添加滚动样式
-                if (modelCount > maxVisibleItems) {
-                    const modelListElement = document.querySelector('.model-list');
-                    if (modelListElement) {
-                        modelListElement.classList.add('scrollable');
-                    }
+                        // 点击复制模型名
+                        div.addEventListener('click', () => {
+                            copyToClipboardText(model);
+                            showMessage(`已复制模型名: ${model}`);
+                        });
+
+                        modelList.appendChild(div);
+                    });
+
+                    modelCount.textContent = `${data.models.length} 个模型`;
+                } else {
+                    modelList.innerHTML = '<div class="model-empty">暂无可用模型</div>';
+                    modelCount.textContent = '0 个模型';
                 }
             } catch (error) {
                 console.error('Loading models failed:', error);
+                const modelList = document.getElementById('model_list');
+                const modelCount = document.querySelector('.model-count');
+                modelList.innerHTML = '<div class="model-empty">加载失败，请稍后重试</div>';
+                modelCount.textContent = '加载失败';
             }
+        }
+
+        // 模型列表展开/收起功能
+        function toggleModelList() {
+            const container = document.querySelector('.model-list-container');
+            container.classList.toggle('expanded');
         }
 
         function showContactModal() {
             const modal = document.getElementById('contactModal');
             modal.classList.remove('hidden');
-            modal.classList.add('fade-in');
         }
 
         function hideContactModal() {
             const modal = document.getElementById('contactModal');
             modal.classList.add('hidden');
-            modal.classList.remove('fade-in');
         }
 
         function showUpgradeModal() {
             const modal = document.getElementById('upgradeModal');
             modal.classList.remove('hidden');
-            modal.classList.add('fade-in');
         }
 
         function hideUpgradeModal() {
             const modal = document.getElementById('upgradeModal');
             modal.classList.add('hidden');
-            modal.classList.remove('fade-in');
         }
 
         function showPaymentQR() {
             const paymentSection = document.getElementById('paymentSection');
             paymentSection.classList.remove('hidden');
-            paymentSection.classList.add('fade-in');
         }
 
-        // Close modal when clicking outside
         document.addEventListener('click', function (event) {
             const contactModal = document.getElementById('contactModal');
             const upgradeModal = document.getElementById('upgradeModal');
-            
+
             if (event.target === contactModal) {
                 hideContactModal();
             }
@@ -258,589 +252,1314 @@
             }
         });
 
-        // 页面加载完成后执行
         document.addEventListener('DOMContentLoaded', loadModels);
     </script>
 
     <style>
-        /* 现代化设计系统 - 简化版 */
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap');
+
         :root {
-            --primary: #6366f1;
-            --primary-light: #818cf8;
-            --primary-dark: #4f46e5;
-            --secondary: #10b981;
-            --background: #f8fafc;
-            --card: #ffffff;
-            --text-primary: #1e293b;
-            --text-secondary: #64748b;
-            --border: #e2e8f0;
-            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            /* 高级浅色系配色方案 */
+            --bg-primary: #ffffff;
+            --bg-secondary: #fafbfc;
+            --bg-tertiary: #f7f8fa;
+            --text-primary: #1a202c;
+            --text-secondary: #4a5568;
+            --text-dim: #718096;
+            --accent-green: #10b981;
+            --accent-blue: #3b82f6;
+            --accent-red: #ef4444;
+            --accent-yellow: #f59e0b;
+            --border-color: #e5e7eb;
+            --terminal-green: #059669;
+
+            /* 新增辅助颜色 */
+            --bg-subtle: #f9fafb;
+            --border-subtle: #f3f4f6;
+            --text-muted: #9ca3af;
+            --accent-purple: #8b5cf6;
+            --accent-indigo: #6366f1;
         }
 
-        /* 动画效果 */
-        @keyframes fadeIn {
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-subtle) 100%);
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', 'PingFang SC', 'Microsoft YaHei', '微软雅黑', 'Courier New', monospace;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* 优雅的背景装饰 */
+        body::before {
+            content: "";
+            position: fixed;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, var(--accent-green) 0%, transparent 70%);
+            opacity: 0.03;
+            animation: rotate 30s linear infinite;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        body::after {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background:
+                radial-gradient(circle at 20% 80%, var(--accent-blue) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, var(--accent-purple) 0%, transparent 50%);
+            opacity: 0.02;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        @keyframes rotate {
             from {
-                opacity: 0;
-                transform: translateY(20px);
+                transform: rotate(0deg);
             }
 
             to {
-                opacity: 1;
-                transform: translateY(0);
+                transform: rotate(360deg);
             }
         }
 
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateX(-20px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            position: relative;
+            z-index: 2;
         }
 
-        @keyframes pulse {
-
-            0%,
-            100% {
-                transform: scale(1);
-            }
-
-            50% {
-                transform: scale(1.05);
-            }
+        /* 头部 */
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            position: relative;
         }
 
-        .fade-in {
-            animation: fadeIn 0.6s ease-out;
+        .header::after {
+            content: "";
+            position: absolute;
+            bottom: -1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent-green), var(--accent-blue), transparent);
+            border-radius: 2px;
         }
 
-        .slide-in {
-            animation: slideIn 0.4s ease-out;
+        .title {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, var(--accent-green), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+            letter-spacing: -0.02em;
         }
 
-        .pulse {
-            animation: pulse 2s infinite;
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            letter-spacing: 0.05em;
+            font-weight: 400;
+            opacity: 0.8;
         }
 
-        /* 现代化卡片设计 - 简化版 */
-        .card {
-            background: var(--card);
-            border-radius: 12px;
-            box-shadow: var(--shadow-md);
-            border: 1px solid var(--border);
-            transition: all 0.2s ease;
-        }
-
-        .card:hover {
-            box-shadow: var(--shadow-lg);
-            transform: translateY(-2px);
-        }
-
-        /* 现代化按钮 */
-        .btn {
-            display: inline-flex;
-            align-items: center;
+        /* 导航按钮 */
+        .nav-buttons {
+            display: flex;
             justify-content: center;
-            border-radius: 12px;
-            padding: 0.75rem 1.5rem;
-            font-weight: 600;
-            font-size: 0.95rem;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            gap: 1rem;
+            margin-bottom: 3rem;
+            flex-wrap: wrap;
+        }
+
+        .nav-btn {
+            background: linear-gradient(135deg, var(--accent-green), var(--accent-blue));
             color: white;
-            box-shadow: var(--shadow-md);
             border: none;
+            padding: 0.75rem 1.5rem;
+            font-family: inherit;
+            font-size: 0.95rem;
+            font-weight: 600;
             cursor: pointer;
             position: relative;
             overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            line-height: 1.5;
+            letter-spacing: 0.025em;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3), 0 2px 6px rgba(16, 185, 129, 0.2);
         }
 
-        .btn::before {
-            content: '';
+        .nav-btn::before {
+            content: "";
             position: absolute;
             top: 0;
             left: -100%;
             width: 100%;
             height: 100%;
             background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-            transition: left 0.5s;
+            transition: left 0.5s ease;
+            z-index: -1;
         }
 
-        .btn:hover {
+        .nav-btn:hover::before {
+            left: 100%;
+        }
+
+        .nav-btn:hover {
             transform: translateY(-2px);
-            box-shadow: var(--shadow-lg);
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4), 0 4px 10px rgba(16, 185, 129, 0.3);
+            color: white;
+        }
+
+        /* 终端窗口 */
+        .terminal {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.06);
+        }
+
+        .terminal-header {
+            background: var(--bg-subtle);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 0.875rem 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.625rem;
+        }
+
+        .terminal-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            transition: all 0.2s ease;
+        }
+
+        .terminal-dot.red {
+            background: #ef4444;
+            box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+        }
+
+        .terminal-dot.yellow {
+            background: #f59e0b;
+            box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+        }
+
+        .terminal-dot.green {
+            background: #10b981;
+            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+        }
+
+        .terminal-title {
+            flex: 1;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .terminal-body {
+            padding: 2rem;
+        }
+
+        /* 输入区域 */
+        .input-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            .input-group {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .input-field {
+            background: white;
+            border: 2px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 1rem 1.125rem;
+            font-family: inherit;
+            font-size: 0.95rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 8px;
+            line-height: 1.5;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: var(--accent-green);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1), 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .input-field::placeholder {
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        /* 按钮组 */
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--accent-green), var(--accent-blue));
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            font-family: inherit;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3), 0 2px 6px rgba(16, 185, 129, 0.2);
+            flex: 1;
+            min-width: 150px;
+            line-height: 1.5;
+        }
+
+        .btn::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s ease;
+            z-index: -1;
         }
 
         .btn:hover::before {
             left: 100%;
         }
 
-        .btn:active {
-            transform: translateY(0);
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4), 0 4px 10px rgba(16, 185, 129, 0.3);
+            color: white;
         }
 
-        .btn-icon {
-            padding: 0.75rem;
-            border-radius: 12px;
-            background: var(--primary);
+        /* 主按钮使用默认样式，无需特殊处理 */
+
+        /* 消息区域 */
+        .message {
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 2px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            display: none;
         }
 
-        /* 现代化输入框 */
-        .input-modern {
-            border: 2px solid var(--border);
-            border-radius: 12px;
-            padding: 0.875rem 1rem;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-            background: var(--card);
-            box-shadow: var(--shadow-sm);
+        .message.success {
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid var(--accent-green);
+            color: var(--accent-green);
         }
 
-        .input-modern:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-            transform: translateY(-1px);
+        .message.error {
+            background: rgba(255, 51, 102, 0.1);
+            border: 1px solid var(--accent-red);
+            color: var(--accent-red);
         }
 
-        /* 现代化滚动条 */
-        .custom-scrollbar {
-            scrollbar-width: thin;
-            scrollbar-color: var(--primary-light) var(--border);
+        /* 信息显示区域 */
+        .info-grid {
+            display: grid;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
         }
 
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
+        .info-grid-row {
+            display: grid;
+            gap: 1.5rem;
         }
 
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: var(--border);
-            border-radius: 4px;
+        .info-grid-row.row-3 {
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
         }
 
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: var(--primary-light);
-            border-radius: 4px;
-            border: 2px solid var(--border);
+        .info-grid-row.row-1 {
+            /* 单行全宽 */
         }
 
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: var(--primary);
-        }
-
-        /* 信息卡片样式 */
         .info-card {
-            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-            border-radius: 16px;
-            padding: 1.5rem;
-            border: 1px solid var(--border);
-            transition: all 0.3s ease;
+            background: white;
+            border: 1px solid var(--border-color);
+            padding: 1.75rem;
             position: relative;
             overflow: hidden;
+            border-radius: 12px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.06);
+        }
+
+        .info-card:hover {
+            border-color: var(--accent-green);
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(16, 185, 129, 0.15), 0 6px 12px rgba(16, 185, 129, 0.1);
         }
 
         .info-card::before {
-            content: '';
+            content: "";
             position: absolute;
             top: 0;
             left: 0;
             width: 4px;
             height: 100%;
-            background: linear-gradient(to bottom, var(--primary), var(--secondary));
+            background: linear-gradient(to bottom, var(--accent-green), var(--accent-blue));
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .info-card:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-lg);
+        .info-card:hover::before {
+            width: 6px;
         }
 
-        /* Model列表现代化设计 */
-        .model-list-container {
-            position: relative;
+        .info-card.full-width {
+            background: linear-gradient(135deg, white, var(--bg-subtle));
         }
 
-        .model-list {
-            max-height: 0;
-            overflow-y: hidden;
-            transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            background: var(--card);
-            border-radius: 12px;
-            box-shadow: var(--shadow-md);
-            border: 1px solid var(--border);
+        .info-title {
+            color: var(--accent-green);
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            letter-spacing: 0.05em;
         }
 
-        .model-list.scrollable {
-            overflow-y: auto;
+        .info-title i {
+            font-size: 1.1rem;
         }
 
-        .model-list-container:hover .model-list {
-            max-height: var(--model-list-max-height, 288px);
+        .info-content {
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            word-break: break-all;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            line-height: 1.5;
         }
 
-        .model-item {
-            padding: 1rem 1.25rem;
-            border-bottom: 1px solid var(--border);
-            transition: all 0.2s ease;
+        .copy-btn {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+            padding: 0.5rem;
             cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.8rem;
+        }
+
+        .copy-btn:hover {
+            color: var(--accent-green);
+            border-color: var(--accent-green);
+        }
+
+        /* 模型列表 */
+        .model-list-container {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.06);
+        }
+
+        .full-width .model-list-container {
+            background: linear-gradient(135deg, white, var(--bg-subtle));
+        }
+
+        .model-list-container:hover {
+            border-color: var(--accent-green);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(16, 185, 129, 0.15), 0 4px 8px rgba(16, 185, 129, 0.1);
+        }
+
+        .model-list-header {
+            background: var(--bg-subtle);
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.3s ease;
+        }
+
+        .model-list-header:hover {
+            background: var(--border-subtle);
+        }
+
+        .model-list-title {
+            color: var(--accent-green);
+            font-size: 1rem;
+            font-weight: 600;
             display: flex;
             align-items: center;
             gap: 0.75rem;
         }
 
-        .model-item:last-child {
-            border-bottom: none;
+        .model-list-title i {
+            font-size: 1.2rem;
         }
 
-        .model-item:hover {
-            background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%);
-            transform: translateX(4px);
+        .model-count {
+            background: rgba(72, 187, 120, 0.2);
+            color: var(--accent-green);
+            padding: 0.375rem 0.875rem;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            border: 1px solid rgba(72, 187, 120, 0.3);
+        }
+
+        .expand-icon {
+            color: var(--text-secondary);
+            transition: transform 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .model-list-container.expanded .expand-icon {
+            transform: rotate(180deg);
+        }
+
+        .model-list-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            background: var(--bg-primary);
+        }
+
+        .model-list-container.expanded .model-list-content {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .model-list {
+            padding: 0.5rem;
+        }
+
+        .model-item {
+            padding: 0.875rem 1rem;
+            margin: 0.25rem 0;
+            background: var(--bg-subtle);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
         }
 
         .model-item::before {
-            content: '▸';
-            color: var(--primary);
-            font-size: 0.875rem;
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 3px;
+            height: 100%;
+            background: var(--accent-blue);
+            transform: scaleY(0);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* 文本样式优化 */
-        .truncate-text {
-            max-width: 100%;
+        .model-item:hover {
+            background: white;
+            border-color: var(--accent-blue);
+            transform: translateX(4px);
+            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.1), 0 2px 4px rgba(59, 130, 246, 0.05);
+        }
+
+        .model-item:hover::before {
+            transform: scaleY(1);
+        }
+
+        .model-index {
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-indigo));
+            color: white;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            flex-shrink: 0;
+            box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+        }
+
+        .model-name {
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            flex: 1;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
-            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
-            padding: 0.5rem 0.75rem;
-            border-radius: 8px;
-            border: 1px solid var(--border);
         }
 
-        @media (min-width: 768px) {
-            .truncate-text {
-                max-width: 500px;
-            }
+        .model-tag {
+            background: rgba(104, 211, 145, 0.2);
+            color: var(--accent-green);
+            padding: 0.2rem 0.6rem;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
-        /* 模态框现代化 */
-        .modal {
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(8px);
+        /* 模型列表加载状态 */
+        .model-loading {
+            padding: 2rem;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
         }
 
-        .modal-content {
-            background: var(--card);
-            border-radius: 20px;
-            box-shadow: var(--shadow-xl);
-            border: 1px solid var(--border);
+        .model-loading::before {
+            content: "⏳";
+            margin-right: 0.5rem;
+            animation: spin 1s linear infinite;
         }
 
-        @keyframes modalFadeIn {
+        @keyframes spin {
             from {
-                opacity: 0;
-                transform: scale(0.9) translateY(-20px);
+                transform: rotate(0deg);
             }
 
             to {
-                opacity: 1;
-                transform: scale(1) translateY(0);
+                transform: rotate(360deg);
             }
         }
 
-        #contactModal.fade-in,
-        #upgradeModal.fade-in {
-            animation: modalFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        /* 空状态 */
+        .model-empty {
+            padding: 2rem;
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 0.9rem;
         }
 
-        /* 响应式优化 */
+        .model-empty::before {
+            content: "📦";
+            display: block;
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        /* 查询结果 */
+        #usage_result {
+            background: var(--bg-primary);
+            border: 1px solid var(--accent-green);
+            margin-top: 1rem;
+        }
+
+        .terminal-output .line {
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .terminal-output .line:last-child {
+            border-bottom: none;
+        }
+
+        .terminal-output .line.success {
+            color: var(--accent-green);
+        }
+
+        /* 滚动条 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-dim);
+        }
+
+        /* 响应式设计优化 */
         @media (max-width: 768px) {
-            .card {
-                border-radius: 12px;
-                margin: 0.5rem;
-            }
 
-            .btn {
-                padding: 0.875rem 1.25rem;
-                font-size: 0.9rem;
-            }
-
-            .input-modern {
-                padding: 0.75rem;
-                font-size: 1rem;
+            /* 信息卡片响应式布局 */
+            .info-grid-row.row-3 {
+                grid-template-columns: 1fr;
+                gap: 1rem;
             }
 
             .info-card {
-                padding: 1.25rem;
+                padding: 1.5rem;
+            }
+
+            .info-title {
+                font-size: 0.95rem;
+                margin-bottom: 1rem;
+            }
+
+            .model-list-header {
+                padding: 1rem 1.25rem;
+            }
+
+            .model-list-title {
+                font-size: 0.95rem;
+                gap: 0.5rem;
+            }
+
+            .model-count {
+                font-size: 0.75rem;
+                padding: 0.25rem 0.6rem;
+            }
+
+            .model-list-container.expanded .model-list-content {
+                max-height: 250px;
+            }
+
+            .model-item {
+                padding: 0.75rem 0.875rem;
+                gap: 0.75rem;
+            }
+
+            .model-index {
+                width: 20px;
+                height: 20px;
+                font-size: 0.7rem;
+            }
+
+            .model-name {
+                font-size: 0.8rem;
+            }
+
+            .model-tag {
+                font-size: 0.6rem;
+                padding: 0.15rem 0.5rem;
             }
         }
 
-        @media (max-width: 640px) {
-            .card {
-                border-radius: 10px;
+        @media (max-width: 480px) {
+
+            /* 超小屏幕优化 */
+            .info-card {
+                padding: 1.25rem;
+            }
+
+            .info-content {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.75rem;
+            }
+
+            .copy-btn {
+                align-self: flex-end;
+            }
+
+            .model-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+                padding: 0.625rem 0.75rem;
+            }
+
+            .model-item>div:not(:first-child) {
+                align-self: flex-end;
+            }
+
+            .model-name {
+                width: 100%;
+                font-size: 0.75rem;
+                text-align: left;
+            }
+        }
+
+        @media (min-width: 769px) and (max-width: 1024px) {
+
+            /* 平板设备优化 */
+            .info-grid-row.row-3 {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (min-width: 1200px) {
+
+            /* 大屏幕优化 */
+            .info-grid-row.row-3 {
+                grid-template-columns: repeat(3, 1fr);
+            }
+
+            .info-card {
+                padding: 2rem;
+            }
+
+            .model-list-header {
+                padding: 1.5rem 2rem;
+            }
+
+            .modal-content {
+                max-width: 480px;
+            }
+        }
+
+        /* 模态框响应式优化 */
+        @media (max-width: 768px) {
+            .modal {
+                padding: 0.75rem;
+            }
+
+            .modal-content {
+                max-width: 100%;
+                max-height: 90vh;
+                border-radius: 8px 8px 0 0;
+                margin: auto 0;
+            }
+
+            .modal-body {
+                padding: 1.25rem;
+                max-height: calc(90vh - 4rem);
+            }
+
+            .modal-header {
+                padding: 1rem 1.25rem;
+            }
+
+            .modal-title {
+                font-size: 1rem;
+            }
+
+            .modal-close {
+                font-size: 1.1rem;
+                width: 1.75rem;
+                height: 1.75rem;
+            }
+
+            .qr-code img {
+                max-width: 180px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .modal {
+                padding: 0.5rem;
+                align-items: flex-end;
+            }
+
+            .modal-content {
+                max-height: 85vh;
+                border-radius: 12px 12px 0 0;
+                width: 100%;
+            }
+
+            .modal-body {
+                padding: 1rem;
+                max-height: calc(85vh - 3.5rem);
+            }
+
+            .modal-header {
+                padding: 0.875rem 1rem;
+            }
+
+            .modal-title {
+                font-size: 0.95rem;
+            }
+
+            .payment-info {
+                font-size: 0.9rem;
+            }
+
+            .qr-code img {
+                max-width: 160px;
             }
 
             .btn {
+                padding: 0.875rem 1.5rem;
+                font-size: 0.9rem;
+            }
+        }
+
+        /* 小屏幕下模态框滚动优化 */
+        .modal-body::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .modal-body::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+            border-radius: 3px;
+        }
+
+        .modal-body::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+
+        .modal-body::-webkit-scrollbar-thumb:hover {
+            background: var(--text-dim);
+        }
+
+        /* 页脚 */
+        .footer {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        .footer a,
+        .footer button {
+            color: var(--text-muted);
+            font-size: 1.2rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            text-decoration: none;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 3rem;
+            height: 3rem;
+            border-radius: 12px;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .footer a:hover,
+        .footer button:hover {
+            color: var(--accent-green);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(16, 185, 129, 0.15), 0 4px 8px rgba(16, 185, 129, 0.1);
+        }
+
+        /* 模态框 */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 1rem;
+        }
+
+        .modal.hidden {
+            display: none;
+        }
+
+        .modal-content {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            max-width: 450px;
+            width: 100%;
+            max-height: 85vh;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15), 0 12px 24px rgba(0, 0, 0, 0.1);
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+            overflow-y: auto;
+            flex: 1;
+            max-height: calc(85vh - 4rem);
+        }
+
+        .modal-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+            background: var(--bg-subtle);
+        }
+
+        .modal-title {
+            color: var(--accent-green);
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .modal-close {
+            background: transparent;
+            color: var(--text-secondary);
+            border: none;
+            font-size: 1.25rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            padding: 0.25rem;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 2rem;
+            height: 2rem;
+        }
+
+        .modal-close:hover {
+            color: var(--accent-red);
+            background: rgba(245, 101, 101, 0.1);
+        }
+
+        .modal-body h3 {
+            color: var(--accent-green);
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: 1rem;
+        }
+
+        .qr-code {
+            text-align: center;
+            margin: 2rem 0;
+        }
+
+        .qr-code img {
+            max-width: 200px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+        }
+
+        .payment-info {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            padding: 1rem;
+            margin: 1rem 0;
+            font-size: 0.9rem;
+        }
+
+        .payment-info ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .payment-info li {
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+
+        .payment-info li::before {
+            content: ">";
+            color: var(--accent-green);
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .glow {
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from {
+                text-shadow: 0 0 5px currentColor;
+            }
+
+            to {
+                text-shadow: 0 0 20px currentColor, 0 0 30px currentColor;
+            }
+        }
+
+        .typewriter {
+            overflow: hidden;
+            border-right: 2px solid var(--accent-green);
+            white-space: nowrap;
+            animation: typing 3s steps(30, end), blink 0.75s step-end infinite;
+        }
+
+        @keyframes typing {
+            from {
+                width: 0;
+            }
+
+            to {
                 width: 100%;
-                justify-content: center;
-            }
-
-            .truncate-text {
-                max-width: 100%;
-                font-size: 0.875rem;
             }
         }
 
-        /* Footer icons hover effect */
-        .footer-icon {
-            transition: transform 0.2s ease-in-out;
-        }
+        @keyframes blink {
 
-        .footer-icon:hover {
-            transform: translateY(-2px);
+            from,
+            to {
+                border-color: transparent;
+            }
+
+            50% {
+                border-color: var(--accent-green);
+            }
         }
     </style>
 </head>
 
-<body class="bg-gradient-to-r from-blue-50 to-green-50 flex items-center justify-center min-h-screen p-4">
-    <div class="bg-white shadow-2xl rounded-xl p-6 w-full max-w-4xl fade-in">
-        <!-- Header Navigation -->
-        <div class="flex flex-col md:flex-row justify-between items-center mb-8">
-            <div class="flex items-center">
-                <i class="fas fa-server text-indigo-600 text-lg mr-3"></i>
-                <h1 class="text-2xl md:text-3xl font-bold text-gray-800">
-                    API <span class="text-indigo-600">Service</span>
-                </h1>
-            </div>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <h1 class="title glow">模型之心</h1>
+            <p class="subtitle">LLM 大模型服务</p>
+        </div>
 
-            <div class="flex flex-col md:flex-row gap-3 mt-4 md:mt-0">
-                <a href="https://chat.aihao.world/" target="_blank"
-                    class="btn flex items-center bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-600 hover:from-purple-600 hover:via-pink-600 hover:to-indigo-700 shadow-lg transform hover:scale-105 transition-all duration-300">
-                    <i class="fas fa-comments mr-2"></i>
-                    <span class="font-bold">开启对话</span>
-                </a>
-                <button onclick="showUpgradeModal()"
-                    class="btn flex items-center bg-gradient-to-r from-green-500 via-emerald-500 to-teal-600 hover:from-green-600 hover:via-emerald-600 hover:to-teal-700 shadow-lg transform hover:scale-105 transition-all duration-300">
-                    <i class="fas fa-arrow-up mr-2"></i>
-                    <span class="font-bold">提升额度</span>
-                </button>
+        <!-- 导航按钮 -->
+        <div class="nav-buttons">
+            <a href="https://chat.aihao.world/" target="_blank" class="nav-btn">
+                <i class="fas fa-comments"></i>
+                <span>开启对话</span>
+            </a>
+            <button onclick="showUpgradeModal()" class="nav-btn">
+                <i class="fas fa-arrow-up"></i>
+                <span>升级额度</span>
+            </button>
+        </div>
+
+        <!-- API密钥生成终端 -->
+        <div class="terminal">
+            <div class="terminal-header">
+                <div class="terminal-dot red"></div>
+                <div class="terminal-dot yellow"></div>
+                <div class="terminal-dot green"></div>
+                <div class="terminal-title">密钥生成器</div>
+            </div>
+            <div class="terminal-body">
+                <!-- 消息提示区域 -->
+                <div id="message_area" class="message"></div>
+
+                <!-- 输入区域 -->
+                <div class="input-group">
+                    <input type="tel" id="phone_input" class="input-field" placeholder="手机号码: +86">
+                    <input type="password" id="password_input" class="input-field" placeholder="登录密码: ********">
+                </div>
+
+                <!-- 按钮组 -->
+                <div class="button-group">
+                    <button onclick="generateApiKey()" class="btn primary">
+                        <i class="fas fa-key"></i>
+                        生成密钥
+                    </button>
+                    <button onclick="checkUsage()" class="btn">
+                        <i class="fas fa-chart-line"></i>
+                        查询额度
+                    </button>
+                </div>
+
+                <!-- 查询结果 -->
+                <div id="usage_result" class="terminal hidden"></div>
             </div>
         </div>
 
-        <!-- API Key Generation Area -->
-        <div class="card fade-in mb-6">
-            <div class="p-6">
-                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
-                    <i class="fas fa-key text-indigo-600 text-lg mr-2"></i>
-                    获取API密钥
-                </h2>
-                
-                <!-- 消息提示区域 - 移动到组件内部顶部 -->
-                <div id="message_area" class="mb-4 hidden"></div>
-                
-                <div class="space-y-4">
-                    <div class="flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-4">
-                        <input type="tel" id="phone_input" class="input-modern flex-grow w-full md:w-auto"
-                            placeholder="请输入手机号">
-                        <input type="password" id="password_input" class="input-modern flex-grow w-full md:w-auto"
-                            placeholder="请输入密码">
+        <!-- 信息显示网格 -->
+        <div class="info-grid">
+            <!-- 第一行：API密钥和接口地址 -->
+            <div class="info-grid-row row-3">
+                <!-- API密钥显示 -->
+                <div class="info-card">
+                    <div class="info-title">
+                        <i class="fas fa-key"></i>
+                        API 密钥
                     </div>
-                    <div class="flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-4">
-                        <button onclick="generateApiKey()" class="btn w-full md:w-auto">
-                            <i class="fas fa-key mr-2"></i>
-                            获取API密钥
-                        </button>
-                        <button onclick="checkUsage()" class="btn w-full md:w-auto bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 hover:from-blue-600 hover:via-indigo-600 hover:to-purple-700">
-                            <i class="fas fa-chart-line mr-2"></i>
-                            查询额度
-                        </button>
+                    <div class="info-content">
+                        <span id="api_key_display">等待生成...</span>
+                        <button onclick="copyToClipboard('api_key_display')" class="copy-btn">复制</button>
                     </div>
-                    
-                    <!-- 查询结果显示区域 -->
-                    <div id="usage_result" class="hidden mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                        <div class="flex items-center justify-between">
-                            <div class="flex-1">
-                                <h4 class="font-semibold text-blue-800 mb-2">额度信息</h4>
-                                <div class="grid grid-cols-2 gap-2 text-sm">
-                                    <div class="text-gray-600">已使用:</div>
-                                    <div id="usage_value" class="font-medium text-gray-800">0 tokens</div>
-                                    <div class="text-gray-600">限额:</div>
-                                    <div id="limit_value" class="font-medium text-gray-800">1,000,000 credits</div>
-                                    <div class="text-gray-600">剩余:</div>
-                                    <div id="remaining_value" class="font-medium text-green-600">1,000,000 credits</div>
-                                </div>
+                </div>
+
+                <!-- Base URL显示 -->
+                <div class="info-card">
+                    <div class="info-title">
+                        <i class="fas fa-link"></i>
+                        接口地址
+                    </div>
+                    <div class="info-content">
+                        <span>https://api.aihao.world</span>
+                        <button onclick="copyToClipboardText('https://api.aihao.world')" class="copy-btn">复制</button>
+                    </div>
+                </div>
+
+                <!-- 使用限额 -->
+                <div class="info-card">
+                    <div class="info-title">
+                        <i class="fas fa-chart-line"></i>
+                        额度限制
+                    </div>
+                    <div class="info-content">
+                        <span>100 万积分 / 密钥</span>
+                        <button onclick="showUpgradeModal()" class="copy-btn">升级</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 第二行：模型列表（全宽） -->
+            <div class="info-grid-row row-1">
+                <div class="info-card full-width"
+                    style="padding: 0; border: none; background: transparent; overflow: hidden;">
+                    <div class="model-list-container" onclick="toggleModelList()">
+                        <div class="model-list-header">
+                            <div class="model-list-title">
+                                <i class="fas fa-cube"></i>
+                                <span>支持模型</span>
+                                <span class="model-count">0 个模型</span>
                             </div>
-                            <button onclick="hideUsageResult()" class="text-blue-500 hover:text-blue-700 ml-4">
-                                <i class="fas fa-times"></i>
-                            </button>
+                            <div class="expand-icon">
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                        </div>
+                        <div class="model-list-content">
+                            <div class="model-list" id="model_list">
+                                <!-- Models will be loaded dynamically -->
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- API Information Display Area -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <!-- API Key Display -->
-            <div class="info-card fade-in">
-                <div class="flex flex-col h-full">
-                    <div class="flex items-center mb-3">
-                        <div class="bg-indigo-100 p-2 rounded-lg mr-3">
-                            <i class="fas fa-key text-indigo-600 text-lg"></i>
-                        </div>
-                        <h3 class="text-lg font-semibold text-gray-800">API密钥</h3>
-                    </div>
-                    <div class="flex-1 flex items-center justify-between">
-                        <span id="api_key_display" class="truncate-text text-gray-700">生成API密钥后请保存</span>
-                        <button onclick="copyToClipboard('api_key_display')" class="btn-icon ml-3">
-                            <i class="fas fa-copy text-white"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Base URL 显示 -->
-            <div class="info-card fade-in">
-                <div class="flex flex-col h-full">
-                    <div class="flex items-center mb-3">
-                        <div class="bg-green-100 p-2 rounded-lg mr-3">
-                            <i class="fas fa-link text-green-600 text-lg"></i>
-                        </div>
-                        <h3 class="text-lg font-semibold text-gray-800">Base URL</h3>
-                    </div>
-                    <div class="flex-1 flex items-center justify-between">
-                        <span id="base_url_display" class="truncate-text text-gray-700">https://api.aihao.world</span>
-                        <button onclick="copyToClipboard('base_url_display')" class="btn-icon ml-3">
-                            <i class="fas fa-copy text-white"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Model 列表 -->
-            <div class="info-card fade-in model-list-container md:col-span-2">
-                <div class="flex flex-col h-full">
-                    <div class="flex items-center mb-3">
-                        <div class="bg-purple-100 p-2 rounded-lg mr-3">
-                            <i class="fas fa-cube text-purple-600 text-lg"></i>
-                        </div>
-                        <h3 class="text-lg font-semibold text-gray-800">支持的模型</h3>
-                    </div>
-                    <div class="model-list" id="model_list">
-                        <!-- Models will be loaded dynamically -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- Usage 显示 -->
-            <div class="info-card fade-in md:col-span-2">
-                <div class="flex flex-col h-full">
-                    <div class="flex items-center mb-3">
-                        <div class="bg-blue-100 p-2 rounded-lg mr-3">
-                            <i class="fas fa-chart-line text-blue-600 text-lg"></i>
-                        </div>
-                        <h3 class="text-lg font-semibold text-gray-800">使用限额</h3>
-                    </div>
-                    <div class="flex-1 flex items-center justify-between">
-                        <span class="text-gray-700">每个API密钥免费额度</span>
-                        <span class="text-green-600 font-semibold">1,000,000 credits</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Footer -->
-        <div class="mt-8 flex justify-center space-x-6">
-            <a href="https://github.com/firslov/MyAPI" target="_blank"
-                class="text-gray-600 hover:text-indigo-600 transition-colors hover-scale footer-icon"
-                title="GitHub Repository">
-                <i class="fab fa-github text-2xl"></i>
+        <!-- 页脚 -->
+        <div class="footer">
+            <a href="https://github.com/firslov/MyAPI" target="_blank" title="源代码">
+                <i class="fab fa-github"></i>
             </a>
-            <a href="https://www.cherry-ai.com/download" target="_blank"
-                class="text-gray-600 hover:text-indigo-600 transition-colors hover-scale footer-icon"
-                title="Download Cherry AI">
-                <i class="fas fa-download text-2xl"></i>
+            <a href="https://www.cherry-ai.com/download" target="_blank" title="下载客户端">
+                <i class="fas fa-download"></i>
             </a>
-            <a href="/get-usage" class="text-gray-600 hover:text-indigo-600 transition-colors hover-scale footer-icon"
-                title="Dashboard & Management">
-                <i class="fas fa-chart-bar text-2xl"></i>
+            <a href="/dashboard" title="管理面板">
+                <i class="fas fa-chart-bar"></i>
             </a>
-            <button onclick="showContactModal()"
-                class="text-gray-600 hover:text-indigo-600 transition-colors hover-scale footer-icon"
-                title="Contact Author">
-                <i class="fas fa-user-circle text-2xl"></i>
+            <button onclick="showContactModal()" title="联系客服">
+                <i class="fas fa-user-circle"></i>
             </button>
         </div>
     </div>
 
-    <!-- Contact Modal -->
-    <div id="contactModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-        <div class="bg-white rounded-lg p-6 max-w-sm w-full mx-4 relative">
-            <button onclick="hideContactModal()" class="absolute top-2 right-2 text-gray-500 hover:text-gray-700">
-                <i class="fas fa-times text-xl"></i>
-            </button>
-            <div class="text-center">
-                <h3 class="text-xl font-bold text-gray-800 mb-4">联系作者</h3>
-                <img src="/static/contact-qr.jpg" alt="Contact QR Code" class="mx-auto w-64 h-64 object-contain">
-                <p class="mt-4 text-gray-600">扫描二维码联系作者</p>
+    <!-- 联系模态框 -->
+    <div id="contactModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">联系管理员</h3>
+                <button onclick="hideContactModal()" class="modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="qr-code">
+                    <img src="/static/contact-qr.jpg" alt="联系客服二维码">
+                    <p style="margin-top: 1rem; color: var(--text-secondary);">扫码获取客服支持</p>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Upgrade Modal -->
-    <div id="upgradeModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4 relative">
-            <button onclick="hideUpgradeModal()" class="absolute top-2 right-2 text-gray-500 hover:text-gray-700">
-                <i class="fas fa-times text-xl"></i>
-            </button>
-            <div class="text-center">
-                <h3 class="text-xl font-bold text-gray-800 mb-4">提升额度</h3>
-                <div class="text-left mb-6">
-                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4 rounded">
-                        <p class="text-gray-700 text-sm">额度说明：1,000,000 credits / 1 元</p>
-                    </div>
-                    <div class="space-y-3 text-sm text-gray-600">
-                        <p class="flex items-start">
-                            <i class="fas fa-check text-green-500 mt-1 mr-2"></i>
-                            <span>Claude、gpt5等模型费率较高，如需更多额度可扫码支付</span>
-                        </p>
-                        <p class="flex items-start">
-                            <i class="fas fa-check text-green-500 mt-1 mr-2"></i>
-                            <span>本平台仅在官方定价基础上收取极低手续费用于运营</span>
-                        </p>
-                        <p class="flex items-start">
-                            <i class="fas fa-check text-green-500 mt-1 mr-2"></i>
-                            <span>额度按照credits计费，不同模型根据实际定价进行折算</span>
-                        </p>
-                        <p class="flex items-start">
-                            <i class="fas fa-check text-green-500 mt-1 mr-2"></i>
-                            <span>扫码时请标明注册手机号，确认付款后5-15分钟内生效</span>
-                        </p>
-                    </div>
-                </div>
-                <button onclick="showPaymentQR()" 
-                    class="btn flex items-center justify-center bg-gradient-to-r from-green-500 via-emerald-500 to-teal-600 hover:from-green-600 hover:via-emerald-600 hover:to-teal-700 shadow-lg transform hover:scale-105 transition-all duration-300 w-full">
-                    <i class="fas fa-qrcode mr-2"></i>
-                    <span class="font-bold">显示付款码</span>
+    <!-- 升级模态框 -->
+    <div id="upgradeModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">升级账户额度</h3>
+                <button onclick="hideUpgradeModal()" class="modal-close">
+                    <i class="fas fa-times"></i>
                 </button>
-                
-                <!-- Payment QR Section -->
-                <div id="paymentSection" class="hidden mt-6 fade-in">
-                    <div class="border-t pt-4">
-                        <h4 class="text-lg font-semibold text-gray-800 mb-3">付款务必备注手机号</h4>
-                        <div class="bg-gray-100 p-4 rounded-lg">
-                            <div class="text-center">
-                                <div class="bg-white p-4 rounded-lg inline-block">
-                                    <img src="/static/wxtrade.jpg" alt="微信支付二维码" class="w-48 h-48 object-contain rounded">
-                                </div>
-                                <p class="mt-3 text-sm text-gray-600">请扫描上方二维码完成付款</p>
-                                <p class="text-xs text-gray-500 mt-2">付款后请稍等5-15分钟生效</p>
+            </div>
+            <div class="modal-body">
+                <div class="payment-info">
+                    <p><strong style="color: var(--accent-green);">兑换费率:</strong> 100 万积分 / ¥1</p>
+                </div>
+
+                <div class="payment-info">
+                    <ul>
+                        <li>高级模型（Claude、GPT-5等）需要更多积分</li>
+                        <li>仅收取最低服务费用用于平台运营</li>
+                        <li>积分根据实际模型定价进行换算</li>
+                        <li>付款时请务必注明注册手机号</li>
+                        <li>确认付款后 5-15 分钟内生效</li>
+                    </ul>
+                </div>
+
+                <button onclick="showPaymentQR()" class="btn primary" style="width: 100%;">
+                    <i class="fas fa-qrcode"></i>
+                    显示付款二维码
+                </button>
+
+                <!-- 支付二维码区域 -->
+                <div id="paymentSection" class="hidden" style="margin-top: 2rem;">
+                    <div class="payment-info">
+                        <p style="text-align: center; margin-bottom: 1rem;"><strong
+                                style="color: var(--accent-yellow);">重要：付款时请备注手机号</strong></p>
+                        <div class="qr-code">
+                            <div style="background: white; padding: 1rem; display: inline-block; border-radius: 8px;">
+                                <img src="/static/wxtrade.jpg" alt="微信支付二维码" style="border: none; border-radius: 4px;">
                             </div>
+                            <p style="margin-top: 1rem; color: var(--text-secondary);">扫码完成支付</p>
+                            <p style="font-size: 0.8rem; color: var(--text-dim);">支付后请等待 5-15 分钟生效</p>
                         </div>
                     </div>
                 </div>

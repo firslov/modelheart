@@ -1,118 +1,189 @@
-# MyAPI - LLM API 中转服务
+# Model Heart - LLM API 中转服务
 
-轻量化的LLM API请求中转系统，支持多模型接入和用量管理。
+智能化的LLM API请求转发系统，提供多模型接入、负载均衡和完善的用量管理。
 
-## 🚀 核心功能
+## ✨ 核心功能
 
-- **多模型支持** - 统一接入多种LLM模型，自动负载均衡
-- **API密钥管理** - 基于手机号的密钥生成和安全认证
-- **用量监控** - 实时统计、限额管理和使用分析
-- **流式响应** - 支持流式对话，提升用户体验
-- **管理面板** - 可视化仪表板，便于管理和监控
+### 🔄 智能负载均衡
 
-## 🛠️ 快速开始
+- **加权轮询算法** - 根据服务器性能和响应时间动态分配请求
+- **健康检查机制** - 自动监控服务器状态，故障秒级切换
+- **连接池优化** - 动态调整连接池大小，适应不同负载场景
+
+### 🔐 安全认证体系
+
+- **双重认证** - 手机号+密码的用户注册认证
+- **API密钥管理** - 安全的密钥生成和管理机制
+- **权限控制** - 基于Session的管理员权限系统
+
+### 📊 精准用量监控
+
+- **Token级统计** - 支持不同模型的输入/输出Token权重配置
+- **实时限额控制** - 动态检查用户使用额度
+- **多维度分析** - 按用户、模型、服务器等多维度使用统计
+
+### 🌐 多协议支持
+
+- **OpenAI兼容** - `/v1/chat/completions`、`/v1/completions`、`/v1/embeddings`
+- **Anthropic原生** - `/anthropic/v1/messages` 接口直接转发
+- **流式响应** - 完整支持SSE流式传输，优化用户体验
+
+### 🎛️ 可视化管理
+
+- **现代化界面** - 响应式Web管理面板
+- **实时监控** - 服务器状态、模型使用情况实时展示
+- **便捷操作** - 一键添加/删除服务器，启用/禁用模型
+
+## 🚀 快速开始
 
 ### 环境要求
-- Python 3.8+
-- SQLite数据库
 
-### 安装运行
+- Python 3.8+
+- SQLite数据库（内置）
+
+### 安装部署
+
 ```bash
-# 安装依赖
+# 1. 克隆项目
+git clone <repository-url>
+cd myapi
+
+# 2. 安装依赖
 pip install -r requirements.txt
 
-# 初始化数据库
+# 3. 初始化数据库
 python scripts/init_database.py
 
-# 启动服务
+# 4. 启动服务
 python -m app.main
 ```
 
-服务启动后访问：http://localhost:8087
+服务启动后访问：**<http://localhost:8087>**
 
-### 生产部署
+### 生产环境
+
 ```bash
-# 使用systemd服务
+# 使用systemd服务管理
 sudo cp scripts/myapi.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable myapi
 sudo systemctl start myapi
+
+# 或使用docker（推荐）
+docker build -t model-heart .
+docker run -d -p 8087:8087 --name model-heart model-heart
 ```
 
-## 📁 项目结构
+## 📋 API接口
+
+### 🔑 用户接口
+
+- `GET /` - 用户注册页面，生成API密钥
+- `POST /generate-api-key` - 生成新API密钥（需手机号+密码）
+- `POST /check-usage` - 查询个人使用额度
+
+### 🛠️ 管理接口
+
+- `GET /login` - 管理员登录页面
+- `GET /dashboard` - 管理控制台（需要认证）
+- `GET /models` - 获取所有可用模型列表
+- `GET /get-llm-servers` - 获取LLM服务器配置
+- `POST /update-llm-servers` - 更新服务器配置
+
+### 🤖 LLM转发接口
+
+- `POST /v1/chat/completions` - OpenAI兼容聊天接口
+- `POST /v1/completions` - OpenAI兼容文本补全
+- `POST /v1/embeddings` - OpenAI兼容向量化接口
+- `POST /anthropic/v1/messages` - Anthropic原生接口
+
+## 🏗️ 系统架构
 
 ```
 myapi/
-├── app/                    # 应用核心
-│   ├── api/               # API路由
-│   ├── config/            # 配置管理
-│   ├── core/              # 核心逻辑
-│   ├── database/          # 数据库操作
-│   ├── middleware/        # 中间件
-│   ├── models/            # 数据模型
-│   ├── services/          # 业务服务
-│   └── utils/             # 工具函数
-├── scripts/               # 脚本文件
-├── static/                # 静态资源
-├── templates/             # HTML模板
-└── requirements.txt       # 依赖列表
+├── app/                    # 应用核心模块
+│   ├── api/               # RESTful API路由层
+│   ├── config/            # 配置管理（环境变量、系统设置）
+│   ├── core/              # 应用工厂和核心逻辑
+│   ├── database/          # 数据库ORM和会话管理
+│   ├── middleware/        # 认证和权限中间件
+│   ├── models/            # 数据模型定义
+│   ├── services/          # 业务逻辑层（LLM服务、API服务）
+│   └── utils/             # 工具函数和辅助模块
+├── scripts/               # 部署和维护脚本
+├── static/                # 前端静态资源（JS/CSS/图片）
+├── templates/             # Jinja2 HTML模板
+└── requirements.txt       # Python依赖包列表
 ```
-
-## 🔌 API接口
-
-### 管理接口
-- `GET /` - 首页，生成API密钥
-- `GET /get-usage` - 用量统计和管理面板
-- `GET /models` - 获取可用模型列表
-- `POST /generate-api-key` - 生成API密钥
-
-### LLM接口
-- `POST /v1/chat/completions` - 聊天补全（兼容OpenAI）
-- `POST /v1/completions` - 文本补全
-- `POST /v1/embeddings` - 文本向量化
-- `POST /anthropic/v1/messages` - Anthropic API转发
 
 ## ⚙️ 配置说明
 
 ### 环境变量
+
 ```bash
-export SESSION_SECRET_KEY="your-secret-key"
-export DEFAULT_LIMIT=1000000
+# 必需配置
+export SESSION_SECRET_KEY="your-secret-key-here"  # Session加密密钥
+
+# 可选配置
+export DEFAULT_LIMIT=1000000                        # 默认用户Token限额
+export ENV=production                               # 运行环境（development/production）
 ```
 
-### 数据库配置
-项目使用SQLite数据库，所有配置数据存储在数据库中，无需JSON文件。
+### 数据库设计
 
-## 📊 功能特性
+- **存储引擎**：SQLite（轻量化，易部署）
+- **ORM框架**：SQLAlchemy 2.0（异步支持）
+- **核心表**：
+  - `api_keys` - API密钥和用户信息
+  - `llm_servers` - LLM服务器配置
+  - `server_models` - 模型映射关系
+  - `model_usage` - 使用统计记录
 
-### 用量管理
-- 基于token的精确用量计算
-- 模型权重配置支持
-- 实时限额检查和统计
+## 🎯 使用场景
 
-### 安全认证
-- API密钥验证
-- 手机号+密码双重认证
-- 会话管理和权限控制
+### 🏢 企业级应用
 
-### 多模型支持
-- 统一API接口
-- 自动负载均衡
-- 服务器健康检查
+- **多模型统一接入** - 同时支持OpenAI、Anthropic、本地模型等
+- **成本控制** - 精确的Token用量统计和限额管理
+- **高可用性** - 多服务器负载均衡，故障自动切换
 
-## 🔧 开发说明
+### 👥 个人开发者
 
-### 添加新模型
-1. 通过管理面板添加服务器配置
-2. 配置模型映射和权重
-3. 启用模型状态
+- **简化接入** - 统一的API接口，无需适配不同平台
+- **用量可视化** - 直观的使用统计和成本分析
+- **灵活扩展** - 支持自定义模型和服务器配置
 
-### 自定义配置
-修改 `app/config/settings.py` 中的配置项。
+## 🔧 高级特性
 
-## 📖 详细文档
+### 智能路由算法
 
-- [快速启动指南](scripts/QUICK_START.md) - 详细的部署和运维说明
+- **健康检查** - 定期ping服务器，自动剔除故障节点
+- **权重调整** - 根据响应时间和错误率动态调整权重
+- **连接复用** - HTTP/2支持，提升传输效率
+
+### 性能优化
+
+- **异步架构** - 全异步处理，支持高并发
+- **流式传输** - SSE协议支持，实时响应体验
+- **缓存机制** - 智能缓存常用配置，减少数据库查询
+
+## 📈 监控指标
+
+### 系统指标
+
+- 服务器健康状态和响应时间
+- API请求成功率和错误分布
+- 连接池使用情况
+
+### 业务指标
+
+- 用户注册和使用活跃度
+- 各模型使用频次和成本
+- Token消耗趋势分析
+
+## 🤝 贡献指南
+
+欢迎提交Issue和Pull Request来改进项目！
 
 ## 📄 许可证
 
