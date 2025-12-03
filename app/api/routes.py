@@ -68,10 +68,15 @@ async def _handle_llm_server_action(request, api_service, data, session: AsyncSe
         # 切换模型状态 - 只更新特定模型的status
         model_id = data.get("model")
         if model_id:
+            # 加载当前服务器配置
             servers_data = await api_service.load_llm_servers(session)
             if url in servers_data and model_id in servers_data[url].get("model", {}):
-                servers_data[url]["model"][model_id]["status"] = model_status
-                await api_service.save_llm_servers(servers_data, session)
+                # 只更新该模型的status，其他配置保持不变
+                server_config = servers_data[url].copy()
+                if "model" in server_config and model_id in server_config["model"]:
+                    server_config["model"][model_id]["status"] = model_status
+                    # 使用update_llm_server方法只更新这个服务器
+                    await api_service.update_llm_server(url, server_config, session)
     else:
         raise HTTPException(status_code=400, detail="Invalid action")
 

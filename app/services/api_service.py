@@ -140,11 +140,19 @@ class ApiService:
         output_weight = 1.0
         
         if model:
-            # 从数据库获取模型权重配置
+            # 从数据库获取模型权重配置，支持新旧字段
             from sqlalchemy.orm import selectinload
+            from sqlalchemy import or_
+            
+            # 同时查询新旧字段：前端模型名称可能是actual_model_name或frontend_model_name
             result = await session.execute(
                 select(ServerModel)
-                .where(ServerModel.actual_model_name == model)
+                .where(
+                    or_(
+                        ServerModel.actual_model_name == model,  # 旧字段
+                        ServerModel.frontend_model_name == model  # 新字段
+                    )
+                )
                 .options(selectinload(ServerModel.server))
             )
             server_models = result.scalars().all()
@@ -351,10 +359,15 @@ class ApiService:
                 "enabled": True
             }
             
-            # 手动构建模型映射 - 现在key是前端使用的模型名称，value中的name是实际后端模型名称
+            # 手动构建模型映射 - 支持新旧字段
             for model in server.models:
-                server_config["model"][model.actual_model_name] = {
-                    "name": model.client_model_name,  # 实际后端模型名称
+                # 获取前端模型名称（优先使用新字段）
+                frontend_name = model.frontend_model_name or model.actual_model_name
+                # 获取后端模型名称（优先使用新字段）
+                backend_name = model.backend_model_name or model.client_model_name
+                
+                server_config["model"][frontend_name] = {
+                    "name": backend_name,  # 实际后端模型名称
                     "reqs": model.reqs,
                     "status": model.status,
                     "input_token_weight": model.input_token_weight,
@@ -384,12 +397,18 @@ class ApiService:
                 apikey=server_data.get('apikey')
             )
             
-            # 添加模型配置 - 现在key是前端使用的模型名称，value中的name是实际后端模型名称
+            # 添加模型配置 - 同时设置新旧字段以确保兼容性
             models_data = server_data.get('model', {})
-            for actual_model_name, model_data in models_data.items():
+            for frontend_model_name, model_data in models_data.items():
+                backend_model_name = model_data.get('name', frontend_model_name)
+                
                 server_model = ServerModel(
-                    client_model_name=model_data.get('name', actual_model_name),  # 实际后端模型名称
-                    actual_model_name=actual_model_name,  # 前端使用的模型名称
+                    # 旧字段（保持兼容）
+                    client_model_name=backend_model_name,  # 实际后端模型名称
+                    actual_model_name=frontend_model_name,  # 前端使用的模型名称
+                    # 新字段（更清晰的命名）
+                    backend_model_name=backend_model_name,  # 实际后端模型名称
+                    frontend_model_name=frontend_model_name,  # 前端使用的模型名称
                     reqs=model_data.get('reqs', 0),
                     status=model_data.get('status', True),
                     input_token_weight=model_data.get('input_token_weight', 1.0),
@@ -427,18 +446,21 @@ class ApiService:
                 existing_server.device = server_data.get('device', existing_server.device)
                 existing_server.apikey = server_data.get('apikey', existing_server.apikey)
                 
-                # 获取新的模型配置 - 现在key是前端使用的模型名称，value中的name是实际后端模型名称
+                # 获取新的模型配置
                 models_data = server_data.get('model', {})
                 
-                # 创建现有模型的映射，用于保留请求计数
+                # 创建现有模型的映射，用于保留请求计数（支持新旧字段）
                 existing_models_map = {}
                 for model in existing_server.models:
-                    existing_models_map[model.actual_model_name] = model  # 使用前端模型名称作为key
+                    # 使用前端模型名称作为key，支持新旧字段
+                    frontend_name = model.frontend_model_name or model.actual_model_name
+                    existing_models_map[frontend_name] = model
                 
                 # 删除不存在的模型，更新或添加新的模型
                 models_to_delete = []
                 for existing_model in existing_server.models:
-                    if existing_model.actual_model_name not in models_data:
+                    frontend_name = existing_model.frontend_model_name or existing_model.actual_model_name
+                    if frontend_name not in models_data:
                         models_to_delete.append(existing_model)
                 
                 # 删除不存在的模型
@@ -448,11 +470,19 @@ class ApiService:
                     await session.delete(model_to_delete)
                 
                 # 更新或添加模型
-                for actual_model_name, model_data in models_data.items():
-                    if actual_model_name in existing_models_map:
+                for frontend_model_name, model_data in models_data.items():
+                    backend_model_name = model_data.get('name', frontend_model_name)
+                    
+                    if frontend_model_name in existing_models_map:
                         # 更新现有模型
-                        existing_model = existing_models_map[actual_model_name]
-                        existing_model.client_model_name = model_data.get('name', actual_model_name)  # 更新实际后端模型名称
+                        existing_model = existing_models_map[frontend_model_name]
+                        # 更新旧字段
+                        existing_model.client_model_name = backend_model_name  # 实际后端模型名称
+                        existing_model.actual_model_name = frontend_model_name  # 前端使用的模型名称
+                        # 更新新字段
+                        existing_model.backend_model_name = backend_model_name  # 实际后端模型名称
+                        existing_model.frontend_model_name = frontend_model_name  # 前端使用的模型名称
+                        
                         existing_model.status = model_data.get('status', True)
                         existing_model.input_token_weight = model_data.get('input_token_weight', 1.0)
                         existing_model.output_token_weight = model_data.get('output_token_weight', 1.0)
@@ -464,8 +494,12 @@ class ApiService:
                     else:
                         # 添加新模型
                         server_model = ServerModel(
-                            client_model_name=model_data.get('name', actual_model_name),  # 实际后端模型名称
-                            actual_model_name=actual_model_name,  # 前端使用的模型名称
+                            # 旧字段（保持兼容）
+                            client_model_name=backend_model_name,  # 实际后端模型名称
+                            actual_model_name=frontend_model_name,  # 前端使用的模型名称
+                            # 新字段（更清晰的命名）
+                            backend_model_name=backend_model_name,  # 实际后端模型名称
+                            frontend_model_name=frontend_model_name,  # 前端使用的模型名称
                             reqs=model_data.get('reqs', 0),
                             status=model_data.get('status', True),
                             input_token_weight=model_data.get('input_token_weight', 1.0),
@@ -480,14 +514,22 @@ class ApiService:
                     apikey=server_data.get('apikey')
                 )
                 
-                # 添加模型配置 - 现在key是前端使用的模型名称，value中的name是实际后端模型名称
+                # 添加模型配置 - 同时设置新旧字段
                 models_data = server_data.get('model', {})
-                for actual_model_name, model_data in models_data.items():
+                for frontend_model_name, model_data in models_data.items():
+                    backend_model_name = model_data.get('name', frontend_model_name)
+                    
                     server_model = ServerModel(
-                        client_model_name=model_data.get('name', actual_model_name),  # 实际后端模型名称
-                        actual_model_name=actual_model_name,  # 前端使用的模型名称
+                        # 旧字段（保持兼容）
+                        client_model_name=backend_model_name,  # 实际后端模型名称
+                        actual_model_name=frontend_model_name,  # 前端使用的模型名称
+                        # 新字段（更清晰的命名）
+                        backend_model_name=backend_model_name,  # 实际后端模型名称
+                        frontend_model_name=frontend_model_name,  # 前端使用的模型名称
                         reqs=model_data.get('reqs', 0),
-                        status=model_data.get('status', True)
+                        status=model_data.get('status', True),
+                        input_token_weight=model_data.get('input_token_weight', 1.0),
+                        output_token_weight=model_data.get('output_token_weight', 1.0)
                     )
                     llm_server.models.append(server_model)
                 
@@ -578,9 +620,11 @@ class ApiService:
         server = result.scalar_one_or_none()
         
         if server:
-            # 查找模型 - 使用actual_model_name（前端模型名称）来匹配
+            # 查找模型 - 支持新旧字段
             for server_model in server.models:
-                if server_model.actual_model_name == model_name:
+                # 检查是否匹配前端模型名称（支持新旧字段）
+                frontend_name = server_model.frontend_model_name or server_model.actual_model_name
+                if frontend_name == model_name:
                     server_model.reqs += 1
                     await session.commit()
                     break

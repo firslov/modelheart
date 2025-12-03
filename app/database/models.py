@@ -85,12 +85,15 @@ class ServerModel(Base):
     __tablename__ = "server_models"
     __table_args__ = (
         UniqueConstraint('server_id', 'actual_model_name', name='uq_server_model'),
+        UniqueConstraint('server_id', 'frontend_model_name', name='uq_server_model_new'),
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     server_id = Column(Integer, ForeignKey("llm_servers.id", ondelete="CASCADE"), nullable=False)
-    client_model_name = Column(String(100), nullable=False)  # 实际后端模型名称
-    actual_model_name = Column(String(100), nullable=False)  # 前端使用的模型名称
+    client_model_name = Column(String(100), nullable=False)  # 实际后端模型名称（旧字段，保持兼容）
+    actual_model_name = Column(String(100), nullable=False)  # 前端使用的模型名称（旧字段，保持兼容）
+    backend_model_name = Column(String(100), nullable=True)  # 实际后端模型名称（新字段）
+    frontend_model_name = Column(String(100), nullable=True)  # 前端使用的模型名称（新字段）
     reqs = Column(Integer, default=0)
     status = Column(Boolean, default=True)
     input_token_weight = Column(Float, default=1.0)  # input token权重
@@ -101,10 +104,15 @@ class ServerModel(Base):
 
     def to_dict(self):
         """转换为字典格式"""
+        # 优先使用新字段，如果新字段为空则使用旧字段
+        backend_name = self.backend_model_name or self.client_model_name
+        frontend_name = self.frontend_model_name or self.actual_model_name
+        
         return {
-            "name": self.client_model_name,  # 现在返回实际后端模型名称
+            "name": backend_name,  # 返回实际后端模型名称
             "reqs": self.reqs,
             "status": self.status,
             "input_token_weight": self.input_token_weight,
-            "output_token_weight": self.output_token_weight
+            "output_token_weight": self.output_token_weight,
+            "_frontend_name": frontend_name  # 内部使用，保持兼容
         }
