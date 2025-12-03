@@ -149,9 +149,11 @@ async function addServer() {
         return;
     }
 
-    // Collect models from table
+    // Collect models from table and check for duplicates
     const models = {};
+    const frontendModels = new Set();
     const rows = document.querySelectorAll('#addServerModelsTable tr');
+    const duplicateModels = [];
 
     for (const row of rows) {
         const frontendInput = row.querySelector('.model-frontend');
@@ -167,6 +169,19 @@ async function addServer() {
         const status = statusSelect.value === 'true';
 
         if (frontendModel && backendModel) {
+            // Check for duplicate frontend model names
+            if (frontendModels.has(frontendModel)) {
+                duplicateModels.push(frontendModel);
+                // Highlight the duplicate row
+                frontendInput.style.borderColor = '#ef4444';
+                frontendInput.style.backgroundColor = '#fef2f2';
+            } else {
+                frontendModels.add(frontendModel);
+                // Reset styling if not duplicate
+                frontendInput.style.borderColor = '';
+                frontendInput.style.backgroundColor = '';
+            }
+
             models[frontendModel] = {
                 name: backendModel,
                 status: status,
@@ -175,6 +190,13 @@ async function addServer() {
                 output_token_weight: outputWeight
             };
         }
+    }
+
+    // Show warning if duplicates found
+    if (duplicateModels.length > 0) {
+        const warningMessage = `发现重复的前端模型名称:\n${duplicateModels.join(', ')}\n\n每个前端模型名称在同一服务器中必须是唯一的。`;
+        alert(warningMessage);
+        return;
     }
 
     if (Object.keys(models).length === 0) {
@@ -200,7 +222,8 @@ async function addServer() {
         });
 
         if (!response.ok) {
-            throw new Error('Failed to add server');
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Failed to add server');
         }
 
         closeAddServerModal();
@@ -291,7 +314,8 @@ function addModelRow(frontendModel = '', backendModel = '', status = true, reqs 
     row.innerHTML = `
         <td class="px-4 py-2 border">
             <input type="text" class="w-full px-2 py-1 border rounded model-frontend" 
-                   value="${frontendModel}" placeholder="Frontend model name">
+                   value="${frontendModel}" placeholder="Frontend model name"
+                   oninput="validateModelName(this)">
         </td>
         <td class="px-4 py-2 border">
             <input type="text" class="w-full px-2 py-1 border rounded model-backend" 
@@ -340,9 +364,11 @@ async function updateServer() {
         return;
     }
 
-    // Collect models from table
+    // Collect models from table and check for duplicates
     const models = {};
+    const frontendModels = new Set();
     const rows = document.querySelectorAll('#editServerModelsTable tr');
+    const duplicateModels = [];
 
     // Get current server data once to avoid multiple API calls
     let currentServerData = null;
@@ -368,6 +394,19 @@ async function updateServer() {
         const status = statusSelect.value === 'true';
 
         if (frontendModel && backendModel) {
+            // Check for duplicate frontend model names
+            if (frontendModels.has(frontendModel)) {
+                duplicateModels.push(frontendModel);
+                // Highlight the duplicate row
+                frontendInput.style.borderColor = '#ef4444';
+                frontendInput.style.backgroundColor = '#fef2f2';
+            } else {
+                frontendModels.add(frontendModel);
+                // Reset styling if not duplicate
+                frontendInput.style.borderColor = '';
+                frontendInput.style.backgroundColor = '';
+            }
+
             // Get current reqs value from existing data
             let reqs = 0;
             if (currentServerData && currentServerData.model) {
@@ -386,6 +425,13 @@ async function updateServer() {
                 output_token_weight: outputWeight
             };
         }
+    }
+
+    // Show warning if duplicates found
+    if (duplicateModels.length > 0) {
+        const warningMessage = `发现重复的前端模型名称:\n${duplicateModels.join(', ')}\n\n每个前端模型名称在同一服务器中必须是唯一的。`;
+        alert(warningMessage);
+        return;
     }
 
     if (Object.keys(models).length === 0) {
@@ -784,6 +830,42 @@ function createModelUsageDetails(modelUsage) {
     }
 
     return details;
+}
+
+// Real-time validation for model names
+function validateModelName(inputElement) {
+    const table = inputElement.closest('tbody');
+    const rows = table.querySelectorAll('tr');
+    const currentValue = inputElement.value.trim();
+    
+    // Reset styling
+    inputElement.style.borderColor = '';
+    inputElement.style.backgroundColor = '';
+    
+    if (!currentValue) {
+        return;
+    }
+    
+    // Check for duplicates
+    let duplicateCount = 0;
+    rows.forEach(row => {
+        const otherInput = row.querySelector('.model-frontend');
+        if (otherInput && otherInput !== inputElement && otherInput.value.trim() === currentValue) {
+            duplicateCount++;
+        }
+    });
+    
+    if (duplicateCount > 0) {
+        inputElement.style.borderColor = '#ef4444';
+        inputElement.style.backgroundColor = '#fef2f2';
+        
+        // Show warning tooltip
+        if (!inputElement.title.includes('重复')) {
+            inputElement.title = `前端模型名称重复！已有 ${duplicateCount} 个相同的名称。`;
+        }
+    } else {
+        inputElement.title = '';
+    }
 }
 
 // Initialize model usage data
