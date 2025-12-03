@@ -581,22 +581,55 @@ async def proxy_handler_chat(
                 end_time = time.time()
                 total_duration = end_time - start_time
 
-                # 流式响应结束后，异步更新统计信息
-                async def update_stats_async():
-                    from app.database.database import AsyncSessionLocal
-
-                    async with AsyncSessionLocal() as new_session:
-                        # 重新获取服务实例
-                        _, new_api_service = get_services(request)
-                        # 更新最终用量
-                        await new_api_service.update_usage(
-                            api_key, req_data, model, new_session
-                        )
-                        # 更新模型请求计数
-                        await new_api_service.increment_model_reqs(
-                            target_server, model, new_session
-                        )
-                        await new_session.commit()
+                # 流式响应结束后，异步更新统计信息（使用现有会话，添加错误处理和重试）
+                async def update_stats_async_with_retry():
+                    max_retries = 3
+                    retry_delay = 1.0  # 初始重试延迟（秒）
+                    
+                    for attempt in range(max_retries):
+                        try:
+                            # 使用现有会话而不是创建新会话
+                            # 重新获取服务实例
+                            _, new_api_service = get_services(request)
+                            # 更新最终用量
+                            await new_api_service.update_usage(
+                                api_key, req_data, model, session
+                            )
+                            # 更新模型请求计数
+                            await new_api_service.increment_model_reqs(
+                                target_server, model, session
+                            )
+                            await session.commit()
+                            
+                            # 记录成功
+                            from app.utils.helpers import logger
+                            logger.info(
+                                f"Stream stats updated successfully - Model: {model}, "
+                                f"Attempt: {attempt + 1}/{max_retries}"
+                            )
+                            break  # 成功，退出重试循环
+                            
+                        except Exception as e:
+                            from app.utils.helpers import logger
+                            logger.error(
+                                f"Failed to update stream stats (attempt {attempt + 1}/{max_retries}): {e}"
+                            )
+                            
+                            if attempt < max_retries - 1:
+                                # 等待一段时间后重试
+                                await asyncio.sleep(retry_delay)
+                                retry_delay *= 2  # 指数退避
+                            else:
+                                # 最后一次尝试也失败，记录错误但不抛出异常
+                                logger.error(
+                                    f"All retries failed for stream stats update - Model: {model}, "
+                                    f"Error: {e}"
+                                )
+                                # 回滚会话以避免污染
+                                try:
+                                    await session.rollback()
+                                except:
+                                    pass
 
                 # 记录流式响应性能指标
                 from app.utils.helpers import logger
@@ -608,7 +641,7 @@ async def proxy_handler_chat(
                 )
 
                 # 不等待统计更新完成，立即返回流式响应
-                asyncio.create_task(update_stats_async())
+                asyncio.create_task(update_stats_async_with_retry())
 
             return StreamingResponse(
                 stream_wrapper(),
@@ -756,25 +789,58 @@ async def proxy_handler_completions(
                     async for chunk in response.aiter_text():
                         yield chunk
 
-                # 流式响应结束后，异步更新统计信息
-                async def update_stats_async():
-                    from app.database.database import AsyncSessionLocal
-
-                    async with AsyncSessionLocal() as new_session:
-                        # 重新获取服务实例
-                        _, new_api_service = get_services(request)
-                        # 更新Anthropic使用统计
-                        await new_api_service.update_anthropic_usage(
-                            api_key, model, new_session
-                        )
-                        # 更新模型请求计数
-                        await new_api_service.increment_model_reqs(
-                            target_server, model, new_session
-                        )
-                        await new_session.commit()
+                # 流式响应结束后，异步更新统计信息（使用现有会话，添加错误处理和重试）
+                async def update_stats_async_with_retry():
+                    max_retries = 3
+                    retry_delay = 1.0  # 初始重试延迟（秒）
+                    
+                    for attempt in range(max_retries):
+                        try:
+                            # 使用现有会话而不是创建新会话
+                            # 重新获取服务实例
+                            _, new_api_service = get_services(request)
+                            # 更新Anthropic使用统计
+                            await new_api_service.update_anthropic_usage(
+                                api_key, model, session
+                            )
+                            # 更新模型请求计数
+                            await new_api_service.increment_model_reqs(
+                                target_server, model, session
+                            )
+                            await session.commit()
+                            
+                            # 记录成功
+                            from app.utils.helpers import logger
+                            logger.info(
+                                f"Anthropic stream stats updated successfully - Model: {model}, "
+                                f"Attempt: {attempt + 1}/{max_retries}"
+                            )
+                            break  # 成功，退出重试循环
+                            
+                        except Exception as e:
+                            from app.utils.helpers import logger
+                            logger.error(
+                                f"Failed to update Anthropic stream stats (attempt {attempt + 1}/{max_retries}): {e}"
+                            )
+                            
+                            if attempt < max_retries - 1:
+                                # 等待一段时间后重试
+                                await asyncio.sleep(retry_delay)
+                                retry_delay *= 2  # 指数退避
+                            else:
+                                # 最后一次尝试也失败，记录错误但不抛出异常
+                                logger.error(
+                                    f"All retries failed for Anthropic stream stats update - Model: {model}, "
+                                    f"Error: {e}"
+                                )
+                                # 回滚会话以避免污染
+                                try:
+                                    await session.rollback()
+                                except:
+                                    pass
 
                 # 不等待统计更新完成，立即返回流式响应
-                asyncio.create_task(update_stats_async())
+                asyncio.create_task(update_stats_async_with_retry())
 
             return StreamingResponse(
                 stream_wrapper(),
@@ -868,25 +934,58 @@ async def anthropic_proxy_handler(
                     async for chunk in response.aiter_text():
                         yield chunk
 
-                # 流式响应结束后，异步更新统计信息
-                async def update_stats_async():
-                    from app.database.database import AsyncSessionLocal
-
-                    async with AsyncSessionLocal() as new_session:
-                        # 重新获取服务实例
-                        _, new_api_service = get_services(request)
-                        # 更新Anthropic使用统计
-                        await new_api_service.update_anthropic_usage(
-                            api_key, model, new_session
-                        )
-                        # 更新模型请求计数
-                        await new_api_service.increment_model_reqs(
-                            target_server, model, new_session
-                        )
-                        await new_session.commit()
+                # 流式响应结束后，异步更新统计信息（使用现有会话，添加错误处理和重试）
+                async def update_stats_async_with_retry():
+                    max_retries = 3
+                    retry_delay = 1.0  # 初始重试延迟（秒）
+                    
+                    for attempt in range(max_retries):
+                        try:
+                            # 使用现有会话而不是创建新会话
+                            # 重新获取服务实例
+                            _, new_api_service = get_services(request)
+                            # 更新Anthropic使用统计
+                            await new_api_service.update_anthropic_usage(
+                                api_key, model, session
+                            )
+                            # 更新模型请求计数
+                            await new_api_service.increment_model_reqs(
+                                target_server, model, session
+                            )
+                            await session.commit()
+                            
+                            # 记录成功
+                            from app.utils.helpers import logger
+                            logger.info(
+                                f"Anthropic stream stats updated successfully - Model: {model}, "
+                                f"Attempt: {attempt + 1}/{max_retries}"
+                            )
+                            break  # 成功，退出重试循环
+                            
+                        except Exception as e:
+                            from app.utils.helpers import logger
+                            logger.error(
+                                f"Failed to update Anthropic stream stats (attempt {attempt + 1}/{max_retries}): {e}"
+                            )
+                            
+                            if attempt < max_retries - 1:
+                                # 等待一段时间后重试
+                                await asyncio.sleep(retry_delay)
+                                retry_delay *= 2  # 指数退避
+                            else:
+                                # 最后一次尝试也失败，记录错误但不抛出异常
+                                logger.error(
+                                    f"All retries failed for Anthropic stream stats update - Model: {model}, "
+                                    f"Error: {e}"
+                                )
+                                # 回滚会话以避免污染
+                                try:
+                                    await session.rollback()
+                                except:
+                                    pass
 
                 # 不等待统计更新完成，立即返回流式响应
-                asyncio.create_task(update_stats_async())
+                asyncio.create_task(update_stats_async_with_retry())
 
             return StreamingResponse(
                 stream_wrapper(),

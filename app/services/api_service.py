@@ -28,7 +28,16 @@ class ApiService:
             self.encoding = None
             self._use_tiktoken = False
         
-        self._token_cache = {}  # 添加token缓存
+        # 改进的token缓存：使用LRU缓存策略
+        self._token_cache = {}  # token缓存
+        self._token_cache_keys = []  # 用于LRU管理的key列表
+        self._max_token_cache_size = 1000  # 最大缓存大小
+        
+        # 模型权重缓存
+        self._model_weights_cache = {}  # 模型权重缓存
+        self._model_weights_last_updated = 0  # 最后更新时间
+        self._model_weights_cache_ttl = 60  # 缓存TTL（秒）
+        
         self._stats_cache = None  # 统计缓存
         self._stats_last_updated = 0
 
@@ -119,6 +128,62 @@ class ApiService:
         else:
             await self._update_usage_internal(api_key, request_data, model, session)
 
+    async def _get_model_weights(self, model: str, session: AsyncSession) -> tuple[float, float]:
+        """获取模型权重，使用缓存优化
+        
+        Args:
+            model: 模型名称
+            session: 数据库会话
+            
+        Returns:
+            tuple: (input_weight, output_weight)
+        """
+        current_time = time.time()
+        
+        # 检查缓存是否有效
+        cache_key = model
+        if (cache_key in self._model_weights_cache and 
+            current_time - self._model_weights_last_updated < self._model_weights_cache_ttl):
+            return self._model_weights_cache[cache_key]
+        
+        # 从数据库获取模型权重配置，支持新旧字段
+        from sqlalchemy.orm import selectinload
+        from sqlalchemy import or_
+        
+        # 同时查询新旧字段：前端模型名称可能是actual_model_name或frontend_model_name
+        result = await session.execute(
+            select(ServerModel)
+            .where(
+                or_(
+                    ServerModel.actual_model_name == model,  # 旧字段
+                    ServerModel.frontend_model_name == model  # 新字段
+                )
+            )
+            .options(selectinload(ServerModel.server))
+        )
+        server_models = result.scalars().all()
+        
+        # 默认权重
+        input_weight = 1.0
+        output_weight = 1.0
+        
+        if server_models:
+            # 优先选择启用的模型
+            enabled_models = [m for m in server_models if m.status]
+            if enabled_models:
+                server_model = enabled_models[0]
+            else:
+                server_model = server_models[0]  # 如果没有启用的，使用第一个
+            
+            input_weight = server_model.input_token_weight
+            output_weight = server_model.output_token_weight
+        
+        # 更新缓存
+        self._model_weights_cache[cache_key] = (input_weight, output_weight)
+        self._model_weights_last_updated = current_time
+        
+        return input_weight, output_weight
+
     async def _update_usage_internal(self, api_key: str, request_data: Dict, model: str, session: AsyncSession) -> None:
         """内部更新使用情况方法"""
         # 获取API密钥记录
@@ -135,39 +200,12 @@ class ApiService:
         api_key_record.last_used_str = get_current_time()
         api_key_record.reqs += 1
 
-        # 获取模型权重
+        # 获取模型权重（使用缓存优化）
         input_weight = 1.0
         output_weight = 1.0
         
         if model:
-            # 从数据库获取模型权重配置，支持新旧字段
-            from sqlalchemy.orm import selectinload
-            from sqlalchemy import or_
-            
-            # 同时查询新旧字段：前端模型名称可能是actual_model_name或frontend_model_name
-            result = await session.execute(
-                select(ServerModel)
-                .where(
-                    or_(
-                        ServerModel.actual_model_name == model,  # 旧字段
-                        ServerModel.frontend_model_name == model  # 新字段
-                    )
-                )
-                .options(selectinload(ServerModel.server))
-            )
-            server_models = result.scalars().all()
-            
-            # 如果有多个匹配的模型，使用第一个启用的模型
-            if server_models:
-                # 优先选择启用的模型
-                enabled_models = [m for m in server_models if m.status]
-                if enabled_models:
-                    server_model = enabled_models[0]
-                else:
-                    server_model = server_models[0]  # 如果没有启用的，使用第一个
-                
-                input_weight = server_model.input_token_weight
-                output_weight = server_model.output_token_weight
+            input_weight, output_weight = await self._get_model_weights(model, session)
 
         # 计算加权token数量
         weighted_tokens = 0
@@ -195,19 +233,35 @@ class ApiService:
             for m in request_data.get("messages", []):
                 content = m.get("content", "")
                 if isinstance(content, str):
-                    # 使用缓存避免重复计算
+                    # 使用改进的缓存机制
                     cache_key = hash(content)
                     if cache_key in self._token_cache:
                         prompt_tokens += self._token_cache[cache_key]
+                        # 更新LRU：将最近使用的key移到列表末尾
+                        if cache_key in self._token_cache_keys:
+                            self._token_cache_keys.remove(cache_key)
+                        self._token_cache_keys.append(cache_key)
                     else:
                         if self._use_tiktoken and self.encoding:
                             # 使用tiktoken计算token数量
                             token_count = len(self.encoding.encode(content))
                         else:
-                            # 回退方案：使用简单的字符计数（大约4个字符=1个token）
-                            token_count = max(1, len(content) // 4)
+                            # 改进的回退方案：使用更准确的字符计数算法
+                            # 中文大约1.5个字符=1个token，英文大约4个字符=1个token
+                            chinese_chars = sum(1 for c in content if '\u4e00' <= c <= '\u9fff')
+                            english_chars = len(content) - chinese_chars
+                            token_count = max(1, int(chinese_chars / 1.5 + english_chars / 4))
+                        
+                        # 添加到缓存
                         self._token_cache[cache_key] = token_count
+                        self._token_cache_keys.append(cache_key)
                         prompt_tokens += token_count
+                        
+                        # 检查缓存大小，使用LRU策略清理
+                        if len(self._token_cache) > self._max_token_cache_size:
+                            # 移除最久未使用的缓存项
+                            oldest_key = self._token_cache_keys.pop(0)
+                            del self._token_cache[oldest_key]
             
             # 估算output tokens（假设为input tokens的1/3）
             completion_tokens = max(1, int(prompt_tokens * 0.33))
@@ -241,12 +295,6 @@ class ApiService:
             
             model_usage.requests += 1
             model_usage.tokens += weighted_tokens
-
-        # 限制缓存大小
-        if len(self._token_cache) > 1000:
-            # 移除最旧的缓存项
-            oldest_key = next(iter(self._token_cache))
-            del self._token_cache[oldest_key]
 
         await session.commit()
         # log_api_usage(api_key, api_key_record.to_dict())
