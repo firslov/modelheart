@@ -18,7 +18,16 @@ class ApiService:
     """API服务管理类"""
 
     def __init__(self):
-        self.encoding = tiktoken.encoding_for_model(settings.TOKENIZER_MODEL)
+        # 尝试初始化tiktoken编码，如果失败则使用简单的字符计数作为回退
+        try:
+            self.encoding = tiktoken.encoding_for_model(settings.TOKENIZER_MODEL)
+            self._use_tiktoken = True
+        except Exception as e:
+            # 如果tiktoken初始化失败（例如网络问题），使用简单的字符计数
+            print(f"Warning: tiktoken initialization failed: {e}. Using fallback token counting.")
+            self.encoding = None
+            self._use_tiktoken = False
+        
         self._token_cache = {}  # 添加token缓存
         self._stats_cache = None  # 统计缓存
         self._stats_last_updated = 0
@@ -183,7 +192,12 @@ class ApiService:
                     if cache_key in self._token_cache:
                         prompt_tokens += self._token_cache[cache_key]
                     else:
-                        token_count = len(self.encoding.encode(content))
+                        if self._use_tiktoken and self.encoding:
+                            # 使用tiktoken计算token数量
+                            token_count = len(self.encoding.encode(content))
+                        else:
+                            # 回退方案：使用简单的字符计数（大约4个字符=1个token）
+                            token_count = max(1, len(content) // 4)
                         self._token_cache[cache_key] = token_count
                         prompt_tokens += token_count
             
