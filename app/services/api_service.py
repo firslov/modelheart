@@ -411,87 +411,101 @@ class ApiService:
         """
         from sqlalchemy.orm import selectinload
         from sqlalchemy import delete
+        from sqlalchemy.exc import IntegrityError
         
-        # 查找现有服务器
-        result = await session.execute(
-            select(LLMServer)
-            .where(LLMServer.server_url == server_url)
-            .options(selectinload(LLMServer.models))
-        )
-        existing_server = result.scalar_one_or_none()
-        
-        if existing_server:
-            # 更新服务器信息
-            existing_server.device = server_data.get('device', existing_server.device)
-            existing_server.apikey = server_data.get('apikey', existing_server.apikey)
+        try:
+            # 查找现有服务器
+            result = await session.execute(
+                select(LLMServer)
+                .where(LLMServer.server_url == server_url)
+                .options(selectinload(LLMServer.models))
+            )
+            existing_server = result.scalar_one_or_none()
             
-            # 获取新的模型配置 - 现在key是前端使用的模型名称，value中的name是实际后端模型名称
-            models_data = server_data.get('model', {})
-            
-            # 创建现有模型的映射，用于保留请求计数
-            existing_models_map = {}
-            for model in existing_server.models:
-                existing_models_map[model.actual_model_name] = model  # 使用前端模型名称作为key
-            
-            # 删除不存在的模型，更新或添加新的模型
-            models_to_delete = []
-            for existing_model in existing_server.models:
-                if existing_model.actual_model_name not in models_data:
-                    models_to_delete.append(existing_model)
-            
-            # 删除不存在的模型
-            for model_to_delete in models_to_delete:
-                existing_server.models.remove(model_to_delete)
-                # 确保从数据库中删除
-                await session.delete(model_to_delete)
-            
-            # 更新或添加模型
-            for actual_model_name, model_data in models_data.items():
-                if actual_model_name in existing_models_map:
-                    # 更新现有模型
-                    existing_model = existing_models_map[actual_model_name]
-                    existing_model.client_model_name = model_data.get('name', actual_model_name)  # 更新实际后端模型名称
-                    existing_model.status = model_data.get('status', True)
-                    existing_model.input_token_weight = model_data.get('input_token_weight', 1.0)
-                    existing_model.output_token_weight = model_data.get('output_token_weight', 1.0)
-                    # 保留原有的请求计数，除非明确指定新的值
-                    if 'reqs' in model_data:
-                        existing_model.reqs = model_data.get('reqs', 0)
-                    # 确保模型被标记为已修改
-                    session.add(existing_model)
-                else:
-                    # 添加新模型
+            if existing_server:
+                # 更新服务器信息
+                existing_server.device = server_data.get('device', existing_server.device)
+                existing_server.apikey = server_data.get('apikey', existing_server.apikey)
+                
+                # 获取新的模型配置 - 现在key是前端使用的模型名称，value中的name是实际后端模型名称
+                models_data = server_data.get('model', {})
+                
+                # 创建现有模型的映射，用于保留请求计数
+                existing_models_map = {}
+                for model in existing_server.models:
+                    existing_models_map[model.actual_model_name] = model  # 使用前端模型名称作为key
+                
+                # 删除不存在的模型，更新或添加新的模型
+                models_to_delete = []
+                for existing_model in existing_server.models:
+                    if existing_model.actual_model_name not in models_data:
+                        models_to_delete.append(existing_model)
+                
+                # 删除不存在的模型
+                for model_to_delete in models_to_delete:
+                    existing_server.models.remove(model_to_delete)
+                    # 确保从数据库中删除
+                    await session.delete(model_to_delete)
+                
+                # 更新或添加模型
+                for actual_model_name, model_data in models_data.items():
+                    if actual_model_name in existing_models_map:
+                        # 更新现有模型
+                        existing_model = existing_models_map[actual_model_name]
+                        existing_model.client_model_name = model_data.get('name', actual_model_name)  # 更新实际后端模型名称
+                        existing_model.status = model_data.get('status', True)
+                        existing_model.input_token_weight = model_data.get('input_token_weight', 1.0)
+                        existing_model.output_token_weight = model_data.get('output_token_weight', 1.0)
+                        # 保留原有的请求计数，除非明确指定新的值
+                        if 'reqs' in model_data:
+                            existing_model.reqs = model_data.get('reqs', 0)
+                        # 确保模型被标记为已修改
+                        session.add(existing_model)
+                    else:
+                        # 添加新模型
+                        server_model = ServerModel(
+                            client_model_name=model_data.get('name', actual_model_name),  # 实际后端模型名称
+                            actual_model_name=actual_model_name,  # 前端使用的模型名称
+                            reqs=model_data.get('reqs', 0),
+                            status=model_data.get('status', True),
+                            input_token_weight=model_data.get('input_token_weight', 1.0),
+                            output_token_weight=model_data.get('output_token_weight', 1.0)
+                        )
+                        existing_server.models.append(server_model)
+            else:
+                # 如果服务器不存在，创建新的
+                llm_server = LLMServer(
+                    server_url=server_url,
+                    device=server_data.get('device'),
+                    apikey=server_data.get('apikey')
+                )
+                
+                # 添加模型配置 - 现在key是前端使用的模型名称，value中的name是实际后端模型名称
+                models_data = server_data.get('model', {})
+                for actual_model_name, model_data in models_data.items():
                     server_model = ServerModel(
                         client_model_name=model_data.get('name', actual_model_name),  # 实际后端模型名称
                         actual_model_name=actual_model_name,  # 前端使用的模型名称
                         reqs=model_data.get('reqs', 0),
-                        status=model_data.get('status', True),
-                        input_token_weight=model_data.get('input_token_weight', 1.0),
-                        output_token_weight=model_data.get('output_token_weight', 1.0)
+                        status=model_data.get('status', True)
                     )
-                    existing_server.models.append(server_model)
-        else:
-            # 如果服务器不存在，创建新的
-            llm_server = LLMServer(
-                server_url=server_url,
-                device=server_data.get('device'),
-                apikey=server_data.get('apikey')
-            )
+                    llm_server.models.append(server_model)
+                
+                session.add(llm_server)
             
-            # 添加模型配置 - 现在key是前端使用的模型名称，value中的name是实际后端模型名称
-            models_data = server_data.get('model', {})
-            for actual_model_name, model_data in models_data.items():
-                server_model = ServerModel(
-                    client_model_name=model_data.get('name', actual_model_name),  # 实际后端模型名称
-                    actual_model_name=actual_model_name,  # 前端使用的模型名称
-                    reqs=model_data.get('reqs', 0),
-                    status=model_data.get('status', True)
-                )
-                llm_server.models.append(server_model)
+            await session.commit()
             
-            session.add(llm_server)
-        
-        await session.commit()
+        except IntegrityError as e:
+            # 回滚事务
+            await session.rollback()
+            # 记录错误并重新抛出
+            print(f"数据库完整性错误: {e}")
+            raise HTTPException(400, f"数据库完整性错误: 可能存在重复的模型配置")
+        except Exception as e:
+            # 回滚事务
+            await session.rollback()
+            print(f"更新LLM服务器时出错: {e}")
+            raise
 
     async def update_anthropic_usage(self, api_key: str, model: str, session: AsyncSession) -> None:
         """更新Anthropic API使用情况 - 只增加请求计数，不计算token用量

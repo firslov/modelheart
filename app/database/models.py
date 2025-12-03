@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -83,6 +83,9 @@ class LLMServer(Base):
 class ServerModel(Base):
     """服务器模型映射表"""
     __tablename__ = "server_models"
+    __table_args__ = (
+        UniqueConstraint('server_id', 'actual_model_name', name='uq_server_model'),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     server_id = Column(Integer, ForeignKey("llm_servers.id", ondelete="CASCADE"), nullable=False)
