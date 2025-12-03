@@ -97,7 +97,11 @@ async def get_llm_servers(
         _, api_service = get_services(request)
         servers_data = await api_service.load_llm_servers(session)
         return servers_data
+    except HTTPException:
+        raise
     except Exception as e:
+        import logging
+        logging.error(f"Error loading LLM servers: {e}", exc_info=True)
         raise HTTPException(
             status_code=500, detail=f"Error loading LLM servers: {str(e)}"
         )
@@ -116,6 +120,8 @@ async def update_llm_servers(
     except HTTPException:
         raise
     except Exception as e:
+        import logging
+        logging.error(f"Error updating LLM servers: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail=f"Error updating LLM servers: {str(e)}",
@@ -149,6 +155,8 @@ async def list_models(
 
         return {"object": "list", "data": models}
     except Exception as e:
+        import logging
+        logging.error(f"Error loading models: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error loading models: {str(e)}")
 
 
@@ -178,6 +186,8 @@ async def get_models(request: Request, session: AsyncSession = Depends(get_db_se
         return {"models": models}
 
     except Exception as e:
+        import logging
+        logging.error(f"Error loading models: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error loading models: {str(e)}")
 
 

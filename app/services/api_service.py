@@ -51,16 +51,24 @@ class ApiService:
         Raises:
             HTTPException: 无效的API密钥
         """
-        if not api_key:
-            raise HTTPException(401, "Invalid API Key")
-        
-        result = await session.execute(
-            select(ApiKey).where(ApiKey.api_key == api_key)
-        )
-        api_key_record = result.scalar_one_or_none()
-        
-        if not api_key_record:
-            raise HTTPException(401, "Invalid API Key")
+        try:
+            if not api_key:
+                raise HTTPException(401, "Invalid API Key")
+            
+            result = await session.execute(
+                select(ApiKey).where(ApiKey.api_key == api_key)
+            )
+            api_key_record = result.scalar_one_or_none()
+            
+            if not api_key_record:
+                raise HTTPException(401, "Invalid API Key")
+        except HTTPException:
+            raise
+        except Exception as e:
+            # 记录数据库查询错误
+            import logging
+            logging.error(f"Database error in validate_api_key: {e}")
+            raise HTTPException(500, "Internal server error during API key validation")
 
     async def check_usage_limit(self, api_key: str, session: AsyncSession) -> None:
         """检查使用限额
@@ -72,13 +80,21 @@ class ApiService:
         Raises:
             HTTPException: 超出使用限额
         """
-        result = await session.execute(
-            select(ApiKey).where(ApiKey.api_key == api_key)
-        )
-        api_key_record = result.scalar_one_or_none()
-        
-        if api_key_record and api_key_record.usage >= api_key_record.limit_value:
-            raise HTTPException(402, "Usage limit exceeded")
+        try:
+            result = await session.execute(
+                select(ApiKey).where(ApiKey.api_key == api_key)
+            )
+            api_key_record = result.scalar_one_or_none()
+            
+            if api_key_record and api_key_record.usage >= api_key_record.limit_value:
+                raise HTTPException(402, "Usage limit exceeded")
+        except HTTPException:
+            raise
+        except Exception as e:
+            # 记录数据库查询错误
+            import logging
+            logging.error(f"Database error in check_usage_limit: {e}")
+            raise HTTPException(500, "Internal server error during usage limit check")
 
     async def generate_api_key(self, session: AsyncSession) -> str:
         """生成新的API密钥
@@ -89,28 +105,35 @@ class ApiService:
         Returns:
             str: 新生成的API密钥
         """
-        new_key = generate_token()
-        
-        # 检查是否已存在
-        result = await session.execute(
-            select(ApiKey).where(ApiKey.api_key == new_key)
-        )
-        existing = result.scalar_one_or_none()
-        
-        if existing:
-            # 如果已存在，重新生成
-            return await self.generate_api_key(session)
-        
-        # 创建新的API密钥记录
-        api_key = ApiKey(
-            api_key=new_key,
-            limit_value=settings.DEFAULT_LIMIT,
-            created_at_str=get_current_time()
-        )
-        session.add(api_key)
-        await session.commit()
-        
-        return new_key
+        try:
+            new_key = generate_token()
+            
+            # 检查是否已存在
+            result = await session.execute(
+                select(ApiKey).where(ApiKey.api_key == new_key)
+            )
+            existing = result.scalar_one_or_none()
+            
+            if existing:
+                # 如果已存在，重新生成
+                return await self.generate_api_key(session)
+            
+            # 创建新的API密钥记录
+            api_key = ApiKey(
+                api_key=new_key,
+                limit_value=settings.DEFAULT_LIMIT,
+                created_at_str=get_current_time()
+            )
+            session.add(api_key)
+            await session.commit()
+            
+            return new_key
+        except Exception as e:
+            # 回滚事务并记录错误
+            await session.rollback()
+            import logging
+            logging.error(f"Error generating API key: {e}")
+            raise HTTPException(500, "Failed to generate API key")
 
     async def update_usage(self, api_key: str, request_data: Dict, model: str = None, session: AsyncSession = None) -> None:
         """更新API使用情况，根据模型权重计算token
@@ -185,119 +208,133 @@ class ApiService:
         return input_weight, output_weight
 
     async def _update_usage_internal(self, api_key: str, request_data: Dict, model: str, session: AsyncSession) -> None:
-        """内部更新使用情况方法"""
-        # 获取API密钥记录
-        result = await session.execute(
-            select(ApiKey).where(ApiKey.api_key == api_key)
-        )
-        api_key_record = result.scalar_one_or_none()
-        
-        if not api_key_record:
-            return
-
-        # 更新最后使用时间
-        api_key_record.last_used = datetime.now()
-        api_key_record.last_used_str = get_current_time()
-        api_key_record.reqs += 1
-
-        # 获取模型权重（使用缓存优化）
-        input_weight = 1.0
-        output_weight = 1.0
-        
-        if model:
-            input_weight, output_weight = await self._get_model_weights(model, session)
-
-        # 计算加权token数量
-        weighted_tokens = 0
-        
-        # 从响应中获取实际的input和output token数量
-        if "usage" in request_data:
-            # 如果请求数据中已经包含usage信息（来自上游响应）
-            usage_data = request_data["usage"]
-            prompt_tokens = usage_data.get("prompt_tokens", 0)
+        """内部更新使用情况方法 - 使用SELECT FOR UPDATE防止并发竞争条件"""
+        try:
+            # 使用SELECT FOR UPDATE锁定API密钥记录，防止并发更新
+            from sqlalchemy import select, update, and_
             
-            # 处理embeddings接口的特殊情况（只有prompt_tokens和total_tokens）
-            if "completion_tokens" in usage_data:
-                completion_tokens = usage_data.get("completion_tokens", 0)
-            elif "total_tokens" in usage_data:
-                # embeddings接口：total_tokens = prompt_tokens
-                completion_tokens = 0
-            else:
-                completion_tokens = 0
-            
-            # 应用权重计算
-            weighted_tokens = (prompt_tokens * input_weight) + (completion_tokens * output_weight)
-        else:
-            # 回退到基于消息内容的估算
-            prompt_tokens = 0
-            for m in request_data.get("messages", []):
-                content = m.get("content", "")
-                if isinstance(content, str):
-                    # 使用改进的缓存机制
-                    cache_key = hash(content)
-                    if cache_key in self._token_cache:
-                        prompt_tokens += self._token_cache[cache_key]
-                        # 更新LRU：将最近使用的key移到列表末尾
-                        if cache_key in self._token_cache_keys:
-                            self._token_cache_keys.remove(cache_key)
-                        self._token_cache_keys.append(cache_key)
-                    else:
-                        if self._use_tiktoken and self.encoding:
-                            # 使用tiktoken计算token数量
-                            token_count = len(self.encoding.encode(content))
-                        else:
-                            # 改进的回退方案：使用更准确的字符计数算法
-                            # 中文大约1.5个字符=1个token，英文大约4个字符=1个token
-                            chinese_chars = sum(1 for c in content if '\u4e00' <= c <= '\u9fff')
-                            english_chars = len(content) - chinese_chars
-                            token_count = max(1, int(chinese_chars / 1.5 + english_chars / 4))
-                        
-                        # 添加到缓存
-                        self._token_cache[cache_key] = token_count
-                        self._token_cache_keys.append(cache_key)
-                        prompt_tokens += token_count
-                        
-                        # 检查缓存大小，使用LRU策略清理
-                        if len(self._token_cache) > self._max_token_cache_size:
-                            # 移除最久未使用的缓存项
-                            oldest_key = self._token_cache_keys.pop(0)
-                            del self._token_cache[oldest_key]
-            
-            # 估算output tokens（假设为input tokens的1/3）
-            completion_tokens = max(1, int(prompt_tokens * 0.33))
-            
-            # 应用权重计算
-            weighted_tokens = (prompt_tokens * input_weight) + (completion_tokens * output_weight)
-
-        api_key_record.usage += weighted_tokens
-
-        # 更新模型使用统计
-        if model:
-            # 查找或创建模型使用记录
             result = await session.execute(
-                select(ModelUsage).where(
-                    and_(
-                        ModelUsage.api_key_id == api_key_record.id,
-                        ModelUsage.model_name == model
-                    )
-                )
+                select(ApiKey)
+                .where(ApiKey.api_key == api_key)
+                .with_for_update()  # 锁定记录，防止并发更新
             )
-            model_usage = result.scalar_one_or_none()
+            api_key_record = result.scalar_one_or_none()
             
-            if not model_usage:
-                model_usage = ModelUsage(
-                    api_key_id=api_key_record.id,
-                    model_name=model,
-                    requests=0,
-                    tokens=0
-                )
-                session.add(model_usage)
-            
-            model_usage.requests += 1
-            model_usage.tokens += weighted_tokens
+            if not api_key_record:
+                return
 
-        await session.commit()
-        # log_api_usage(api_key, api_key_record.to_dict())
+            # 更新最后使用时间
+            api_key_record.last_used = datetime.now()
+            api_key_record.last_used_str = get_current_time()
+            api_key_record.reqs += 1
+
+            # 获取模型权重（使用缓存优化）
+            input_weight = 1.0
+            output_weight = 1.0
+            
+            if model:
+                input_weight, output_weight = await self._get_model_weights(model, session)
+
+            # 计算加权token数量
+            weighted_tokens = 0
+            
+            # 从响应中获取实际的input和output token数量
+            if "usage" in request_data:
+                # 如果请求数据中已经包含usage信息（来自上游响应）
+                usage_data = request_data["usage"]
+                prompt_tokens = usage_data.get("prompt_tokens", 0)
+                
+                # 处理embeddings接口的特殊情况（只有prompt_tokens和total_tokens）
+                if "completion_tokens" in usage_data:
+                    completion_tokens = usage_data.get("completion_tokens", 0)
+                elif "total_tokens" in usage_data:
+                    # embeddings接口：total_tokens = prompt_tokens
+                    completion_tokens = 0
+                else:
+                    completion_tokens = 0
+                
+                # 应用权重计算
+                weighted_tokens = (prompt_tokens * input_weight) + (completion_tokens * output_weight)
+            else:
+                # 回退到基于消息内容的估算
+                prompt_tokens = 0
+                for m in request_data.get("messages", []):
+                    content = m.get("content", "")
+                    if isinstance(content, str):
+                        # 使用改进的缓存机制
+                        cache_key = hash(content)
+                        if cache_key in self._token_cache:
+                            prompt_tokens += self._token_cache[cache_key]
+                            # 更新LRU：将最近使用的key移到列表末尾
+                            if cache_key in self._token_cache_keys:
+                                self._token_cache_keys.remove(cache_key)
+                            self._token_cache_keys.append(cache_key)
+                        else:
+                            if self._use_tiktoken and self.encoding:
+                                # 使用tiktoken计算token数量
+                                token_count = len(self.encoding.encode(content))
+                            else:
+                                # 改进的回退方案：使用更准确的字符计数算法
+                                # 中文大约1.5个字符=1个token，英文大约4个字符=1个token
+                                chinese_chars = sum(1 for c in content if '\u4e00' <= c <= '\u9fff')
+                                english_chars = len(content) - chinese_chars
+                                token_count = max(1, int(chinese_chars / 1.5 + english_chars / 4))
+                            
+                            # 添加到缓存
+                            self._token_cache[cache_key] = token_count
+                            self._token_cache_keys.append(cache_key)
+                            prompt_tokens += token_count
+                            
+                            # 检查缓存大小，使用LRU策略清理
+                            if len(self._token_cache) > self._max_token_cache_size:
+                                # 移除最久未使用的缓存项
+                                oldest_key = self._token_cache_keys.pop(0)
+                                del self._token_cache[oldest_key]
+                
+                # 估算output tokens（假设为input tokens的1/3）
+                completion_tokens = max(1, int(prompt_tokens * 0.33))
+                
+                # 应用权重计算
+                weighted_tokens = (prompt_tokens * input_weight) + (completion_tokens * output_weight)
+
+            api_key_record.usage += weighted_tokens
+
+            # 更新模型使用统计 - 同样需要锁定
+            if model:
+                # 使用SELECT FOR UPDATE锁定模型使用记录
+                result = await session.execute(
+                    select(ModelUsage)
+                    .where(
+                        and_(
+                            ModelUsage.api_key_id == api_key_record.id,
+                            ModelUsage.model_name == model
+                        )
+                    )
+                    .with_for_update()  # 锁定记录，防止并发更新
+                )
+                model_usage = result.scalar_one_or_none()
+                
+                if not model_usage:
+                    model_usage = ModelUsage(
+                        api_key_id=api_key_record.id,
+                        model_name=model,
+                        requests=0,
+                        tokens=0
+                    )
+                    session.add(model_usage)
+                
+                model_usage.requests += 1
+                model_usage.tokens += weighted_tokens
+
+            await session.commit()
+            # log_api_usage(api_key, api_key_record.to_dict())
+            
+        except Exception as e:
+            # 回滚事务并记录错误
+            await session.rollback()
+            import logging
+            logging.error(f"Error updating usage for API key {api_key}: {e}")
+            # 不重新抛出异常，避免影响正常请求处理
 
     async def get_usage_stats(self, session: AsyncSession) -> UsageStats:
         """获取使用统计信息 - 添加缓存优化
@@ -598,56 +635,69 @@ class ApiService:
             raise
 
     async def update_anthropic_usage(self, api_key: str, model: str, session: AsyncSession) -> None:
-        """更新Anthropic API使用情况 - 只增加请求计数，不计算token用量
+        """更新Anthropic API使用情况 - 只增加请求计数，不计算token用量，防止并发竞争条件
 
         Args:
             api_key: API密钥
             model: 模型名称
             session: 数据库会话
         """
-        # 获取API密钥记录
-        result = await session.execute(
-            select(ApiKey).where(ApiKey.api_key == api_key)
-        )
-        api_key_record = result.scalar_one_or_none()
-        
-        if not api_key_record:
-            return
-
-        # 更新最后使用时间
-        api_key_record.last_used = datetime.now()
-        api_key_record.last_used_str = get_current_time()
-        
-        # 只增加请求计数，不增加token用量
-        api_key_record.reqs += 1
-
-        # 更新模型使用统计 - 只增加请求计数，不增加token用量
-        if model:
-            # 查找或创建模型使用记录
-            from sqlalchemy import and_
+        try:
+            # 使用SELECT FOR UPDATE锁定API密钥记录，防止并发更新
+            from sqlalchemy import select, and_
+            
             result = await session.execute(
-                select(ModelUsage).where(
-                    and_(
-                        ModelUsage.api_key_id == api_key_record.id,
-                        ModelUsage.model_name == model
-                    )
-                )
+                select(ApiKey)
+                .where(ApiKey.api_key == api_key)
+                .with_for_update()  # 锁定记录，防止并发更新
             )
-            model_usage = result.scalar_one_or_none()
+            api_key_record = result.scalar_one_or_none()
             
-            if not model_usage:
-                model_usage = ModelUsage(
-                    api_key_id=api_key_record.id,
-                    model_name=model,
-                    requests=0,
-                    tokens=0
-                )
-                session.add(model_usage)
-            
-            model_usage.requests += 1
-            # tokens保持为0，因为Anthropic路由不计算token用量
+            if not api_key_record:
+                return
 
-        await session.commit()
+            # 更新最后使用时间
+            api_key_record.last_used = datetime.now()
+            api_key_record.last_used_str = get_current_time()
+            
+            # 只增加请求计数，不增加token用量
+            api_key_record.reqs += 1
+
+            # 更新模型使用统计 - 只增加请求计数，不增加token用量
+            if model:
+                # 使用SELECT FOR UPDATE锁定模型使用记录
+                result = await session.execute(
+                    select(ModelUsage)
+                    .where(
+                        and_(
+                            ModelUsage.api_key_id == api_key_record.id,
+                            ModelUsage.model_name == model
+                        )
+                    )
+                    .with_for_update()  # 锁定记录，防止并发更新
+                )
+                model_usage = result.scalar_one_or_none()
+                
+                if not model_usage:
+                    model_usage = ModelUsage(
+                        api_key_id=api_key_record.id,
+                        model_name=model,
+                        requests=0,
+                        tokens=0
+                    )
+                    session.add(model_usage)
+                
+                model_usage.requests += 1
+                # tokens保持为0，因为Anthropic路由不计算token用量
+
+            await session.commit()
+            
+        except Exception as e:
+            # 回滚事务并记录错误
+            await session.rollback()
+            import logging
+            logging.error(f"Error updating Anthropic usage for API key {api_key}: {e}")
+            # 不重新抛出异常，避免影响正常请求处理
 
     async def increment_model_reqs(self, server_url: str, model_name: str, session: AsyncSession) -> None:
         """增加模型请求计数
