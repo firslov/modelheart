@@ -301,7 +301,7 @@ class ApiService:
 
             # 更新模型使用统计 - 同样需要锁定
             if model:
-                # 使用SELECT FOR UPDATE锁定模型使用记录
+                # 使用SELECT FOR UPDATE锁定模型使用记录，使用first()而不是scalar_one_or_none()
                 result = await session.execute(
                     select(ModelUsage)
                     .where(
@@ -312,9 +312,9 @@ class ApiService:
                     )
                     .with_for_update()  # 锁定记录，防止并发更新
                 )
-                model_usage = result.scalar_one_or_none()
+                model_usage_result = result.first()
                 
-                if not model_usage:
+                if not model_usage_result:
                     model_usage = ModelUsage(
                         api_key_id=api_key_record.id,
                         model_name=model,
@@ -322,6 +322,8 @@ class ApiService:
                         tokens=0
                     )
                     session.add(model_usage)
+                else:
+                    model_usage = model_usage_result[0]
                 
                 model_usage.requests += 1
                 model_usage.tokens += weighted_tokens
@@ -665,7 +667,7 @@ class ApiService:
 
             # 更新模型使用统计 - 只增加请求计数，不增加token用量
             if model:
-                # 使用SELECT FOR UPDATE锁定模型使用记录
+                # 使用SELECT FOR UPDATE锁定模型使用记录，使用first()而不是scalar_one_or_none()
                 result = await session.execute(
                     select(ModelUsage)
                     .where(
@@ -676,9 +678,9 @@ class ApiService:
                     )
                     .with_for_update()  # 锁定记录，防止并发更新
                 )
-                model_usage = result.scalar_one_or_none()
+                model_usage_result = result.first()
                 
-                if not model_usage:
+                if not model_usage_result:
                     model_usage = ModelUsage(
                         api_key_id=api_key_record.id,
                         model_name=model,
@@ -686,6 +688,8 @@ class ApiService:
                         tokens=0
                     )
                     session.add(model_usage)
+                else:
+                    model_usage = model_usage_result[0]
                 
                 model_usage.requests += 1
                 # tokens保持为0，因为Anthropic路由不计算token用量

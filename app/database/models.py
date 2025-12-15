@@ -41,6 +41,9 @@ class ApiKey(Base):
 class ModelUsage(Base):
     """模型使用统计表"""
     __tablename__ = "model_usage"
+    __table_args__ = (
+        UniqueConstraint('api_key_id', 'model_name', name='uq_model_usage_api_key_model'),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     api_key_id = Column(Integer, ForeignKey("api_keys.id", ondelete="CASCADE"), nullable=False)
