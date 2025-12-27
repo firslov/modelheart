@@ -7,15 +7,11 @@ from app.database.models import Base
 DATABASE_URL = f"sqlite+aiosqlite:///{os.path.join(settings.BASE_DIR, 'app', 'database', 'myapi.db')}"
 
 # 创建异步引擎
+# SQLite的aiosqlite驱动不支持连接池参数，需要移除
 engine = create_async_engine(
     DATABASE_URL,
     echo=False,  # 生产环境设为False
     future=True,
-    pool_pre_ping=True,
-    pool_recycle=300,  # 5分钟回收连接
-    pool_size=20,  # 连接池大小
-    max_overflow=30,  # 最大溢出连接数
-    pool_timeout=60,  # 连接超时时间(秒)
 )
 
 # 创建异步会话工厂

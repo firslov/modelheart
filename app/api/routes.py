@@ -41,19 +41,22 @@ async def _handle_llm_server_action(request, api_service, data, session: AsyncSe
 
     # 处理不同操作
     if action == "add":
-        # 添加新服务器 - 加载现有服务器，然后添加新服务器
-        servers_data = await api_service.load_llm_servers(session)
-        servers_data[url] = config
-        await api_service.save_llm_servers(servers_data, session)
+        # 添加新服务器 - 直接使用update_llm_server方法
+        # 如果服务器已存在，update_llm_server会更新它；如果不存在，会创建新的
+        await api_service.update_llm_server(url, config, session)
     elif action == "update":
         old_url = data.get("oldUrl")
 
         if old_url and old_url != url:
             # 如果URL改变了，先删除旧的服务器，再添加新的
+            # 检查新URL是否已存在
             servers_data = await api_service.load_llm_servers(session)
             if old_url in servers_data:
+                # 删除旧服务器
                 del servers_data[old_url]
+            # 添加/更新新服务器
             servers_data[url] = config
+            # 使用save_llm_servers保存所有服务器
             await api_service.save_llm_servers(servers_data, session)
         else:
             # 只更新当前服务器的配置
