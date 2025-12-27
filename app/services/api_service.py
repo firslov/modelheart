@@ -472,40 +472,59 @@ class ApiService:
             servers_data: 服务器配置数据
             session: 数据库会话
         """
-        # 先删除所有现有服务器配置
         from sqlalchemy import delete
-        await session.execute(delete(LLMServer))
+        from sqlalchemy.exc import IntegrityError
         
-        # 添加新的服务器配置
-        for server_url, server_data in servers_data.items():
-            llm_server = LLMServer(
-                server_url=server_url,
-                device=server_data.get('device'),
-                apikey=server_data.get('apikey')
-            )
+        try:
+            # 先删除所有现有服务器配置
+            # 使用delete语句而不是session.delete()，确保级联删除正常工作
+            await session.execute(delete(ServerModel))
+            await session.execute(delete(LLMServer))
             
-            # 添加模型配置 - 同时设置新旧字段以确保兼容性
-            models_data = server_data.get('model', {})
-            for frontend_model_name, model_data in models_data.items():
-                backend_model_name = model_data.get('name', frontend_model_name)
-                
-                server_model = ServerModel(
-                    # 旧字段（保持兼容）
-                    client_model_name=backend_model_name,  # 实际后端模型名称
-                    actual_model_name=frontend_model_name,  # 前端使用的模型名称
-                    # 新字段（更清晰的命名）
-                    backend_model_name=backend_model_name,  # 实际后端模型名称
-                    frontend_model_name=frontend_model_name,  # 前端使用的模型名称
-                    reqs=model_data.get('reqs', 0),
-                    status=model_data.get('status', True),
-                    input_token_weight=model_data.get('input_token_weight', 1.0),
-                    output_token_weight=model_data.get('output_token_weight', 1.0)
+            # 添加新的服务器配置
+            for server_url, server_data in servers_data.items():
+                llm_server = LLMServer(
+                    server_url=server_url,
+                    device=server_data.get('device'),
+                    apikey=server_data.get('apikey')
                 )
-                llm_server.models.append(server_model)
+                
+                # 添加模型配置 - 同时设置新旧字段以确保兼容性
+                models_data = server_data.get('model', {})
+                for frontend_model_name, model_data in models_data.items():
+                    backend_model_name = model_data.get('name', frontend_model_name)
+                    
+                    server_model = ServerModel(
+                        # 旧字段（保持兼容）
+                        client_model_name=backend_model_name,  # 实际后端模型名称
+                        actual_model_name=frontend_model_name,  # 前端使用的模型名称
+                        # 新字段（更清晰的命名）
+                        backend_model_name=backend_model_name,  # 实际后端模型名称
+                        frontend_model_name=frontend_model_name,  # 前端使用的模型名称
+                        reqs=model_data.get('reqs', 0),
+                        status=model_data.get('status', True),
+                        input_token_weight=model_data.get('input_token_weight', 1.0),
+                        output_token_weight=model_data.get('output_token_weight', 1.0)
+                    )
+                    llm_server.models.append(server_model)
+                
+                session.add(llm_server)
             
-            session.add(llm_server)
-        
-        await session.commit()
+            await session.commit()
+            
+        except IntegrityError as e:
+            # 回滚事务
+            await session.rollback()
+            # 记录错误并重新抛出
+            import logging
+            logging.error(f"数据库完整性错误: {e}")
+            raise HTTPException(400, f"数据库完整性错误: 可能存在重复的模型配置")
+        except Exception as e:
+            # 回滚事务
+            await session.rollback()
+            import logging
+            logging.error(f"保存LLM服务器时出错: {e}")
+            raise
 
     async def update_llm_server(self, server_url: str, server_data: Dict, session: AsyncSession) -> None:
         """更新单个LLM服务器配置
