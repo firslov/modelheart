@@ -12,40 +12,61 @@
     <style>
         /* 与index.html相同的高级浅色系配色方案 */
         :root {
-            --bg-primary: #ffffff;
-            --bg-secondary: #fafbfc;
-            --bg-tertiary: #f7f8fa;
-            --text-primary: #1a202c;
-            --text-secondary: #4a5568;
-            --text-dim: #718096;
-            --accent-green: #10b981;
-            --accent-blue: #3b82f6;
-            --accent-red: #ef4444;
-            --accent-yellow: #f59e0b;
-            --border-color: #e5e7eb;
-            --terminal-green: #059669;
-            --bg-subtle: #f9fafb;
-            --border-subtle: #f3f4f6;
-            --text-muted: #9ca3af;
-            --accent-purple: #8b5cf6;
-            --accent-indigo: #6366f1;
+            /* 极致高级配色系统 - Premium Color Palette */
+            --bg-primary: #fafcff;
+            --bg-secondary: #f0f4f8;
+            --bg-tertiary: #e8edf3;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-dim: #94a3b8;
+            --text-muted: #cbd5e1;
+
+            /* 精致强调色 */
+            --accent-primary: #06b6d4;
+            --accent-secondary: #8b5cf6;
+            --accent-success: #10b981;
+            --accent-error: #ef4444;
+            --accent-warning: #f59e0b;
+
+            /* 边框和背景色 */
+            --border-color: #e2e8f0;
+            --border-subtle: #f1f5f9;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+            --bg-glass-dark: rgba(255, 255, 255, 0.95);
+
+            /* 阴影系统 */
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.03);
+            --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
+            --shadow-glow: 0 0 20px rgba(6, 182, 212, 0.15), 0 0 40px rgba(139, 92, 246, 0.1);
+
+            /* 渐变 */
+            --gradient-primary: linear-gradient(135deg, #06b6d4 0%, #8b5cf6 100%);
+            --gradient-surface: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+            --gradient-glow: linear-gradient(135deg, rgba(6, 182, 212, 0.1) 0%, rgba(139, 92, 246, 0.05) 100%);
 
             /* Dashboard特有变量保持兼容 */
-            --primary: var(--accent-green);
+            --terminal-green: #059669;
+            --bg-subtle: #f9fafb;
+            --accent-indigo: #6366f1;
+            --primary: var(--accent-success);
             --primary-light: #34d399;
             --primary-dark: #059669;
-            --secondary: var(--accent-blue);
+            --secondary: var(--accent-primary);
             --background: var(--bg-primary);
             --card: var(--bg-primary);
             --border: var(--border-color);
-            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
         }
 
         body {
             font-family: 'JetBrains Mono', 'PingFang SC', 'Microsoft YaHei', '微软雅黑', 'Courier New', monospace;
-            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-subtle) 100%);
+            background: var(--bg-primary);
+            background-image:
+                radial-gradient(ellipse 80% 50% at 50% -20%, rgba(6, 182, 212, 0.08), transparent),
+                radial-gradient(ellipse 60% 40% at 100% 0%, rgba(139, 92, 246, 0.06), transparent),
+                radial-gradient(ellipse 50% 30% at 0% 100%, rgba(16, 185, 129, 0.05), transparent);
             color: var(--text-primary);
             min-height: 100vh;
             position: relative;
@@ -56,29 +77,28 @@
         body::before {
             content: "";
             position: fixed;
-            top: -50%;
-            right: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, var(--accent-green) 0%, transparent 70%);
-            opacity: 0.03;
-            animation: rotate 30s linear infinite;
-            z-index: -1;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                linear-gradient(rgba(6, 182, 212, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(6, 182, 212, 0.02) 1px, transparent 1px);
+            background-size: 60px 60px;
             pointer-events: none;
+            z-index: 0;
         }
 
         body::after {
             content: "";
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background:
-                radial-gradient(circle at 20% 80%, var(--accent-blue) 0%, transparent 50%),
-                radial-gradient(circle at 80% 20%, var(--accent-purple) 0%, transparent 50%);
-            opacity: 0.02;
-            z-index: -1;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at center, rgba(6, 182, 212, 0.03) 0%, transparent 50%);
+            animation: float 20s ease-in-out infinite;
+            z-index: 0;
             pointer-events: none;
         }
 
@@ -90,6 +110,12 @@
             to {
                 transform: rotate(360deg);
             }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            33% { transform: translate(30px, -30px) rotate(120deg); }
+            66% { transform: translate(-20px, 20px) rotate(240deg); }
         }
 
         /* 动画效果 */
@@ -127,11 +153,12 @@
 
         /* 现代化卡片设计 - 与index.html保持一致 */
         .card {
-            background: var(--card);
-            border-radius: 12px;
-            box-shadow: var(--shadow-md);
-            border: 1px solid var(--border);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: var(--bg-glass);
+            backdrop-filter: blur(20px) saturate(180%);
+            border-radius: 16px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border-color);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
             overflow: hidden;
         }
@@ -143,14 +170,14 @@
             left: 0;
             width: 4px;
             height: 100%;
-            background: linear-gradient(to bottom, var(--accent-green), var(--accent-blue));
-            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: var(--gradient-primary);
+            transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .card:hover {
-            border-color: var(--accent-green);
+            border-color: var(--accent-primary);
             transform: translateY(-4px);
-            box-shadow: 0 12px 24px rgba(16, 185, 129, 0.15), 0 6px 12px rgba(16, 185, 129, 0.1);
+            box-shadow: var(--shadow-xl), var(--shadow-glow);
         }
 
         .card:hover::before {
@@ -187,7 +214,7 @@
 
         .progress-bar-fill {
             height: 100%;
-            background: linear-gradient(90deg, var(--accent-green), var(--accent-blue));
+            background: var(--gradient-primary);
             transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
             border-radius: 4px;
             position: relative;
@@ -242,7 +269,7 @@
             top: 0;
             width: 3px;
             height: 100%;
-            background: var(--accent-blue);
+            background: var(--accent-primary);
             transform: scaleY(0);
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
@@ -258,7 +285,7 @@
 
         /* 现代化按钮 */
         .btn-primary {
-            background: linear-gradient(135deg, var(--accent-green) 0%, var(--terminal-green) 100%);
+            background: var(--gradient-primary);
             color: white;
             border: none;
             padding: 0.75rem 1.5rem;
@@ -268,9 +295,9 @@
             cursor: pointer;
             position: relative;
             overflow: hidden;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3), 0 2px 6px rgba(16, 185, 129, 0.2);
+            box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3), 0 2px 6px rgba(139, 92, 246, 0.2);
             line-height: 1.5;
             letter-spacing: 0.025em;
         }
@@ -292,14 +319,14 @@
 
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4), 0 4px 10px rgba(16, 185, 129, 0.3);
+            box-shadow: 0 8px 20px rgba(6, 182, 212, 0.4), 0 4px 10px rgba(139, 92, 246, 0.3);
             color: white;
         }
 
         /* 现代化模态框 */
         .modal {
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(8px);
+            background: rgba(15, 23, 42, 0.4);
+            backdrop-filter: blur(12px) saturate(180%);
             position: fixed;
             top: 0;
             left: 0;
@@ -309,7 +336,7 @@
             align-items: center;
             justify-content: center;
             z-index: 1000;
-            padding: 1rem;
+            padding: 1.5rem;
         }
 
         .modal.hidden {
@@ -317,9 +344,10 @@
         }
 
         .modal-content {
-            background: var(--card);
+            background: var(--bg-glass-dark);
+            backdrop-filter: blur(30px) saturate(200%);
             border: 1px solid var(--border-color);
-            border-radius: 16px;
+            border-radius: 20px;
             max-width: 90vw;
             max-height: 90vh;
             width: 100%;
@@ -327,7 +355,7 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15), 0 12px 24px rgba(0, 0, 0, 0.1);
+            box-shadow: var(--shadow-2xl);
         }
 
         /* Modal body with scrolling */
@@ -349,7 +377,7 @@
         /* 现代化滚动条 */
         .custom-scrollbar {
             scrollbar-width: thin;
-            scrollbar-color: var(--primary-light) var(--border);
+            scrollbar-color: var(--accent-primary) var(--border-color);
         }
 
         .custom-scrollbar::-webkit-scrollbar {
@@ -358,18 +386,18 @@
         }
 
         .custom-scrollbar::-webkit-scrollbar-track {
-            background: var(--border);
+            background: var(--border-color);
             border-radius: 4px;
         }
 
         .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: var(--primary-light);
+            background: var(--accent-primary);
             border-radius: 4px;
-            border: 2px solid var(--border);
+            border: 2px solid var(--border-color);
         }
 
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: var(--primary);
+            background: var(--accent-secondary);
         }
 
         /* 移动端优化 */
@@ -508,7 +536,7 @@
             }
 
             .llm-server-model-tag {
-                background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
+                background: var(--gradient-primary);
                 color: white;
                 padding: 0.25rem 0.5rem;
                 border-radius: 6px;
@@ -689,8 +717,8 @@
                     <i class="fas fa-chart-line text-green-600 text-xl"></i>
                 </div>
                 <h1 class="text-2xl md:text-3xl font-bold"
-                    style="background: linear-gradient(135deg, var(--accent-green), var(--accent-blue)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));">
-                    管理<span class="text-green-600">控制台</span>
+                    style="background: var(--gradient-primary); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));">
+                    管理<span class="text-cyan-500">控制台</span>
                 </h1>
             </div>
 
