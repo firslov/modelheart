@@ -3,17 +3,13 @@ import string
 import json
 import aiofiles
 from typing import Dict
-import logging
 from datetime import datetime
 from app.config.settings import settings
+from app.utils.logging_config import setup_logging, get_logger
 
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(levelname)s | %(asctime)s | %(message)s",
-    handlers=[logging.FileHandler("app.log"), logging.StreamHandler()],
-)
-logger = logging.getLogger(__name__)
+# 初始化日志配置
+setup_logging(level="INFO")
+logger = get_logger(__name__)
 
 
 async def load_json_file(filename: str) -> Dict:
@@ -79,8 +75,9 @@ def log_api_usage(api_key: str, usage_info: Dict) -> None:
         api_key: API密钥
         usage_info: 使用情况信息
     """
+    remaining = usage_info.get('limit', 0) - usage_info.get('usage', 0)
     logger.info(
-        f"API_key: {api_key[-6:]} | "
-        f"剩余Token: {usage_info['limit'] - usage_info['usage']} | "
-        f"请求次数: {usage_info['reqs']} | "
+        f"API key={api_key[-6:]} | "
+        f"remaining={remaining} | "
+        f"requests={usage_info.get('reqs', 0)}"
     )

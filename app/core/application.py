@@ -15,8 +15,12 @@ from app.config.settings import settings
 from app.models.api_models import ApiKeyUsage
 from app.services.api_service import ApiService
 from app.services.llm_service import LLMService
-from app.utils.helpers import logger
+from app.services.usage_queue import UsageQueue
+from app.utils.logging_config import get_logger
+from app.middleware.logging import RequestTrackingMiddleware
 from app.database.database import get_db_session, init_db
+
+logger = get_logger(__name__)
 
 
 class Application:
@@ -25,26 +29,36 @@ class Application:
     def __init__(self):
         self.llm_service = LLMService()
         self.api_service = ApiService()
+        self.usage_queue = UsageQueue(
+            batch_size=100,  # 批量写入大小
+            flush_interval=5.0,  # 5秒刷新间隔
+        )
         self.background_tasks: Set[asyncio.Task] = set()
 
     async def startup(self) -> None:
         """应用启动初始化"""
         # 初始化数据库
         await init_db()
-        
+
         # 初始化服务
         await self.llm_service.initialize()
-        
+
         # 从数据库加载LLM服务器配置
         from app.database.database import AsyncSessionLocal
         async with AsyncSessionLocal() as session:
             await self.llm_service.init_llm_resources_from_db(session)
+
+        # 启动用量队列工作器
+        await self.usage_queue.start_worker()
 
         # 启动后台任务
         self._start_background_tasks()
 
     async def shutdown(self) -> None:
         """应用关闭清理"""
+        # 停止用量队列工作器（会等待所有数据写入完成）
+        await self.usage_queue.stop_worker()
+
         # 取消后台任务
         for task in self.background_tasks:
             task.cancel()
@@ -64,16 +78,16 @@ class Application:
         bg_task.add_done_callback(self.background_tasks.discard)
 
     async def _periodic_health_check_task(self) -> None:
-        """定期健康检查任务"""
+        """定期刷新LLM服务器配置任务"""
         while True:
             await asyncio.sleep(settings.CACHE_TTL)
-            
+
             # 定期刷新LLM服务器配置
             async for session in get_db_session():
                 await self.llm_service.init_llm_resources_from_db(session)
                 break
-            
-            logger.info("LLM servers configuration refreshed")
+
+            logger.debug("LLM servers config refreshed")
 
 
 def create_application() -> FastAPI:
@@ -92,6 +106,9 @@ def create_application() -> FastAPI:
     fastapi_app = FastAPI(lifespan=lifespan)
 
     # 配置中间件
+    # 添加请求追踪中间件（最优先执行）
+    fastapi_app.add_middleware(RequestTrackingMiddleware)
+
     # 添加受信任主机中间件
     fastapi_app.add_middleware(
         TrustedHostMiddleware,

@@ -7,11 +7,20 @@ from app.database.models import Base
 DATABASE_URL = f"sqlite+aiosqlite:///{os.path.join(settings.BASE_DIR, 'app', 'database', 'myapi.db')}"
 
 # 创建异步引擎
-# SQLite的aiosqlite驱动不支持连接池参数，需要移除
+# SQLite连接池配置：
+# - pool_pre_ping: 连接健康检查，防止使用失效连接
+# - pool_recycle: 连接回收时间，避免长时间持有连接
+# - connect_args: SQLite特定配置
+# 注意：将来迁移到PostgreSQL时，可以添加pool_size和max_overflow参数
 engine = create_async_engine(
     DATABASE_URL,
     echo=False,  # 生产环境设为False
     future=True,
+    pool_pre_ping=True,  # 连接健康检查，每次使用前验证连接有效性
+    pool_recycle=3600,  # 1小时后回收连接，防止连接长时间闲置
+    connect_args={
+        "check_same_thread": False,  # 允许多线程访问（FastAPI异步场景需要）
+    },
 )
 
 # 创建异步会话工厂

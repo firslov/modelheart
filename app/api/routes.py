@@ -18,11 +18,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config.settings import settings
 from app.middleware.auth import admin_required, verify_admin
 from app.models.api_models import ApiKeyUsage
+from app.models.queue_models import UsageEventData, UsageEventType
 from app.services.api_service import ApiService
 from app.services.llm_service import LLMService
 from app.utils.helpers import get_current_time, log_api_usage
+from app.utils.logging_config import get_logger
 from app.database.database import get_db_session
 import bcrypt
+
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -170,6 +174,11 @@ def get_services(request: Request) -> tuple[LLMService, ApiService]:
     """获取服务实例"""
     app = request.app.state.app
     return app.llm_service, app.api_service
+
+
+def get_usage_queue(request: Request):
+    """获取用量队列实例"""
+    return request.app.state.app.usage_queue
 
 
 @router.get("/get-models")
@@ -539,6 +548,7 @@ async def proxy_handler_chat(
 ):
     """请求转发处理"""
     llm_service, api_service = get_services(request)
+    usage_queue = get_usage_queue(request)
 
     # 身份验证
     auth_header = request.headers.get("Authorization", "")
@@ -560,12 +570,11 @@ async def proxy_handler_chat(
     try:
         # 流式响应处理
         if req_data.get("stream", False):
-            # 对于流式响应，使用异步任务处理统计更新，避免阻塞流式传输
-            import asyncio
+            # 在流式响应前获取模型权重，避免在流式结束后使用已关闭的 session
+            input_weight, output_weight = await api_service._get_model_weights(model, session)
 
             async def stream_wrapper():
                 start_time = time.time()
-                num_tokens = 0
                 chunk_count = 0
 
                 client_stream = await llm_service.forward_request(
@@ -578,83 +587,45 @@ async def proxy_handler_chat(
                         if first_chunk_time is None:
                             first_chunk_time = time.time()
                             first_chunk_delay = first_chunk_time - start_time
-                            # 记录第一个chunk的延迟
-                            from app.utils.helpers import logger
+                            logger.debug(f"First chunk | model={model} | delay={first_chunk_delay:.3f}s")
 
-                            logger.info(
-                                f"Stream first chunk delay: {first_chunk_delay:.3f}s for model {model}"
-                            )
-
-                        num_tokens += chunk.count(
-                            'data: {"choices":[{"delta":{"content":'
-                        )
                         chunk_count += 1
                         yield chunk
 
                 end_time = time.time()
                 total_duration = end_time - start_time
 
-                # 流式响应结束后，异步更新统计信息（使用现有会话，添加错误处理和重试）
-                async def update_stats_async_with_retry():
-                    max_retries = 3
-                    retry_delay = 1.0  # 初始重试延迟（秒）
-                    
-                    for attempt in range(max_retries):
-                        try:
-                            # 使用现有会话而不是创建新会话
-                            # 重新获取服务实例
-                            _, new_api_service = get_services(request)
-                            # 更新最终用量
-                            await new_api_service.update_usage(
-                                api_key, req_data, model, session
-                            )
-                            # 更新模型请求计数
-                            await new_api_service.increment_model_reqs(
-                                target_server, model, session
-                            )
-                            await session.commit()
-                            
-                            # 记录成功
-                            from app.utils.helpers import logger
-                            logger.info(
-                                f"Stream stats updated successfully - Model: {model}, "
-                                f"Attempt: {attempt + 1}/{max_retries}"
-                            )
-                            break  # 成功，退出重试循环
-                            
-                        except Exception as e:
-                            from app.utils.helpers import logger
-                            logger.error(
-                                f"Failed to update stream stats (attempt {attempt + 1}/{max_retries}): {e}"
-                            )
-                            
-                            if attempt < max_retries - 1:
-                                # 等待一段时间后重试
-                                await asyncio.sleep(retry_delay)
-                                retry_delay *= 2  # 指数退避
-                            else:
-                                # 最后一次尝试也失败，记录错误但不抛出异常
-                                logger.error(
-                                    f"All retries failed for stream stats update - Model: {model}, "
-                                    f"Error: {e}"
-                                )
-                                # 回滚会话以避免污染
-                                try:
-                                    await session.rollback()
-                                except:
-                                    pass
-
                 # 记录流式响应性能指标
-                from app.utils.helpers import logger
-
                 logger.info(
-                    f"Stream performance - Model: {model}, Duration: {total_duration:.3f}s, "
-                    f"Chunks: {chunk_count}, Tokens: {num_tokens}, "
-                    f"First chunk delay: {first_chunk_delay if 'first_chunk_delay' in locals() else 'N/A':.3f}s"
+                    f"Stream completed | model={model} | "
+                    f"duration={total_duration:.3f}s | chunks={chunk_count} | "
+                    f"first_chunk={first_chunk_delay if 'first_chunk_delay' in locals() else 'N/A':.3f}s"
                 )
 
-                # 不等待统计更新完成，立即返回流式响应
-                asyncio.create_task(update_stats_async_with_retry())
+                # 流式响应结束后，将统计事件加入队列（非阻塞）
+                # 使用预先获取的模型权重，避免访问可能已关闭的 session
+                await usage_queue.enqueue(
+                    UsageEventData(
+                        event_type=UsageEventType.UPDATE_USAGE,
+                        api_key=api_key,
+                        model=model,
+                        server_url=target_server,
+                        prompt_tokens=0,  # 流式响应不计算 token
+                        completion_tokens=0,
+                        input_token_weight=input_weight,
+                        output_token_weight=output_weight,
+                        request_data=req_data,  # 用于回退计算
+                    )
+                )
+                # 同时入队模型请求计数事件
+                await usage_queue.enqueue(
+                    UsageEventData(
+                        event_type=UsageEventType.INCREMENT_MODEL_REQS,
+                        api_key=api_key,
+                        model=model,
+                        server_url=target_server,
+                    )
+                )
 
             return StreamingResponse(
                 stream_wrapper(),
@@ -672,34 +643,45 @@ async def proxy_handler_chat(
         try:
             response = json.loads(response_text)
 
-            # 更新最终用量
+            # 获取模型权重
+            input_weight, output_weight = await api_service._get_model_weights(model, session)
+
+            # 将统计事件加入队列
             if "usage" in response:
-                tokens = (
-                    response["usage"]["prompt_tokens"]
-                    + response["usage"]["completion_tokens"]
+                await usage_queue.enqueue(
+                    UsageEventData(
+                        event_type=UsageEventType.UPDATE_USAGE,
+                        api_key=api_key,
+                        model=model,
+                        server_url=target_server,
+                        prompt_tokens=response["usage"].get("prompt_tokens", 0),
+                        completion_tokens=response["usage"].get("completion_tokens", 0),
+                        input_token_weight=input_weight,
+                        output_token_weight=output_weight,
+                    )
                 )
-                # 这里需要更新数据库中的用量
-                await api_service.update_usage(api_key, req_data, model, session)
 
-            # 更新模型请求计数
-            await api_service.increment_model_reqs(target_server, model, session)
-
-            # 提交事务
-            await session.commit()
+            # 入队模型请求计数事件
+            await usage_queue.enqueue(
+                UsageEventData(
+                    event_type=UsageEventType.INCREMENT_MODEL_REQS,
+                    api_key=api_key,
+                    model=model,
+                    server_url=target_server,
+                )
+            )
 
             return JSONResponse(response)
         except json.JSONDecodeError as e:
-            await session.rollback()
             return JSONResponse(
                 {"error": "Invalid response from upstream server", "message": str(e)},
                 status_code=500,
             )
 
     except HTTPException as e:
-        await session.rollback()
         return JSONResponse({"error": str(e.detail)}, status_code=e.status_code)
     except Exception as e:
-        await session.rollback()
+        logger.error(f"chat/completions error: {e}", exc_info=True)
         return JSONResponse({"error": "Internal server error"}, status_code=500)
 
 
@@ -710,6 +692,7 @@ async def proxy_handler_embeddings(
 ):
     """处理embeddings请求转发"""
     llm_service, api_service = get_services(request)
+    usage_queue = get_usage_queue(request)
 
     # 身份验证
     auth_header = request.headers.get("Authorization", "")
@@ -733,33 +716,45 @@ async def proxy_handler_embeddings(
         response_text = await llm_service.forward_request(target, req_data, headers)
         response = json.loads(response_text)
 
-        # 更新用量
+        # 获取模型权重
+        input_weight, output_weight = await api_service._get_model_weights(model, session)
+
+        # 更新用量 - embeddings 接口只有 prompt_tokens
         if "usage" in response and "prompt_tokens" in response["usage"]:
-            # 对于embeddings接口，需要将响应中的usage信息传递给update_usage方法
-            # 因为embeddings的响应格式与chat completions不同
-            req_data_with_usage = req_data.copy()
-            req_data_with_usage["usage"] = response["usage"]
-            await api_service.update_usage(api_key, req_data_with_usage, model, session)
+            await usage_queue.enqueue(
+                UsageEventData(
+                    event_type=UsageEventType.UPDATE_USAGE,
+                    api_key=api_key,
+                    model=model,
+                    server_url=target_server,
+                    prompt_tokens=response["usage"]["prompt_tokens"],
+                    completion_tokens=0,  # embeddings 没有 completion_tokens
+                    input_token_weight=input_weight,
+                    output_token_weight=output_weight,
+                )
+            )
 
-        # 更新模型请求计数
-        await api_service.increment_model_reqs(target_server, model, session)
-
-        # 提交事务
-        await session.commit()
+        # 入队模型请求计数事件
+        await usage_queue.enqueue(
+            UsageEventData(
+                event_type=UsageEventType.INCREMENT_MODEL_REQS,
+                api_key=api_key,
+                model=model,
+                server_url=target_server,
+            )
+        )
 
         return JSONResponse(response)
 
     except json.JSONDecodeError as e:
-        await session.rollback()
         return JSONResponse(
             {"error": "Invalid response from upstream server", "message": str(e)},
             status_code=500,
         )
     except HTTPException as e:
-        await session.rollback()
         return JSONResponse({"error": str(e.detail)}, status_code=e.status_code)
     except Exception as e:
-        await session.rollback()
+        logger.error(f"embeddings error: {e}", exc_info=True)
         return JSONResponse({"error": "Internal server error"}, status_code=500)
 
 
@@ -770,6 +765,7 @@ async def proxy_handler_completions(
 ):
     """请求转发处理"""
     llm_service, api_service = get_services(request)
+    usage_queue = get_usage_queue(request)
 
     # 身份验证
     auth_header = request.headers.get("Authorization", "")
@@ -790,9 +786,6 @@ async def proxy_handler_completions(
     try:
         # 流式响应处理
         if req_data.get("stream", False):
-            # 对于流式响应，使用异步任务处理统计更新，避免阻塞流式传输
-            import asyncio
-
             async def stream_wrapper():
                 client_stream = await llm_service.forward_request(
                     target, req_data, headers, stream=True
@@ -802,58 +795,25 @@ async def proxy_handler_completions(
                     async for chunk in response.aiter_text():
                         yield chunk
 
-                # 流式响应结束后，异步更新统计信息（使用现有会话，添加错误处理和重试）
-                async def update_stats_async_with_retry():
-                    max_retries = 3
-                    retry_delay = 1.0  # 初始重试延迟（秒）
-                    
-                    for attempt in range(max_retries):
-                        try:
-                            # 使用现有会话而不是创建新会话
-                            # 重新获取服务实例
-                            _, new_api_service = get_services(request)
-                            # 更新Anthropic使用统计
-                            await new_api_service.update_anthropic_usage(
-                                api_key, model, session
-                            )
-                            # 更新模型请求计数
-                            await new_api_service.increment_model_reqs(
-                                target_server, model, session
-                            )
-                            await session.commit()
-                            
-                            # 记录成功
-                            from app.utils.helpers import logger
-                            logger.info(
-                                f"Anthropic stream stats updated successfully - Model: {model}, "
-                                f"Attempt: {attempt + 1}/{max_retries}"
-                            )
-                            break  # 成功，退出重试循环
-                            
-                        except Exception as e:
-                            from app.utils.helpers import logger
-                            logger.error(
-                                f"Failed to update Anthropic stream stats (attempt {attempt + 1}/{max_retries}): {e}"
-                            )
-                            
-                            if attempt < max_retries - 1:
-                                # 等待一段时间后重试
-                                await asyncio.sleep(retry_delay)
-                                retry_delay *= 2  # 指数退避
-                            else:
-                                # 最后一次尝试也失败，记录错误但不抛出异常
-                                logger.error(
-                                    f"All retries failed for Anthropic stream stats update - Model: {model}, "
-                                    f"Error: {e}"
-                                )
-                                # 回滚会话以避免污染
-                                try:
-                                    await session.rollback()
-                                except:
-                                    pass
-
-                # 不等待统计更新完成，立即返回流式响应
-                asyncio.create_task(update_stats_async_with_retry())
+                # 流式响应结束后，将统计事件加入队列
+                # completions 接口流式响应使用 UPDATE_USAGE 类型
+                await usage_queue.enqueue(
+                    UsageEventData(
+                        event_type=UsageEventType.UPDATE_USAGE,
+                        api_key=api_key,
+                        model=model,
+                        server_url=target_server,
+                        request_data=req_data,  # 用于回退计算
+                    )
+                )
+                await usage_queue.enqueue(
+                    UsageEventData(
+                        event_type=UsageEventType.INCREMENT_MODEL_REQS,
+                        api_key=api_key,
+                        model=model,
+                        server_url=target_server,
+                    )
+                )
 
             return StreamingResponse(
                 stream_wrapper(),
@@ -870,19 +830,46 @@ async def proxy_handler_completions(
 
         try:
             response = json.loads(response_text)
+
+            # 获取模型权重
+            input_weight, output_weight = await api_service._get_model_weights(model, session)
+
+            # 将统计事件加入队列
+            if "usage" in response:
+                await usage_queue.enqueue(
+                    UsageEventData(
+                        event_type=UsageEventType.UPDATE_USAGE,
+                        api_key=api_key,
+                        model=model,
+                        server_url=target_server,
+                        prompt_tokens=response["usage"].get("prompt_tokens", 0),
+                        completion_tokens=response["usage"].get("completion_tokens", 0),
+                        input_token_weight=input_weight,
+                        output_token_weight=output_weight,
+                    )
+                )
+
+            # 入队模型请求计数事件
+            await usage_queue.enqueue(
+                UsageEventData(
+                    event_type=UsageEventType.INCREMENT_MODEL_REQS,
+                    api_key=api_key,
+                    model=model,
+                    server_url=target_server,
+                )
+            )
+
             return JSONResponse(response)
         except json.JSONDecodeError as e:
-            await session.rollback()
             return JSONResponse(
                 {"error": "Invalid response from upstream server", "message": str(e)},
                 status_code=500,
             )
 
     except HTTPException as e:
-        await session.rollback()
         return JSONResponse({"error": str(e.detail)}, status_code=e.status_code)
     except Exception as e:
-        await session.rollback()
+        logger.error(f"completions error: {e}", exc_info=True)
         return JSONResponse({"error": "Internal server error"}, status_code=500)
 
 
@@ -900,6 +887,7 @@ async def anthropic_proxy_handler(
 ):
     """Anthropic API转发处理 - 不记录token使用，但统计请求数量"""
     llm_service, api_service = get_services(request)
+    usage_queue = get_usage_queue(request)
 
     # 身份验证 - 验证API密钥存在
     auth_header = request.headers.get("Authorization", "")
@@ -935,9 +923,6 @@ async def anthropic_proxy_handler(
     try:
         # 流式响应处理
         if req_data.get("stream", False):
-            # 对于流式响应，使用异步任务处理统计更新，避免阻塞流式传输
-            import asyncio
-
             async def stream_wrapper():
                 client_stream = await llm_service.forward_request(
                     target, req_data, headers, stream=True
@@ -947,58 +932,23 @@ async def anthropic_proxy_handler(
                     async for chunk in response.aiter_text():
                         yield chunk
 
-                # 流式响应结束后，异步更新统计信息（使用现有会话，添加错误处理和重试）
-                async def update_stats_async_with_retry():
-                    max_retries = 3
-                    retry_delay = 1.0  # 初始重试延迟（秒）
-                    
-                    for attempt in range(max_retries):
-                        try:
-                            # 使用现有会话而不是创建新会话
-                            # 重新获取服务实例
-                            _, new_api_service = get_services(request)
-                            # 更新Anthropic使用统计
-                            await new_api_service.update_anthropic_usage(
-                                api_key, model, session
-                            )
-                            # 更新模型请求计数
-                            await new_api_service.increment_model_reqs(
-                                target_server, model, session
-                            )
-                            await session.commit()
-                            
-                            # 记录成功
-                            from app.utils.helpers import logger
-                            logger.info(
-                                f"Anthropic stream stats updated successfully - Model: {model}, "
-                                f"Attempt: {attempt + 1}/{max_retries}"
-                            )
-                            break  # 成功，退出重试循环
-                            
-                        except Exception as e:
-                            from app.utils.helpers import logger
-                            logger.error(
-                                f"Failed to update Anthropic stream stats (attempt {attempt + 1}/{max_retries}): {e}"
-                            )
-                            
-                            if attempt < max_retries - 1:
-                                # 等待一段时间后重试
-                                await asyncio.sleep(retry_delay)
-                                retry_delay *= 2  # 指数退避
-                            else:
-                                # 最后一次尝试也失败，记录错误但不抛出异常
-                                logger.error(
-                                    f"All retries failed for Anthropic stream stats update - Model: {model}, "
-                                    f"Error: {e}"
-                                )
-                                # 回滚会话以避免污染
-                                try:
-                                    await session.rollback()
-                                except:
-                                    pass
-
-                # 不等待统计更新完成，立即返回流式响应
-                asyncio.create_task(update_stats_async_with_retry())
+                # 流式响应结束后，将统计事件加入队列
+                # Anthropic 接口不计算 token 用量，只记录请求次数
+                await usage_queue.enqueue(
+                    UsageEventData(
+                        event_type=UsageEventType.UPDATE_ANTHROPIC_USAGE,
+                        api_key=api_key,
+                        model=model,
+                    )
+                )
+                await usage_queue.enqueue(
+                    UsageEventData(
+                        event_type=UsageEventType.INCREMENT_MODEL_REQS,
+                        api_key=api_key,
+                        model=model,
+                        server_url=target_server,
+                    )
+                )
 
             return StreamingResponse(
                 stream_wrapper(),
@@ -1016,26 +966,32 @@ async def anthropic_proxy_handler(
         try:
             response = json.loads(response_text)
 
-            # 更新请求计数 - 不计算token用量，只增加reqs计数
-            await api_service.update_anthropic_usage(api_key, model, session)
-
-            # 更新模型请求计数
-            await api_service.increment_model_reqs(target_server, model, session)
-
-            # 提交事务
-            await session.commit()
+            # 将统计事件加入队列 - Anthropic 只记录请求次数
+            await usage_queue.enqueue(
+                UsageEventData(
+                    event_type=UsageEventType.UPDATE_ANTHROPIC_USAGE,
+                    api_key=api_key,
+                    model=model,
+                )
+            )
+            await usage_queue.enqueue(
+                UsageEventData(
+                    event_type=UsageEventType.INCREMENT_MODEL_REQS,
+                    api_key=api_key,
+                    model=model,
+                    server_url=target_server,
+                )
+            )
 
             return JSONResponse(response)
         except json.JSONDecodeError as e:
-            await session.rollback()
             return JSONResponse(
                 {"error": "Invalid response from upstream server", "message": str(e)},
                 status_code=500,
             )
 
     except HTTPException as e:
-        await session.rollback()
         return JSONResponse({"error": str(e.detail)}, status_code=e.status_code)
     except Exception as e:
-        await session.rollback()
+        logger.error(f"anthropic error: {e}", exc_info=True)
         return JSONResponse({"error": "Internal server error"}, status_code=500)

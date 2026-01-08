@@ -9,11 +9,13 @@ from fastapi import HTTPException
 
 from app.config.settings import settings
 from app.models.api_models import AppState
-from app.utils.helpers import logger
+from app.utils.logging_config import get_logger
 from app.database.database import get_db_session
 from app.database.models import LLMServer, ServerModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+
+logger = get_logger(__name__)
 
 
 class LLMService:
@@ -54,7 +56,7 @@ class LLMService:
             "max_connections": 500,
             "adjustment_interval": 30,  # 每30秒检查一次，更频繁调整
         }
-        # logger.info("HTTP client initialized with cloud-optimized settings")
+        logger.info("HTTP client initialized")
 
     async def _monitor_connection_pool(self) -> None:
         """监控并动态调整连接池 - 优化性能"""
@@ -285,11 +287,6 @@ class LLMService:
                 model_info if isinstance(model_info, str) else model_info["name"]
             )
 
-        # # 打印转发请求详情
-        # logger.info(f"Forwarding request to: {target}")
-        # logger.info(f"Request headers: {json.dumps(headers, indent=2)}")
-        # logger.info(f"Request body: {json.dumps(data, indent=2)}")
-
         try:
             if stream:
                 stream_client = self.http_client.stream(
@@ -310,7 +307,7 @@ class LLMService:
 
         except httpx.HTTPStatusError as exc:
             self._update_server_health(target, False)
-            logger.error(f"HTTP error for {target}: {exc.response.status_code}")
+            logger.error(f"HTTP {exc.response.status_code} for {target}")
 
             # 仅在服务器错误时重建客户端（500+错误）
             if exc.response.status_code >= 500:  # 服务器错误
@@ -329,7 +326,7 @@ class LLMService:
 
         except Exception as exc:
             self._update_server_health(target, False)
-            logger.error(f"Network error for {target}: {str(exc)}")
+            logger.error(f"Network error for {target}: {exc}")
 
             if self.http_client:
                 await self.http_client.aclose(force=False)

@@ -55,10 +55,34 @@ pip install -r requirements.txt
 python scripts/init_database.py
 
 # 4. 启动服务
-python -m app.main
+./start.sh
 ```
 
 服务启动后访问：**<http://localhost:8087>**
+
+### 启动说明
+
+| 模式 | 命令 | 说明 |
+|------|------|------|
+| 生产环境 | `./start.sh` | 多进程，高性能（默认） |
+| 开发环境 | `DEV=1 ./start.sh` | 单进程 + 热重载 |
+
+可选参数：
+```bash
+# 自定义 worker 数量
+WORKERS=8 ./start.sh
+
+# 自定义端口
+PORT=9000 ./start.sh
+
+# 调整日志级别
+LOG_LEVEL=debug ./start.sh
+```
+
+推荐安装高性能依赖：
+```bash
+pip install uvloop httptools gunicorn
+```
 
 ### 生产环境
 
