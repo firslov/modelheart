@@ -972,6 +972,10 @@ async def anthropic_proxy_handler(
     # 获取目标服务器
     target_server = llm_service.get_target_server(model)
 
+    # 记录请求日志
+    masked_key = f"{api_key[:8]}...{api_key[-4:]}"
+    logger.info(f"anthropic request | model={model} | key={masked_key} | server={target_server}")
+
     # 构建目标URL - 去掉用户路径中的/anthropic前缀
     original_path = request.url.path
     if original_path.startswith("/anthropic/v1/messages"):
@@ -1002,7 +1006,9 @@ async def anthropic_proxy_handler(
                             async for chunk in response.aiter_text():
                                 yield chunk
 
-                        # 流式响应结束后，将统计事件加入队列
+                        # 流式响应成功完成
+                        logger.info(f"anthropic stream completed | model={model} | key={masked_key}")
+                        # 将统计事件加入队列
                         await usage_queue.enqueue(
                             UsageEventData(
                                 event_type=UsageEventType.UPDATE_ANTHROPIC_USAGE,
@@ -1056,6 +1062,9 @@ async def anthropic_proxy_handler(
 
         try:
             response = json.loads(response_text)
+
+            # 普通响应成功
+            logger.info(f"anthropic response completed | model={model} | key={masked_key}")
 
             # 将统计事件加入队列 - Anthropic 只记录请求次数
             await usage_queue.enqueue(
