@@ -324,6 +324,26 @@ class LLMService:
                 }
             )
 
+        except httpx.RemoteProtocolError as exc:
+            self._update_server_health(target, False)
+            logger.warning(f"HTTP/2 connection terminated for {target}, recreating client: {exc}")
+
+            # HTTP/2 连接被终止，重建客户端
+            if self.http_client:
+                try:
+                    await self.http_client.aclose(force=False)
+                except Exception:
+                    pass
+                await self.initialize()
+
+            # 流式请求需要让上层重试
+            if stream:
+                raise
+
+            return json.dumps(
+                {"error": "与 LLM_SERVER 连接已断开，请重试", "message": str(exc)}
+            )
+
         except Exception as exc:
             self._update_server_health(target, False)
             logger.error(f"Network error for {target}: {exc}")

@@ -1,8 +1,10 @@
+import asyncio
 import json
 import os
 import re
 import time
 from typing import Dict, Tuple
+import httpx
 
 from fastapi import APIRouter, HTTPException, Request, Response, Depends
 from fastapi.responses import (
@@ -576,56 +578,87 @@ async def proxy_handler_chat(
             async def stream_wrapper():
                 start_time = time.time()
                 chunk_count = 0
+                max_retries = 1
 
-                client_stream = await llm_service.forward_request(
-                    target, req_data, headers, stream=True
-                )
+                for attempt in range(max_retries + 1):
+                    try:
+                        client_stream = await llm_service.forward_request(
+                            target, req_data, headers, stream=True
+                        )
 
-                async with client_stream as response:
-                    first_chunk_time = None
-                    async for chunk in response.aiter_text():
-                        if first_chunk_time is None:
-                            first_chunk_time = time.time()
-                            first_chunk_delay = first_chunk_time - start_time
-                            logger.debug(f"First chunk | model={model} | delay={first_chunk_delay:.3f}s")
+                        async with client_stream as response:
+                            first_chunk_time = None
+                            async for chunk in response.aiter_text():
+                                if first_chunk_time is None:
+                                    first_chunk_time = time.time()
+                                    first_chunk_delay = first_chunk_time - start_time
+                                    logger.debug(f"First chunk | model={model} | delay={first_chunk_delay:.3f}s")
 
-                        chunk_count += 1
-                        yield chunk
+                                chunk_count += 1
+                                yield chunk
 
-                end_time = time.time()
-                total_duration = end_time - start_time
+                        end_time = time.time()
+                        total_duration = end_time - start_time
 
-                # 记录流式响应性能指标
-                logger.info(
-                    f"Stream completed | model={model} | "
-                    f"duration={total_duration:.3f}s | chunks={chunk_count} | "
-                    f"first_chunk={first_chunk_delay if 'first_chunk_delay' in locals() else 'N/A':.3f}s"
-                )
+                        # 记录流式响应性能指标
+                        logger.info(
+                            f"Stream completed | model={model} | "
+                            f"duration={total_duration:.3f}s | chunks={chunk_count} | "
+                            f"first_chunk={first_chunk_delay if 'first_chunk_delay' in locals() else 'N/A':.3f}s"
+                        )
 
-                # 流式响应结束后，将统计事件加入队列（非阻塞）
-                # 使用预先获取的模型权重，避免访问可能已关闭的 session
-                await usage_queue.enqueue(
-                    UsageEventData(
-                        event_type=UsageEventType.UPDATE_USAGE,
-                        api_key=api_key,
-                        model=model,
-                        server_url=target_server,
-                        prompt_tokens=0,  # 流式响应不计算 token
-                        completion_tokens=0,
-                        input_token_weight=input_weight,
-                        output_token_weight=output_weight,
-                        request_data=req_data,  # 用于回退计算
-                    )
-                )
-                # 同时入队模型请求计数事件
-                await usage_queue.enqueue(
-                    UsageEventData(
-                        event_type=UsageEventType.INCREMENT_MODEL_REQS,
-                        api_key=api_key,
-                        model=model,
-                        server_url=target_server,
-                    )
-                )
+                        # 流式响应结束后，将统计事件加入队列（非阻塞）
+                        await usage_queue.enqueue(
+                            UsageEventData(
+                                event_type=UsageEventType.UPDATE_USAGE,
+                                api_key=api_key,
+                                model=model,
+                                server_url=target_server,
+                                prompt_tokens=0,
+                                completion_tokens=0,
+                                input_token_weight=input_weight,
+                                output_token_weight=output_weight,
+                                request_data=req_data,
+                            )
+                        )
+                        await usage_queue.enqueue(
+                            UsageEventData(
+                                event_type=UsageEventType.INCREMENT_MODEL_REQS,
+                                api_key=api_key,
+                                model=model,
+                                server_url=target_server,
+                            )
+                        )
+                        break  # 成功完成，跳出重试循环
+
+                    except httpx.RemoteProtocolError as exc:
+                        logger.warning(
+                            f"Stream connection error (attempt {attempt + 1}/{max_retries + 1}) model={model}: {exc}"
+                        )
+                        if attempt < max_retries:
+                            await asyncio.sleep(0.5)
+                            continue
+                        else:
+                            error_data = {
+                                "error": {
+                                    "message": f"上游服务连接中断: {str(exc)}",
+                                    "type": "connection_error",
+                                    "code": "connection_terminated"
+                                }
+                            }
+                            yield f"data: {json.dumps(error_data)}\n\n"
+                            yield "data: [DONE]\n\n"
+
+                    except Exception as exc:
+                        logger.error(f"Stream error model={model}: {exc}")
+                        error_data = {
+                            "error": {
+                                "message": f"流式响应错误: {str(exc)}",
+                                "type": "stream_error"
+                            }
+                        }
+                        yield f"data: {json.dumps(error_data)}\n\n"
+                        yield "data: [DONE]\n\n"
 
             return StreamingResponse(
                 stream_wrapper(),
@@ -787,33 +820,66 @@ async def proxy_handler_completions(
         # 流式响应处理
         if req_data.get("stream", False):
             async def stream_wrapper():
-                client_stream = await llm_service.forward_request(
-                    target, req_data, headers, stream=True
-                )
+                max_retries = 1
 
-                async with client_stream as response:
-                    async for chunk in response.aiter_text():
-                        yield chunk
+                for attempt in range(max_retries + 1):
+                    try:
+                        client_stream = await llm_service.forward_request(
+                            target, req_data, headers, stream=True
+                        )
 
-                # 流式响应结束后，将统计事件加入队列
-                # completions 接口流式响应使用 UPDATE_USAGE 类型
-                await usage_queue.enqueue(
-                    UsageEventData(
-                        event_type=UsageEventType.UPDATE_USAGE,
-                        api_key=api_key,
-                        model=model,
-                        server_url=target_server,
-                        request_data=req_data,  # 用于回退计算
-                    )
-                )
-                await usage_queue.enqueue(
-                    UsageEventData(
-                        event_type=UsageEventType.INCREMENT_MODEL_REQS,
-                        api_key=api_key,
-                        model=model,
-                        server_url=target_server,
-                    )
-                )
+                        async with client_stream as response:
+                            async for chunk in response.aiter_text():
+                                yield chunk
+
+                        # 流式响应结束后，将统计事件加入队列
+                        await usage_queue.enqueue(
+                            UsageEventData(
+                                event_type=UsageEventType.UPDATE_USAGE,
+                                api_key=api_key,
+                                model=model,
+                                server_url=target_server,
+                                request_data=req_data,
+                            )
+                        )
+                        await usage_queue.enqueue(
+                            UsageEventData(
+                                event_type=UsageEventType.INCREMENT_MODEL_REQS,
+                                api_key=api_key,
+                                model=model,
+                                server_url=target_server,
+                            )
+                        )
+                        break  # 成功完成
+
+                    except httpx.RemoteProtocolError as exc:
+                        logger.warning(
+                            f"Stream connection error (attempt {attempt + 1}/{max_retries + 1}) model={model}: {exc}"
+                        )
+                        if attempt < max_retries:
+                            await asyncio.sleep(0.5)
+                            continue
+                        else:
+                            error_data = {
+                                "error": {
+                                    "message": f"上游服务连接中断: {str(exc)}",
+                                    "type": "connection_error",
+                                    "code": "connection_terminated"
+                                }
+                            }
+                            yield f"data: {json.dumps(error_data)}\n\n"
+                            yield "data: [DONE]\n\n"
+
+                    except Exception as exc:
+                        logger.error(f"Stream error model={model}: {exc}")
+                        error_data = {
+                            "error": {
+                                "message": f"流式响应错误: {str(exc)}",
+                                "type": "stream_error"
+                            }
+                        }
+                        yield f"data: {json.dumps(error_data)}\n\n"
+                        yield "data: [DONE]\n\n"
 
             return StreamingResponse(
                 stream_wrapper(),
@@ -924,31 +990,56 @@ async def anthropic_proxy_handler(
         # 流式响应处理
         if req_data.get("stream", False):
             async def stream_wrapper():
-                client_stream = await llm_service.forward_request(
-                    target, req_data, headers, stream=True
-                )
+                max_retries = 1
 
-                async with client_stream as response:
-                    async for chunk in response.aiter_text():
-                        yield chunk
+                for attempt in range(max_retries + 1):
+                    try:
+                        client_stream = await llm_service.forward_request(
+                            target, req_data, headers, stream=True
+                        )
 
-                # 流式响应结束后，将统计事件加入队列
-                # Anthropic 接口不计算 token 用量，只记录请求次数
-                await usage_queue.enqueue(
-                    UsageEventData(
-                        event_type=UsageEventType.UPDATE_ANTHROPIC_USAGE,
-                        api_key=api_key,
-                        model=model,
-                    )
-                )
-                await usage_queue.enqueue(
-                    UsageEventData(
-                        event_type=UsageEventType.INCREMENT_MODEL_REQS,
-                        api_key=api_key,
-                        model=model,
-                        server_url=target_server,
-                    )
-                )
+                        async with client_stream as response:
+                            async for chunk in response.aiter_text():
+                                yield chunk
+
+                        # 流式响应结束后，将统计事件加入队列
+                        await usage_queue.enqueue(
+                            UsageEventData(
+                                event_type=UsageEventType.UPDATE_ANTHROPIC_USAGE,
+                                api_key=api_key,
+                                model=model,
+                            )
+                        )
+                        await usage_queue.enqueue(
+                            UsageEventData(
+                                event_type=UsageEventType.INCREMENT_MODEL_REQS,
+                                api_key=api_key,
+                                model=model,
+                                server_url=target_server,
+                            )
+                        )
+                        break  # 成功完成
+
+                    except httpx.RemoteProtocolError as exc:
+                        logger.warning(
+                            f"Stream connection error (attempt {attempt + 1}/{max_retries + 1}) model={model}: {exc}"
+                        )
+                        if attempt < max_retries:
+                            await asyncio.sleep(0.5)
+                            continue
+                        else:
+                            # Anthropic 错误事件格式
+                            yield f'event: error\n'
+                            yield f'data: {json.dumps({"error": {"message": f"上游服务连接中断: {str(exc)}", "type": "connection_error"}})}\n\n'
+                            yield 'event: message_stop\n'
+                            yield 'data: {"type": "message_stop"}\n\n'
+
+                    except Exception as exc:
+                        logger.error(f"Stream error model={model}: {exc}")
+                        yield f'event: error\n'
+                        yield f'data: {json.dumps({"error": {"message": f"流式响应错误: {str(exc)}", "type": "stream_error"}})}\n\n'
+                        yield 'event: message_stop\n'
+                        yield 'data: {"type": "message_stop"}\n\n'
 
             return StreamingResponse(
                 stream_wrapper(),
