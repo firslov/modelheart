@@ -23,7 +23,12 @@ from app.models.queue_models import (
 )
 from app.database.database import AsyncSessionLocal
 from app.database.models import ApiKey, ModelUsage, LLMServer
-from sqlalchemy import select, update, and_
+from app.database.repositories import (
+    ApiKeyRepository,
+    ModelUsageRepository,
+    LLMServerRepository,
+)
+from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 from app.utils.logging_config import get_logger
 
@@ -232,6 +237,10 @@ class UsageQueue:
         1. 按 api_key 分组，聚合同一 API key 的所有更新
         2. 使用 SELECT FOR UPDATE 防止并发问题
         """
+        # 创建Repository实例
+        api_key_repo = ApiKeyRepository(session, ApiKey)
+        model_usage_repo = ModelUsageRepository(session, ModelUsage)
+
         # 按 api_key 分组
         grouped_by_key: Dict[str, List[UsageEventData]] = defaultdict(list)
         for event in events:
@@ -239,10 +248,7 @@ class UsageQueue:
 
         for api_key, key_events in grouped_by_key.items():
             # 锁定 API key 记录
-            result = await session.execute(
-                select(ApiKey).where(ApiKey.api_key == api_key).with_for_update()
-            )
-            api_key_record = result.scalar_one_or_none()
+            api_key_record = await api_key_repo.get_for_update(api_key)
 
             if not api_key_record:
                 continue
@@ -274,19 +280,9 @@ class UsageQueue:
 
             # 更新模型使用统计
             for model_name, model_data in model_updates.items():
-                result = await session.execute(
-                    select(ModelUsage)
-                    .where(
-                        and_(
-                            ModelUsage.api_key_id == api_key_record.id,
-                            ModelUsage.model_name == model_name,
-                        )
-                    )
-                    .with_for_update()
-                )
-                model_usage_result = result.first()
+                model_usage = await model_usage_repo.get_for_update(api_key_record.id, model_name)
 
-                if not model_usage_result:
+                if not model_usage:
                     model_usage = ModelUsage(
                         api_key_id=api_key_record.id,
                         model_name=model_name,
@@ -295,7 +291,6 @@ class UsageQueue:
                     )
                     session.add(model_usage)
                 else:
-                    model_usage = model_usage_result[0]
                     model_usage.requests += model_data["requests"]
                     model_usage.tokens += model_data["tokens"]
 
@@ -306,16 +301,17 @@ class UsageQueue:
 
         Anthropic 接口不计算 token 用量，只增加请求计数。
         """
+        # 创建Repository实例
+        api_key_repo = ApiKeyRepository(session, ApiKey)
+        model_usage_repo = ModelUsageRepository(session, ModelUsage)
+
         # 按 api_key 分组
         grouped_by_key: Dict[str, List[UsageEventData]] = defaultdict(list)
         for event in events:
             grouped_by_key[event.api_key].append(event)
 
         for api_key, key_events in grouped_by_key.items():
-            result = await session.execute(
-                select(ApiKey).where(ApiKey.api_key == api_key).with_for_update()
-            )
-            api_key_record = result.scalar_one_or_none()
+            api_key_record = await api_key_repo.get_for_update(api_key)
 
             if not api_key_record:
                 continue
@@ -332,19 +328,9 @@ class UsageQueue:
                     model_requests[event.model] += 1
 
             for model_name, request_count in model_requests.items():
-                result = await session.execute(
-                    select(ModelUsage)
-                    .where(
-                        and_(
-                            ModelUsage.api_key_id == api_key_record.id,
-                            ModelUsage.model_name == model_name,
-                        )
-                    )
-                    .with_for_update()
-                )
-                model_usage_result = result.first()
+                model_usage = await model_usage_repo.get_for_update(api_key_record.id, model_name)
 
-                if not model_usage_result:
+                if not model_usage:
                     model_usage = ModelUsage(
                         api_key_id=api_key_record.id,
                         model_name=model_name,
@@ -353,7 +339,6 @@ class UsageQueue:
                     )
                     session.add(model_usage)
                 else:
-                    model_usage = model_usage_result[0]
                     model_usage.requests += request_count
 
     async def _process_increment_model_reqs(
@@ -363,6 +348,9 @@ class UsageQueue:
 
         更新服务器的模型请求计数。
         """
+        # 创建Repository实例
+        llm_server_repo = LLMServerRepository(session, LLMServer)
+
         # 按 server_url + model 分组
         grouped: Dict[tuple, int] = defaultdict(int)
         for event in events:
@@ -370,12 +358,7 @@ class UsageQueue:
                 grouped[(event.server_url, event.model)] += 1
 
         for (server_url, model_name), count in grouped.items():
-            result = await session.execute(
-                select(LLMServer)
-                .where(LLMServer.server_url == server_url)
-                .options(selectinload(LLMServer.models))
-            )
-            server = result.scalar_one_or_none()
+            server = await llm_server_repo.get_by_url_with_models(server_url)
 
             if server:
                 for server_model in server.models:

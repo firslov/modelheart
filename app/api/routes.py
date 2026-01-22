@@ -26,6 +26,10 @@ from app.services.llm_service import LLMService
 from app.utils.helpers import get_current_time, log_api_usage
 from app.utils.logging_config import get_logger
 from app.database.database import get_db_session
+from app.database.repositories import (
+    get_api_key_repo,
+    ApiKeyRepository,
+)
 import bcrypt
 
 logger = get_logger(__name__)
@@ -244,7 +248,9 @@ async def logout(request: Request):
 
 @router.post("/generate-api-key")
 async def generate_api_key(
-    request: Request, session: AsyncSession = Depends(get_db_session)
+    request: Request,
+    session: AsyncSession = Depends(get_db_session),
+    api_key_repo: ApiKeyRepository = Depends(get_api_key_repo),
 ):
     """生成新的API密钥 - 支持手机号和密码验证"""
     try:
@@ -266,11 +272,7 @@ async def generate_api_key(
         _, api_service = get_services(request)
 
         # 检查是否已存在该手机号
-        from app.database.models import ApiKey
-        from sqlalchemy import select
-
-        result = await session.execute(select(ApiKey).where(ApiKey.phone == phone))
-        existing_key = result.scalar_one_or_none()
+        existing_key = await api_key_repo.get_by_phone(phone)
 
         if existing_key:
             # 如果手机号已存在，提示用户已注册
@@ -280,10 +282,7 @@ async def generate_api_key(
             new_key = await api_service.generate_api_key(session)
 
             # 更新记录，添加手机号和密码
-            result = await session.execute(
-                select(ApiKey).where(ApiKey.api_key == new_key)
-            )
-            api_key_record = result.scalar_one_or_none()
+            api_key_record = await api_key_repo.get_by_api_key(new_key)
             if api_key_record:
                 api_key_record.phone = phone
                 api_key_record.password_hash = bcrypt.hashpw(
@@ -301,7 +300,9 @@ async def generate_api_key(
 
 @router.post("/check-usage")
 async def check_usage(
-    request: Request, session: AsyncSession = Depends(get_db_session)
+    request: Request,
+    session: AsyncSession = Depends(get_db_session),
+    api_key_repo: ApiKeyRepository = Depends(get_api_key_repo),
 ):
     """查询API密钥使用额度"""
     try:
@@ -316,11 +317,7 @@ async def check_usage(
             raise HTTPException(status_code=400, detail="请输入有效的手机号")
 
         # 检查是否已存在该手机号
-        from app.database.models import ApiKey
-        from sqlalchemy import select
-
-        result = await session.execute(select(ApiKey).where(ApiKey.phone == phone))
-        existing_key = result.scalar_one_or_none()
+        existing_key = await api_key_repo.get_by_phone(phone)
 
         if not existing_key:
             raise HTTPException(status_code=404, detail="未找到该手机号对应的账户")
@@ -359,7 +356,8 @@ async def check_usage(
 @router.post("/update-api-key-limit")
 @admin_required
 async def update_api_key_limit(
-    request: Request, session: AsyncSession = Depends(get_db_session)
+    request: Request,
+    api_key_repo: ApiKeyRepository = Depends(get_api_key_repo),
 ):
     """更新API密钥的使用限额"""
     data = await request.json()
@@ -371,16 +369,10 @@ async def update_api_key_limit(
             status_code=400, detail="API key and new limit are required"
         )
 
-    _, api_service = get_services(request)
-
-    # 更新数据库中的限额
-    from sqlalchemy import text
-
-    await session.execute(
-        text("UPDATE api_keys SET limit_value = :limit WHERE api_key = :api_key"),
-        {"limit": new_limit, "api_key": api_key},
-    )
-    await session.commit()
+    # 使用Repository更新限额
+    success = await api_key_repo.update_limit(api_key, new_limit)
+    if not success:
+        raise HTTPException(status_code=404, detail="API key not found")
 
     return {"status": "success"}
 
@@ -388,7 +380,8 @@ async def update_api_key_limit(
 @router.post("/reset-api-key-usage")
 @admin_required
 async def reset_api_key_usage(
-    request: Request, session: AsyncSession = Depends(get_db_session)
+    request: Request,
+    api_key_repo: ApiKeyRepository = Depends(get_api_key_repo),
 ):
     """重置API密钥使用量"""
     data = await request.json()
@@ -396,16 +389,10 @@ async def reset_api_key_usage(
     if not api_key:
         raise HTTPException(status_code=400, detail="API key is required")
 
-    _, api_service = get_services(request)
-
-    # 重置数据库中的使用量
-    from sqlalchemy import text
-
-    await session.execute(
-        text("UPDATE api_keys SET usage = 0, reqs = 0 WHERE api_key = :api_key"),
-        {"api_key": api_key},
-    )
-    await session.commit()
+    # 使用Repository重置使用量
+    success = await api_key_repo.reset_usage(api_key)
+    if not success:
+        raise HTTPException(status_code=404, detail="API key not found")
 
     return {"status": "success"}
 
@@ -413,7 +400,8 @@ async def reset_api_key_usage(
 @router.post("/revoke-api-key")
 @admin_required
 async def revoke_api_key(
-    request: Request, session: AsyncSession = Depends(get_db_session)
+    request: Request,
+    api_key_repo: ApiKeyRepository = Depends(get_api_key_repo),
 ):
     """撤销API密钥"""
     data = await request.json()
@@ -421,15 +409,10 @@ async def revoke_api_key(
     if not api_key:
         raise HTTPException(status_code=400, detail="API key is required")
 
-    _, api_service = get_services(request)
-
-    # 从数据库中删除API密钥
-    from sqlalchemy import text
-
-    await session.execute(
-        text("DELETE FROM api_keys WHERE api_key = :api_key"), {"api_key": api_key}
-    )
-    await session.commit()
+    # 使用Repository删除API密钥
+    success = await api_key_repo.delete_by_api_key(api_key)
+    if not success:
+        raise HTTPException(status_code=404, detail="API key not found")
 
     return {"status": "success"}
 
@@ -437,7 +420,9 @@ async def revoke_api_key(
 @router.post("/change-user-password")
 @admin_required
 async def change_user_password(
-    request: Request, session: AsyncSession = Depends(get_db_session)
+    request: Request,
+    session: AsyncSession = Depends(get_db_session),
+    api_key_repo: ApiKeyRepository = Depends(get_api_key_repo),
 ):
     """管理员修改用户密码"""
     try:
@@ -456,11 +441,7 @@ async def change_user_password(
             raise HTTPException(status_code=400, detail="密码长度不能超过72个字符")
 
         # 检查API密钥是否存在
-        from app.database.models import ApiKey
-        from sqlalchemy import select
-
-        result = await session.execute(select(ApiKey).where(ApiKey.api_key == api_key))
-        api_key_record = result.scalar_one_or_none()
+        api_key_record = await api_key_repo.get_by_api_key(api_key)
 
         if not api_key_record:
             raise HTTPException(status_code=404, detail="未找到该API密钥对应的用户")
@@ -482,21 +463,12 @@ async def change_user_password(
 @router.get("/dashboard", response_class=HTMLResponse)
 @admin_required
 async def usage_dashboard(
-    request: Request, session: AsyncSession = Depends(get_db_session)
+    request: Request,
+    api_key_repo: ApiKeyRepository = Depends(get_api_key_repo),
 ):
     """用量统计和管理仪表盘"""
-    _, api_service = get_services(request)
-
-    # 使用ORM查询获取数据，包括模型使用统计
-    from sqlalchemy import select
-    from sqlalchemy.orm import selectinload
-    from app.database.models import ApiKey, ModelUsage
-
-    # 获取API密钥数据，包括模型使用统计
-    result = await session.execute(
-        select(ApiKey).options(selectinload(ApiKey.model_usages))
-    )
-    api_keys_data = result.scalars().all()
+    # 使用Repository获取数据，包括模型使用统计
+    api_keys_data = await api_key_repo.get_all_with_usages()
 
     # 计算统计信息
     total_usage = sum(key.usage or 0 for key in api_keys_data)

@@ -11,6 +11,12 @@ from app.utils.helpers import generate_token, get_current_time, log_api_usage
 from app.config.settings import settings
 from app.database.database import get_db_session
 from app.database.models import ApiKey, ModelUsage, LLMServer, ServerModel
+from app.database.repositories import (
+    ApiKeyRepository,
+    LLMServerRepository,
+    ServerModelRepository,
+    ModelUsageRepository,
+)
 import tiktoken
 
 
@@ -27,19 +33,35 @@ class ApiService:
             print(f"Warning: tiktoken initialization failed: {e}. Using fallback token counting.")
             self.encoding = None
             self._use_tiktoken = False
-        
+
         # 改进的token缓存：使用LRU缓存策略
         self._token_cache = {}  # token缓存
         self._token_cache_keys = []  # 用于LRU管理的key列表
         self._max_token_cache_size = 1000  # 最大缓存大小
-        
+
         # 模型权重缓存
         self._model_weights_cache = {}  # 模型权重缓存
         self._model_weights_last_updated = 0  # 最后更新时间
         self._model_weights_cache_ttl = 60  # 缓存TTL（秒）
-        
+
         self._stats_cache = None  # 统计缓存
         self._stats_last_updated = 0
+
+    def _get_api_key_repo(self, session: AsyncSession) -> ApiKeyRepository:
+        """获取ApiKeyRepository实例"""
+        return ApiKeyRepository(session, ApiKey)
+
+    def _get_llm_server_repo(self, session: AsyncSession) -> LLMServerRepository:
+        """获取LLMServerRepository实例"""
+        return LLMServerRepository(session, LLMServer)
+
+    def _get_server_model_repo(self, session: AsyncSession) -> ServerModelRepository:
+        """获取ServerModelRepository实例"""
+        return ServerModelRepository(session, ServerModel)
+
+    def _get_model_usage_repo(self, session: AsyncSession) -> ModelUsageRepository:
+        """获取ModelUsageRepository实例"""
+        return ModelUsageRepository(session, ModelUsage)
 
     async def validate_api_key(self, api_key: str, session: AsyncSession) -> None:
         """验证API密钥
@@ -54,12 +76,10 @@ class ApiService:
         try:
             if not api_key:
                 raise HTTPException(401, "Invalid API Key")
-            
-            result = await session.execute(
-                select(ApiKey).where(ApiKey.api_key == api_key)
-            )
-            api_key_record = result.scalar_one_or_none()
-            
+
+            api_key_repo = self._get_api_key_repo(session)
+            api_key_record = await api_key_repo.get_by_api_key(api_key)
+
             if not api_key_record:
                 raise HTTPException(401, "Invalid API Key")
         except HTTPException:
@@ -81,11 +101,9 @@ class ApiService:
             HTTPException: 超出使用限额
         """
         try:
-            result = await session.execute(
-                select(ApiKey).where(ApiKey.api_key == api_key)
-            )
-            api_key_record = result.scalar_one_or_none()
-            
+            api_key_repo = self._get_api_key_repo(session)
+            api_key_record = await api_key_repo.get_by_api_key(api_key)
+
             if api_key_record and api_key_record.usage >= api_key_record.limit_value:
                 raise HTTPException(402, "Usage limit exceeded")
         except HTTPException:
@@ -107,26 +125,23 @@ class ApiService:
         """
         try:
             new_key = generate_token()
-            
+
             # 检查是否已存在
-            result = await session.execute(
-                select(ApiKey).where(ApiKey.api_key == new_key)
-            )
-            existing = result.scalar_one_or_none()
-            
+            api_key_repo = self._get_api_key_repo(session)
+            existing = await api_key_repo.get_by_api_key(new_key)
+
             if existing:
                 # 如果已存在，重新生成
                 return await self.generate_api_key(session)
-            
+
             # 创建新的API密钥记录
-            api_key = ApiKey(
+            api_key = await api_key_repo.create(
                 api_key=new_key,
                 limit_value=settings.DEFAULT_LIMIT,
                 created_at_str=get_current_time()
             )
-            session.add(api_key)
             await session.commit()
-            
+
             return new_key
         except Exception as e:
             # 回滚事务并记录错误
@@ -153,73 +168,47 @@ class ApiService:
 
     async def _get_model_weights(self, model: str, session: AsyncSession) -> tuple[float, float]:
         """获取模型权重，使用缓存优化
-        
+
         Args:
             model: 模型名称
             session: 数据库会话
-            
+
         Returns:
             tuple: (input_weight, output_weight)
         """
         current_time = time.time()
-        
+
         # 检查缓存是否有效
         cache_key = model
-        if (cache_key in self._model_weights_cache and 
+        if (cache_key in self._model_weights_cache and
             current_time - self._model_weights_last_updated < self._model_weights_cache_ttl):
             return self._model_weights_cache[cache_key]
-        
+
         # 从数据库获取模型权重配置，支持新旧字段
-        from sqlalchemy.orm import selectinload
-        from sqlalchemy import or_
-        
-        # 同时查询新旧字段：前端模型名称可能是actual_model_name或frontend_model_name
-        result = await session.execute(
-            select(ServerModel)
-            .where(
-                or_(
-                    ServerModel.actual_model_name == model,  # 旧字段
-                    ServerModel.frontend_model_name == model  # 新字段
-                )
-            )
-            .options(selectinload(ServerModel.server))
-        )
-        server_models = result.scalars().all()
-        
+        server_model_repo = self._get_server_model_repo(session)
+        server_model = await server_model_repo.get_by_frontend_name(model)
+
         # 默认权重
         input_weight = 1.0
         output_weight = 1.0
-        
-        if server_models:
-            # 优先选择启用的模型
-            enabled_models = [m for m in server_models if m.status]
-            if enabled_models:
-                server_model = enabled_models[0]
-            else:
-                server_model = server_models[0]  # 如果没有启用的，使用第一个
-            
+
+        if server_model:
             input_weight = server_model.input_token_weight
             output_weight = server_model.output_token_weight
-        
+
         # 更新缓存
         self._model_weights_cache[cache_key] = (input_weight, output_weight)
         self._model_weights_last_updated = current_time
-        
+
         return input_weight, output_weight
 
     async def _update_usage_internal(self, api_key: str, request_data: Dict, model: str, session: AsyncSession) -> None:
         """内部更新使用情况方法 - 使用SELECT FOR UPDATE防止并发竞争条件"""
         try:
             # 使用SELECT FOR UPDATE锁定API密钥记录，防止并发更新
-            from sqlalchemy import select, update, and_
-            
-            result = await session.execute(
-                select(ApiKey)
-                .where(ApiKey.api_key == api_key)
-                .with_for_update()  # 锁定记录，防止并发更新
-            )
-            api_key_record = result.scalar_one_or_none()
-            
+            api_key_repo = self._get_api_key_repo(session)
+            api_key_record = await api_key_repo.get_for_update(api_key)
+
             if not api_key_record:
                 return
 
@@ -231,19 +220,19 @@ class ApiService:
             # 获取模型权重（使用缓存优化）
             input_weight = 1.0
             output_weight = 1.0
-            
+
             if model:
                 input_weight, output_weight = await self._get_model_weights(model, session)
 
             # 计算加权token数量
             weighted_tokens = 0
-            
+
             # 从响应中获取实际的input和output token数量
             if "usage" in request_data:
                 # 如果请求数据中已经包含usage信息（来自上游响应）
                 usage_data = request_data["usage"]
                 prompt_tokens = usage_data.get("prompt_tokens", 0)
-                
+
                 # 处理embeddings接口的特殊情况（只有prompt_tokens和total_tokens）
                 if "completion_tokens" in usage_data:
                     completion_tokens = usage_data.get("completion_tokens", 0)
@@ -252,7 +241,7 @@ class ApiService:
                     completion_tokens = 0
                 else:
                     completion_tokens = 0
-                
+
                 # 应用权重计算
                 weighted_tokens = (prompt_tokens * input_weight) + (completion_tokens * output_weight)
             else:
@@ -279,21 +268,21 @@ class ApiService:
                                 chinese_chars = sum(1 for c in content if '\u4e00' <= c <= '\u9fff')
                                 english_chars = len(content) - chinese_chars
                                 token_count = max(1, int(chinese_chars / 1.5 + english_chars / 4))
-                            
+
                             # 添加到缓存
                             self._token_cache[cache_key] = token_count
                             self._token_cache_keys.append(cache_key)
                             prompt_tokens += token_count
-                            
+
                             # 检查缓存大小，使用LRU策略清理
                             if len(self._token_cache) > self._max_token_cache_size:
                                 # 移除最久未使用的缓存项
                                 oldest_key = self._token_cache_keys.pop(0)
                                 del self._token_cache[oldest_key]
-                
+
                 # 估算output tokens（假设为input tokens的1/3）
                 completion_tokens = max(1, int(prompt_tokens * 0.33))
-                
+
                 # 应用权重计算
                 weighted_tokens = (prompt_tokens * input_weight) + (completion_tokens * output_weight)
 
@@ -301,20 +290,10 @@ class ApiService:
 
             # 更新模型使用统计 - 同样需要锁定
             if model:
-                # 使用SELECT FOR UPDATE锁定模型使用记录，使用first()而不是scalar_one_or_none()
-                result = await session.execute(
-                    select(ModelUsage)
-                    .where(
-                        and_(
-                            ModelUsage.api_key_id == api_key_record.id,
-                            ModelUsage.model_name == model
-                        )
-                    )
-                    .with_for_update()  # 锁定记录，防止并发更新
-                )
-                model_usage_result = result.first()
-                
-                if not model_usage_result:
+                model_usage_repo = self._get_model_usage_repo(session)
+                model_usage = await model_usage_repo.get_for_update(api_key_record.id, model)
+
+                if not model_usage:
                     model_usage = ModelUsage(
                         api_key_id=api_key_record.id,
                         model_name=model,
@@ -322,15 +301,13 @@ class ApiService:
                         tokens=0
                     )
                     session.add(model_usage)
-                else:
-                    model_usage = model_usage_result[0]
-                
+
                 model_usage.requests += 1
                 model_usage.tokens += weighted_tokens
 
             await session.commit()
             # log_api_usage(api_key, api_key_record.to_dict())
-            
+
         except Exception as e:
             # 回滚事务并记录错误
             await session.rollback()
@@ -353,11 +330,9 @@ class ApiService:
         if self._stats_cache and current_time - self._stats_last_updated < 5:
             return self._stats_cache
 
-        # 从数据库获取统计信息
-        result = await session.execute(
-            select(ApiKey)
-        )
-        all_api_keys = result.scalars().all()
+        # 使用Repository获取数据
+        api_key_repo = self._get_api_key_repo(session)
+        all_api_keys = await api_key_repo.get_all()
 
         # 计算统计信息
         total_usage = sum(key.usage for key in all_api_keys)
@@ -407,16 +382,18 @@ class ApiService:
         Args:
             session: 数据库会话
         """
-        # 重置所有API密钥的使用量
+        from sqlalchemy import delete
+
+        # 重置所有API密钥的使用量 - 使用原子操作
         await session.execute(
             update(ApiKey).values(usage=0, reqs=0)
         )
-        
-        # 重置所有模型使用统计
+
+        # 重置所有模型使用统计 - 使用原子操作
         await session.execute(
             update(ModelUsage).values(requests=0, tokens=0)
         )
-        
+
         await session.commit()
 
     async def load_llm_servers(self, session: AsyncSession) -> Dict:
@@ -428,13 +405,9 @@ class ApiService:
             Returns:
                 Dict: LLM服务器配置
         """
-        from sqlalchemy.orm import selectinload
-        
-        result = await session.execute(
-            select(LLMServer).options(selectinload(LLMServer.models))
-        )
-        servers = result.scalars().all()
-        
+        llm_server_repo = self._get_llm_server_repo(session)
+        servers = await llm_server_repo.get_all_with_models()
+
         servers_dict = {}
         for server in servers:
             # 手动构建服务器配置，避免异步延迟加载问题
@@ -445,14 +418,14 @@ class ApiService:
                 "device": server.device,
                 "enabled": True
             }
-            
+
             # 手动构建模型映射 - 支持新旧字段
             for model in server.models:
                 # 获取前端模型名称（优先使用新字段）
                 frontend_name = model.frontend_model_name or model.actual_model_name
                 # 获取后端模型名称（优先使用新字段）
                 backend_name = model.backend_model_name or model.client_model_name
-                
+
                 server_config["model"][frontend_name] = {
                     "name": backend_name,  # 实际后端模型名称
                     "reqs": model.reqs,
@@ -460,9 +433,9 @@ class ApiService:
                     "input_token_weight": model.input_token_weight,
                     "output_token_weight": model.output_token_weight
                 }
-            
+
             servers_dict[server.server_url] = server_config
-        
+
         return servers_dict
 
     async def save_llm_servers(self, servers_data: Dict, session: AsyncSession) -> None:
@@ -472,15 +445,14 @@ class ApiService:
             servers_data: 服务器配置数据
             session: 数据库会话
         """
-        from sqlalchemy import delete
         from sqlalchemy.exc import IntegrityError
-        
+
+        llm_server_repo = self._get_llm_server_repo(session)
+
         try:
-            # 先删除所有现有服务器配置
-            # 使用delete语句而不是session.delete()，确保级联删除正常工作
-            await session.execute(delete(ServerModel))
-            await session.execute(delete(LLMServer))
-            
+            # 先删除所有现有服务器配置（使用Repository的delete_all方法）
+            llm_server_repo.delete_all()
+
             # 添加新的服务器配置
             for server_url, server_data in servers_data.items():
                 llm_server = LLMServer(
@@ -534,18 +506,15 @@ class ApiService:
             server_data: 服务器配置数据
             session: 数据库会话
         """
-        from sqlalchemy.orm import selectinload
         from sqlalchemy import delete
         from sqlalchemy.exc import IntegrityError
-        
+
+        llm_server_repo = self._get_llm_server_repo(session)
+        server_model_repo = self._get_server_model_repo(session)
+
         try:
-            # 查找现有服务器
-            result = await session.execute(
-                select(LLMServer)
-                .where(LLMServer.server_url == server_url)
-                .options(selectinload(LLMServer.models))
-            )
-            existing_server = result.scalar_one_or_none()
+            # 使用Repository查找现有服务器
+            existing_server = await llm_server_repo.get_by_url_with_models(server_url)
             
             if existing_server:
                 # 更新服务器信息
@@ -665,41 +634,26 @@ class ApiService:
         """
         try:
             # 使用SELECT FOR UPDATE锁定API密钥记录，防止并发更新
-            from sqlalchemy import select, and_
-            
-            result = await session.execute(
-                select(ApiKey)
-                .where(ApiKey.api_key == api_key)
-                .with_for_update()  # 锁定记录，防止并发更新
-            )
-            api_key_record = result.scalar_one_or_none()
-            
+            api_key_repo = self._get_api_key_repo(session)
+            model_usage_repo = self._get_model_usage_repo(session)
+
+            api_key_record = await api_key_repo.get_for_update(api_key)
+
             if not api_key_record:
                 return
 
             # 更新最后使用时间
             api_key_record.last_used = datetime.now()
             api_key_record.last_used_str = get_current_time()
-            
+
             # 只增加请求计数，不增加token用量
             api_key_record.reqs += 1
 
             # 更新模型使用统计 - 只增加请求计数，不增加token用量
             if model:
-                # 使用SELECT FOR UPDATE锁定模型使用记录，使用first()而不是scalar_one_or_none()
-                result = await session.execute(
-                    select(ModelUsage)
-                    .where(
-                        and_(
-                            ModelUsage.api_key_id == api_key_record.id,
-                            ModelUsage.model_name == model
-                        )
-                    )
-                    .with_for_update()  # 锁定记录，防止并发更新
-                )
-                model_usage_result = result.first()
-                
-                if not model_usage_result:
+                model_usage = await model_usage_repo.get_for_update(api_key_record.id, model)
+
+                if not model_usage:
                     model_usage = ModelUsage(
                         api_key_id=api_key_record.id,
                         model_name=model,
@@ -707,14 +661,12 @@ class ApiService:
                         tokens=0
                     )
                     session.add(model_usage)
-                else:
-                    model_usage = model_usage_result[0]
-                
+
                 model_usage.requests += 1
                 # tokens保持为0，因为Anthropic路由不计算token用量
 
             await session.commit()
-            
+
         except Exception as e:
             # 回滚事务并记录错误
             await session.rollback()
@@ -730,15 +682,10 @@ class ApiService:
             model_name: 模型名称（前端使用的模型名称）
             session: 数据库会话
         """
-        from sqlalchemy.orm import selectinload
-        
-        # 查找服务器，使用预加载避免延迟加载问题
-        result = await session.execute(
-            select(LLMServer)
-            .where(LLMServer.server_url == server_url)
-            .options(selectinload(LLMServer.models))
-        )
-        server = result.scalar_one_or_none()
+        llm_server_repo = self._get_llm_server_repo(session)
+
+        # 使用Repository查找服务器
+        server = await llm_server_repo.get_by_url_with_models(server_url)
         
         if server:
             # 查找模型 - 支持新旧字段

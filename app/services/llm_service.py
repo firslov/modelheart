@@ -12,6 +12,7 @@ from app.models.api_models import AppState
 from app.utils.logging_config import get_logger
 from app.database.database import get_db_session
 from app.database.models import LLMServer, ServerModel
+from app.database.repositories import LLMServerRepository
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -110,13 +111,9 @@ class LLMService:
         Args:
             session: 数据库会话
         """
-        from sqlalchemy.orm import selectinload
-
-        # 从数据库加载服务器配置，使用selectinload预加载模型关系
-        result = await session.execute(
-            select(LLMServer).options(selectinload(LLMServer.models))
-        )
-        servers = result.scalars().all()
+        # 使用Repository从数据库加载服务器配置
+        llm_server_repo = LLMServerRepository(session, LLMServer)
+        servers = await llm_server_repo.get_all_with_models()
 
         servers_data = {}
         for server in servers:
