@@ -224,19 +224,40 @@ async def login_page(request: Request):
 @router.post("/login")
 async def login(request: Request):
     """处理登录请求"""
-    data = await request.json()
-    username = data.get("username")
-    password = data.get("password")
+    # 支持两种格式：JSON 和表单数据
+    content_type = request.headers.get("content-type", "")
+
+    if "application/json" in content_type:
+        data = await request.json()
+        username = data.get("username")
+        password = data.get("password")
+        accept = request.headers.get("accept", "")
+    else:
+        # 表单数据格式
+        form_data = await request.form()
+        username = form_data.get("username")
+        password = form_data.get("password")
+        accept = ""  # 表单提交不使用JSON响应
 
     if verify_admin(username, password):
         request.session["authenticated"] = True
         request.session["is_admin"] = True
-        accept = request.headers.get("accept", "")
         if "application/json" in accept:
             return {"status": "success"}
         return RedirectResponse(url="/dashboard", status_code=303)
 
-    raise HTTPException(status_code=401, detail="Invalid credentials")
+    # 登录失败
+    if "application/json" in accept:
+        raise HTTPException(status_code=401, detail="用户名或密码错误")
+    else:
+        # 表单提交失败，返回登录页面并显示错误
+        return templates.TemplateResponse(
+            "login.html",
+            {
+                "request": request,
+                "error": "用户名或密码错误"
+            }
+        )
 
 
 @router.get("/logout")
@@ -301,7 +322,6 @@ async def generate_api_key(
 @router.post("/check-usage")
 async def check_usage(
     request: Request,
-    session: AsyncSession = Depends(get_db_session),
     api_key_repo: ApiKeyRepository = Depends(get_api_key_repo),
 ):
     """查询API密钥使用额度"""

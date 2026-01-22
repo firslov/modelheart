@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>管理控制台 - 模型之心</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         /* 与index.html相同的高级浅色系配色方案 */
@@ -61,7 +61,7 @@
         }
 
         body {
-            font-family: 'JetBrains Mono', 'PingFang SC', 'Microsoft YaHei', '微软雅黑', 'Courier New', monospace;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', '微软雅黑', sans-serif;
             background: var(--bg-primary);
             background-image:
                 radial-gradient(ellipse 80% 50% at 50% -20%, rgba(6, 182, 212, 0.08), transparent),
@@ -704,6 +704,11 @@
             .text-2xl.md\\:text-3xl {
                 font-size: 1.5rem;
             }
+        }
+
+        /* Override Tailwind font-mono to avoid blocked fonts in Firefox */
+        .font-mono {
+            font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace !important;
         }
     </style>
 </head>

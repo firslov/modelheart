@@ -106,7 +106,24 @@ def create_application() -> FastAPI:
     fastapi_app = FastAPI(lifespan=lifespan)
 
     # 配置中间件
-    # 添加请求追踪中间件（最优先执行）
+    # CORS 中间件必须最先添加（用于处理预检请求）
+    # 注意：allow_credentials=True 时不能使用 "*"，必须指定具体 origin
+    origins = [
+        "https://api.aihao.world",
+        "http://api.aihao.world",
+        "http://localhost:8087",
+        "http://0.0.0.0:8087",
+    ]
+    fastapi_app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["*"],
+        expose_headers=["*"],
+    )
+
+    # 添加请求追踪中间件
     fastapi_app.add_middleware(RequestTrackingMiddleware)
 
     # 添加受信任主机中间件
@@ -119,22 +136,6 @@ def create_application() -> FastAPI:
             "0.0.0.0:8087",
             "0.0.0.0",
         ],
-    )
-
-    # 配置CORS
-    origins = [
-        "http://localhost:8087",
-        "https://api.aihao.world",
-        "http://api.aihao.world",
-        "http://0.0.0.0:8087",
-    ]
-    fastapi_app.add_middleware(
-        CORSMiddleware,
-        allow_origins=origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-        expose_headers=["set-cookie"],
     )
 
     # 配置静态文件和模板

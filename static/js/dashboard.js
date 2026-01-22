@@ -377,7 +377,7 @@ async function updateServer() {
         const servers = await serversResponse.json();
         currentServerData = servers[oldUrl];
     } catch (error) {
-        console.warn('Could not fetch current server data:', error);
+        // Silently continue if we can't fetch current data
     }
 
     for (const row of rows) {
@@ -462,7 +462,6 @@ async function updateServer() {
             throw new Error(errorData.detail || 'Failed to update server');
         }
 
-        console.log('Update successful');
         closeEditServerModal();
         loadConfigs();
     } catch (error) {
@@ -736,7 +735,6 @@ async function toggleModelUsage(apiKey) {
         const currentKey = apiKeys.find(key => key.key === apiKey);
 
         if (!currentKey || !currentKey.model_usage) {
-            console.log('No model usage data found for API key:', apiKey);
             button.innerHTML = originalText;
             button.disabled = false;
             return;

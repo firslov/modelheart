@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>管理员登录 - 模型之心</title>
     <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="https://cdnjs.loli.net/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 
     <style>
@@ -605,6 +605,15 @@
     <div class="decoration decoration-1"></div>
     <div class="decoration decoration-2"></div>
 
+    {% if error %}
+    <script>
+        // 服务器返回的错误消息，在页面加载后显示
+        window.addEventListener('DOMContentLoaded', function() {
+            showError('{{ error }}');
+        });
+    </script>
+    {% endif %}
+
     <!-- 登录容器 -->
     <div class="login-container">
         <div class="login-card">
@@ -618,7 +627,7 @@
             <div class="login-divider"></div>
 
             <!-- 登录表单 -->
-            <form id="loginForm" class="login-form">
+            <form id="loginForm" class="login-form" method="post" action="/login">
                 <div class="form-group">
                     <label for="username" class="form-label">
                         用户名
@@ -663,67 +672,31 @@
     </div>
 
     <script>
-        // 表单提交处理
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-
+        // 表单提交处理 - 使用原生表单提交以兼容Firefox
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
-            const errorMessage = document.getElementById('error-message');
-            const errorText = document.getElementById('error-text');
             const loginButton = document.getElementById('loginButton');
 
             // 隐藏之前的错误消息
-            errorMessage.classList.remove('show');
+            document.getElementById('error-message').classList.remove('show');
 
             // 验证输入
             if (!username.trim() || !password.trim()) {
+                e.preventDefault();
                 showError('请输入用户名和密码');
                 return;
             }
 
             if (password.length < 3) {
+                e.preventDefault();
                 showError('密码长度至少为3位');
                 return;
             }
 
-            // 显示加载状态
+            // 验证通过，允许表单正常提交
             loginButton.classList.add('loading');
             loginButton.disabled = true;
-
-            try {
-                const response = await fetch('/login', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ username, password }),
-                    redirect: 'follow'
-                });
-
-                if (response.redirected) {
-                    // 服务器重定向，跟随跳转
-                    window.location.href = response.url;
-                } else if (response.ok) {
-                    const data = await response.json();
-                    if (data.status === 'success') {
-                        // 登录成功，跳转到管理页面
-                        window.location.href = '/dashboard';
-                    } else {
-                        showError(data.message || '登录失败');
-                    }
-                } else {
-                    const data = await response.json();
-                    showError(data.detail || '用户名或密码错误');
-                }
-            } catch (error) {
-                console.error('登录错误:', error);
-                showError('网络连接失败，请稍后重试');
-            } finally {
-                // 恢复按钮状态
-                loginButton.classList.remove('loading');
-                loginButton.disabled = false;
-            }
         });
 
         // 显示错误消息
@@ -753,14 +726,20 @@
 
         // 键盘快捷键支持
         document.addEventListener('keydown', (e) => {
-            // Enter键提交表单
+            // Enter键提交表单 - 使用 requestSubmit 创建受信任事件
             if (e.key === 'Enter' && !e.shiftKey) {
                 const form = document.getElementById('loginForm');
                 const activeElement = document.activeElement;
 
                 if (activeElement.tagName === 'INPUT' && form) {
                     e.preventDefault();
-                    form.dispatchEvent(new Event('submit'));
+                    // requestSubmit() 创建受信任的提交事件
+                    if (typeof form.requestSubmit === 'function') {
+                        form.requestSubmit();
+                    } else {
+                        // 降级支持旧浏览器
+                        form.submit();
+                    }
                 }
             }
 
@@ -793,7 +772,8 @@
 
         // 防止表单重复提交
         let isSubmitting = false;
-        document.getElementById('loginForm').addEventListener('submit', (e) => {
+        const loginForm = document.getElementById('loginForm');
+        loginForm.addEventListener('submit', (e) => {
             if (isSubmitting) {
                 e.preventDefault();
                 return false;
