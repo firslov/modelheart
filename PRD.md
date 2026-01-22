@@ -380,10 +380,14 @@ async def proxy_handler_chat(request: Request, ...):
 - [ ] 各文件行数 < 500
 - [ ] 所有API端点功能正常
 
-### 数据库统一
-- [ ] 新增 `base_repository.py` 和 `repositories/` 目录
-- [ ] 路由中无原生 `text()` SQL调用
-- [ ] 并发更新使用原子操作（`+=` 方式）
+### 数据库统一 ✅ (已完成 2026-01-22)
+- [x] 新增 `base_repository.py` 和 `repositories/` 目录
+- [x] 路由中无原生 `text()` SQL调用
+- [x] 并发更新使用原子操作（`+=` 方式）
+- [x] `routes.py` 使用 Repository 替代原生SQL
+- [x] `api_service.py` 使用 Repository
+- [x] `usage_queue.py` 使用 Repository
+- [x] `llm_service.py` 使用 Repository
 
 ### 速率限制
 - [ ] 注册接口限制 5次/分钟

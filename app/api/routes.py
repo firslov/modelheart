@@ -357,6 +357,7 @@ async def check_usage(
 @admin_required
 async def update_api_key_limit(
     request: Request,
+    session: AsyncSession = Depends(get_db_session),
     api_key_repo: ApiKeyRepository = Depends(get_api_key_repo),
 ):
     """更新API密钥的使用限额"""
@@ -374,6 +375,9 @@ async def update_api_key_limit(
     if not success:
         raise HTTPException(status_code=404, detail="API key not found")
 
+    # 提交事务
+    await session.commit()
+
     return {"status": "success"}
 
 
@@ -381,6 +385,7 @@ async def update_api_key_limit(
 @admin_required
 async def reset_api_key_usage(
     request: Request,
+    session: AsyncSession = Depends(get_db_session),
     api_key_repo: ApiKeyRepository = Depends(get_api_key_repo),
 ):
     """重置API密钥使用量"""
@@ -394,6 +399,9 @@ async def reset_api_key_usage(
     if not success:
         raise HTTPException(status_code=404, detail="API key not found")
 
+    # 提交事务
+    await session.commit()
+
     return {"status": "success"}
 
 
@@ -401,6 +409,7 @@ async def reset_api_key_usage(
 @admin_required
 async def revoke_api_key(
     request: Request,
+    session: AsyncSession = Depends(get_db_session),
     api_key_repo: ApiKeyRepository = Depends(get_api_key_repo),
 ):
     """撤销API密钥"""
@@ -413,6 +422,9 @@ async def revoke_api_key(
     success = await api_key_repo.delete_by_api_key(api_key)
     if not success:
         raise HTTPException(status_code=404, detail="API key not found")
+
+    # 提交事务
+    await session.commit()
 
     return {"status": "success"}
 
