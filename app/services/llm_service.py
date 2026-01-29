@@ -309,7 +309,7 @@ class LLMService:
             # 仅在服务器错误时重建客户端（500+错误）
             if exc.response.status_code >= 500:  # 服务器错误
                 if self.http_client:
-                    await self.http_client.aclose(force=False)
+                    await self.http_client.aclose()
                     await self.initialize()  # 重新初始化
 
             if stream:
@@ -328,7 +328,7 @@ class LLMService:
             # HTTP/2 连接被终止，重建客户端
             if self.http_client:
                 try:
-                    await self.http_client.aclose(force=False)
+                    await self.http_client.aclose()
                 except Exception:
                     pass
                 await self.initialize()
@@ -346,7 +346,7 @@ class LLMService:
             logger.error(f"Network error for {target}: {exc}")
 
             if self.http_client:
-                await self.http_client.aclose(force=False)
+                await self.http_client.aclose()
                 self.http_client = httpx.AsyncClient(
                     limits=httpx.Limits(
                         max_connections=1000,

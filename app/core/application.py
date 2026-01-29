@@ -17,7 +17,7 @@ from app.services.api_service import ApiService
 from app.services.llm_service import LLMService
 from app.services.usage_queue import UsageQueue
 from app.utils.logging_config import get_logger
-from app.middleware.logging import RequestTrackingMiddleware
+from app.middleware.logging import RequestTrackingMiddleware, DetailedRequestLoggingMiddleware
 from app.database.database import get_db_session, init_db
 
 logger = get_logger(__name__)
@@ -125,6 +125,9 @@ def create_application() -> FastAPI:
 
     # 添加请求追踪中间件
     fastapi_app.add_middleware(RequestTrackingMiddleware)
+
+    # 添加详细请求日志中间件（用于排查问题）
+    fastapi_app.add_middleware(DetailedRequestLoggingMiddleware)
 
     # 添加受信任主机中间件
     fastapi_app.add_middleware(

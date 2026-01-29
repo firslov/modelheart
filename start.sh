@@ -4,7 +4,7 @@
 WORKERS=${WORKERS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}
 PORT=${PORT:-8087}
 HOST=${HOST:-0.0.0.0}
-LOG_LEVEL=${LOG_LEVEL:-info}
+LOG_LEVEL=${LOG_LEVEL:-warning}  # 默认使用 warning，屏蔽 winch 信号日志
 
 # 开发模式：单进程 + 热重载
 if [ "$DEV" = "1" ]; then
@@ -18,7 +18,8 @@ echo "Starting Model Heart (PROD mode) with $WORKERS workers..."
 
 # 优先使用 gunicorn，回退到 uvicorn
 if command -v gunicorn &> /dev/null; then
-    gunicorn app.main:app \
+    # 使用 grep 过滤 winch 信号日志（只过滤包含 "Handling signal: winch" 的完整行）
+    { gunicorn app.main:app \
         --workers "$WORKERS" \
         --worker-class uvicorn.workers.UvicornWorker \
         --bind "$HOST:$PORT" \
@@ -28,7 +29,7 @@ if command -v gunicorn &> /dev/null; then
         --max-requests-jitter 1000 \
         --access-logfile - \
         --log-level "$LOG_LEVEL" \
-        --worker-connections 1000
+        --worker-connections 1000 2>&1 | grep -vE "Handling signal: winch|^\\[.*\\].*Handling signal: winch"; } || true
 else
     uvicorn app.main:app \
         --host "$HOST" \

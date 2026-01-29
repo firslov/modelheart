@@ -124,8 +124,9 @@ def setup_logging(
     # 设置第三方库的日志级别（减少噪音）
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
-    logging.getLogger("uvicorn").setLevel(logging.WARNING)
-    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)  # 减少 uvicorn 访问日志
+    logging.getLogger("uvicorn").setLevel(logging.WARNING)  # 屏蔽 winch 信号等无关日志
+    logging.getLogger("uvicorn.access").setLevel(logging.INFO)  # 保留访问日志
+    logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
     logging.getLogger("sqlalchemy").setLevel(logging.WARNING)
 
 
