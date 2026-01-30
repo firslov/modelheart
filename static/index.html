@@ -122,7 +122,6 @@
             dummy.select();
             document.execCommand("copy");
             document.body.removeChild(dummy);
-            showMessage("DATA COPIED");
         }
 
         function copyToClipboardText(text) {
@@ -134,7 +133,6 @@
             dummy.select();
             document.execCommand("copy");
             document.body.removeChild(dummy);
-            showMessage("KEY_COPIED");
         }
 
         function showMessage(message, isError) {
@@ -193,7 +191,6 @@
                         // 点击复制模型名
                         div.addEventListener('click', () => {
                             copyToClipboardText(model);
-                            showMessage(`已复制模型名: ${model}`);
                         });
 
                         modelList.appendChild(div);

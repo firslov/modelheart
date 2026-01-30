@@ -37,10 +37,10 @@ class LLMService:
                 keepalive_expiry=180,  # 缩短保持连接时间
             ),
             timeout=httpx.Timeout(
-                connect=5.0,  # 连接超时5秒（云服务器网络更快）
-                read=300.0,  # 读取超时300秒
-                write=5.0,  # 写入超时5秒
-                pool=5.0,  # 连接池超时5秒
+                connect=10.0,  # 连接超时10秒
+                read=None,  # 读取超时无限制（支持长对话）
+                write=10.0,  # 写入超时10秒
+                pool=10.0,  # 连接池超时10秒
             ),
             transport=httpx.AsyncHTTPTransport(
                 retries=2,  # 减少重试次数，避免延迟累积
@@ -354,7 +354,7 @@ class LLMService:
                         keepalive_expiry=300,
                     ),
                     timeout=httpx.Timeout(
-                        connect=10.0, read=300.0, write=10.0, pool=10.0
+                        connect=10.0, read=None, write=10.0, pool=10.0
                     ),
                     transport=httpx.AsyncHTTPTransport(
                         retries=3,
