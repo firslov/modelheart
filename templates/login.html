@@ -1,52 +1,40 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>管理员登录 - 模型之心</title>
+    <title>管理员登录 - Model Heart</title>
     <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Manrope:wght@300;400;500;600;700&family=Geist+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
-
         :root {
-            /* 极致高级配色系统 - Premium Color Palette */
-            --bg-primary: #fafcff;
-            --bg-secondary: #f0f4f8;
-            --bg-tertiary: #e8edf3;
-            --text-primary: #0f172a;
-            --text-secondary: #475569;
-            --text-dim: #94a3b8;
-            --text-muted: #cbd5e1;
+            --bg-deep: #0a0e17;
+            --bg-card: rgba(15, 23, 42, 0.6);
+            --bg-glass: rgba(255, 255, 255, 0.03);
+            --bg-glass-hover: rgba(255, 255, 255, 0.06);
 
-            /* 精致强调色 */
-            --accent-primary: #06b6d4;
-            --accent-secondary: #8b5cf6;
-            --accent-success: #10b981;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+
+            --accent-cyan: #22d3ee;
+            --accent-purple: #a78bfa;
+            --accent-pink: #f472b6;
+            --accent-gold: #fbbf24;
+            --accent-green: #34d399;
             --accent-error: #ef4444;
-            --accent-warning: #f59e0b;
 
-            /* 边框和背景色 */
-            --border-color: #e2e8f0;
-            --border-subtle: #f1f5f9;
-            --bg-glass: rgba(255, 255, 255, 0.85);
-            --bg-glass-dark: rgba(255, 255, 255, 0.95);
+            --border-subtle: rgba(255, 255, 255, 0.06);
+            --border-glow: rgba(34, 211, 238, 0.3);
 
-            /* 阴影系统 */
-            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
-            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
-            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.03);
-            --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
-            --shadow-glow: 0 0 20px rgba(6, 182, 212, 0.15), 0 0 40px rgba(139, 92, 246, 0.1);
+            --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.4);
+            --shadow-glow: 0 0 60px rgba(34, 211, 238, 0.15);
 
-            /* 渐变 */
-            --gradient-primary: linear-gradient(135deg, #06b6d4 0%, #8b5cf6 100%);
-            --gradient-surface: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
-            --gradient-glow: linear-gradient(135deg, rgba(6, 182, 212, 0.1) 0%, rgba(139, 92, 246, 0.05) 100%);
+            --gradient-primary: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-purple) 100%);
+            --gradient-surface: linear-gradient(180deg, rgba(15, 23, 42, 0.8) 0%, rgba(15, 23, 42, 0.95) 100%);
         }
 
         * {
@@ -60,13 +48,9 @@
         }
 
         body {
-            background: var(--bg-primary);
-            background-image:
-                radial-gradient(ellipse 80% 50% at 50% -20%, rgba(6, 182, 212, 0.08), transparent),
-                radial-gradient(ellipse 60% 40% at 100% 0%, rgba(139, 92, 246, 0.06), transparent),
-                radial-gradient(ellipse 50% 30% at 0% 100%, rgba(16, 185, 129, 0.05), transparent);
+            font-family: 'Manrope', -apple-system, sans-serif;
+            background: var(--bg-deep);
             color: var(--text-primary);
-            font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', '微软雅黑', -apple-system, BlinkMacSystemFont, sans-serif;
             min-height: 100vh;
             position: relative;
             overflow-x: hidden;
@@ -76,161 +60,250 @@
             line-height: 1.6;
         }
 
-        /* 精致背景装饰 */
+        /* Animated Background */
         body::before {
-            content: "";
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background:
+                radial-gradient(ellipse 80% 50% at 50% -20%, rgba(34, 211, 238, 0.15), transparent 50%),
+                radial-gradient(ellipse 60% 40% at 100% 50%, rgba(167, 139, 250, 0.1), transparent 50%),
+                radial-gradient(ellipse 50% 30% at 0% 80%, rgba(244, 114, 182, 0.08), transparent 50%);
+            z-index: 0;
+            animation: bgShift 20s ease-in-out infinite;
+        }
+
+        @keyframes bgShift {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.05); }
+        }
+
+        /* Grid Pattern */
+        body::after {
+            content: '';
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
             background-image:
-                linear-gradient(rgba(6, 182, 212, 0.02) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(6, 182, 212, 0.02) 1px, transparent 1px);
-            background-size: 60px 60px;
+                linear-gradient(rgba(34, 211, 238, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(34, 211, 238, 0.03) 1px, transparent 1px);
+            background-size: 80px 80px;
+            z-index: 1;
             pointer-events: none;
-            z-index: 0;
+            mask-image: radial-gradient(ellipse 80% 50% at 50% 50%, black 0%, transparent 70%);
+            -webkit-mask-image: radial-gradient(ellipse 80% 50% at 50% 50%, black 0%, transparent 70%);
         }
 
-        body::after {
-            content: "";
+        /* Floating Orbs */
+        .orb {
             position: fixed;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle at center, rgba(6, 182, 212, 0.03) 0%, transparent 50%);
-            animation: float 20s ease-in-out infinite;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.5;
             z-index: 0;
             pointer-events: none;
         }
 
-        @keyframes float {
-            0%, 100% { transform: translate(0, 0) rotate(0deg); }
-            33% { transform: translate(30px, -30px) rotate(120deg); }
-            66% { transform: translate(-20px, 20px) rotate(240deg); }
+        .orb-1 {
+            width: 400px;
+            height: 400px;
+            background: var(--accent-cyan);
+            top: -100px;
+            right: -100px;
+            animation: float1 25s ease-in-out infinite;
         }
 
-        @keyframes fadeIn {
+        .orb-2 {
+            width: 300px;
+            height: 300px;
+            background: var(--accent-purple);
+            bottom: -50px;
+            left: -50px;
+            animation: float2 30s ease-in-out infinite;
+        }
+
+        @keyframes float1 {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(-50px, 50px) scale(1.1); }
+            66% { transform: translate(30px, -30px) scale(0.9); }
+        }
+
+        @keyframes float2 {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(40px, -40px) scale(0.95); }
+            66% { transform: translate(-30px, 20px) scale(1.05); }
+        }
+
+        /* Login Container */
+        .login-container {
+            width: 100%;
+            max-width: 480px;
+            padding: 2rem;
+            position: relative;
+            z-index: 10;
+            animation: fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes fadeInUp {
             from {
                 opacity: 0;
                 transform: translateY(30px);
             }
-
             to {
                 opacity: 1;
                 transform: translateY(0);
             }
         }
 
-        @keyframes pulse {
-            0% {
-                transform: scale(1);
-            }
-
-            50% {
-                transform: scale(1.05);
-            }
-
-            100% {
-                transform: scale(1);
-            }
-        }
-
-        /* 登录容器 */
-        .login-container {
-            width: 100%;
-            max-width: 480px;
-            padding: 2rem;
-            animation: fadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 2;
-            position: relative;
-        }
-
-        /* 登录区域 - 无卡片设计 */
+        /* Login Card */
         .login-card {
-            background: transparent;
-            border: none;
-            border-radius: 0;
-            padding: 0;
-            box-shadow: none;
+            background: var(--bg-card);
+            backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid var(--border-subtle);
+            border-radius: 24px;
+            box-shadow: var(--shadow-card);
+            overflow: hidden;
             position: relative;
-            overflow: visible;
         }
 
-        /* 分隔线设计 */
-        .login-divider {
+        .login-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
             height: 1px;
             background: linear-gradient(90deg,
-                    transparent 0%,
-                    var(--border-color) 20%,
-                    var(--border-color) 80%,
-                    transparent 100%);
-            margin: 3rem 0;
+                transparent,
+                var(--accent-cyan),
+                var(--accent-purple),
+                transparent);
+            opacity: 0.5;
+        }
+
+        .login-card::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, var(--accent-cyan) 0%, transparent 50%);
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            pointer-events: none;
+        }
+
+        .login-card:hover::after {
+            opacity: 0.03;
+        }
+
+        /* Header */
+        .login-header {
+            padding: 3rem 2.5rem 2rem;
+            text-align: center;
             position: relative;
         }
 
-        .login-divider::before {
-            content: "登录信息";
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: var(--bg-primary);
-            color: var(--text-secondary);
-            padding: 0 1.5rem;
-            font-size: 0.9rem;
-            font-weight: 500;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
+        .logo-container {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            position: relative;
         }
 
-        /* 标题区域 */
-        .login-header {
-            text-align: center;
-            margin-bottom: 1rem;
+        .logo-ring {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            border: 2px solid var(--accent-cyan);
+            border-radius: 50%;
+            animation: pulseRing 3s ease-in-out infinite;
+        }
+
+        @keyframes pulseRing {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.1); opacity: 0.2; }
+        }
+
+        .logo-icon {
+            font-size: 2.5rem;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            filter: drop-shadow(0 0 20px rgba(34, 211, 238, 0.5));
         }
 
         .login-title {
-            font-size: 2.5rem;
-            font-weight: 800;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
             margin-bottom: 0.5rem;
             background: var(--gradient-primary);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
             letter-spacing: -0.02em;
         }
 
         .login-subtitle {
             color: var(--text-secondary);
-            font-size: 1rem;
+            font-size: 0.9375rem;
             letter-spacing: 0.05em;
-            font-weight: 400;
-            opacity: 0.8;
         }
 
-        /* 表单样式 */
+        /* Divider */
+        .login-divider {
+            height: 1px;
+            background: linear-gradient(90deg,
+                transparent 0%,
+                var(--border-subtle) 20%,
+                var(--border-subtle) 80%,
+                transparent 100%);
+            margin: 0 2.5rem 2rem;
+            position: relative;
+        }
+
+        .login-divider::before {
+            content: 'AUTHENTICATION';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--bg-deep);
+            color: var(--text-muted);
+            padding: 0 1rem;
+            font-family: 'Geist Mono', monospace;
+            font-size: 0.6875rem;
+            font-weight: 500;
+            letter-spacing: 0.15em;
+        }
+
+        /* Form */
         .login-form {
-            display: flex;
-            flex-direction: column;
-            gap: 2rem;
+            padding: 0 2.5rem 2.5rem;
         }
 
         .form-group {
+            margin-bottom: 1.75rem;
             position: relative;
         }
 
         .form-label {
             display: block;
-            color: var(--text-primary);
-            font-size: 0.9rem;
+            color: var(--text-secondary);
+            font-size: 0.8125rem;
             font-weight: 600;
             margin-bottom: 0.75rem;
-            letter-spacing: 0.025em;
+            letter-spacing: 0.1em;
             text-transform: uppercase;
-            opacity: 0.7;
         }
 
         .input-wrapper {
@@ -239,11 +312,11 @@
 
         .input-icon {
             position: absolute;
-            left: 1.25rem;
+            left: 1rem;
             top: 50%;
             transform: translateY(-50%);
             color: var(--text-muted);
-            font-size: 1.1rem;
+            font-size: 1rem;
             z-index: 1;
             transition: all 0.3s ease;
         }
@@ -251,55 +324,57 @@
         .form-input {
             width: 100%;
             padding: 1rem 1rem 1rem 3rem;
-            background: white;
-            border: 2px solid var(--border-color);
-            border-radius: 10px;
-            font-family: inherit;
-            font-size: 0.95rem;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1.5px solid var(--border-subtle);
+            border-radius: 12px;
+            font-family: 'Manrope', sans-serif;
+            font-size: 0.9375rem;
+            font-weight: 500;
             color: var(--text-primary);
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
         }
 
         .form-input:focus {
             outline: none;
-            border-color: var(--accent-primary);
-            box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.1), 0 1px 3px rgba(0, 0, 0, 0.1);
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.1);
+            background: rgba(15, 23, 42, 0.8);
         }
 
-        .form-input:focus+.input-icon {
-            color: var(--accent-primary);
+        .form-input:focus + .input-icon {
+            color: var(--accent-cyan);
         }
 
         .form-input::placeholder {
             color: var(--text-muted);
-            font-style: italic;
         }
 
-        /* 登录按钮 */
+        /* Login Button */
         .login-btn {
+            width: 100%;
             background: var(--gradient-primary);
             color: white;
             border: none;
-            padding: 1rem 2rem;
-            font-family: inherit;
-            font-size: 0.95rem;
+            padding: 1.125rem 2rem;
+            font-family: 'Manrope', sans-serif;
+            font-size: 0.9375rem;
             font-weight: 600;
             cursor: pointer;
             position: relative;
             overflow: hidden;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            border-radius: 12px;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 14px;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 0.75rem;
-            box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3), 0 2px 6px rgba(139, 92, 246, 0.2);
-            margin-top: 0.5rem;
+            letter-spacing: 0.02em;
+            box-shadow: 0 4px 20px rgba(34, 211, 238, 0.3);
+            margin-top: 1rem;
         }
 
         .login-btn::before {
-            content: "";
+            content: '';
             position: absolute;
             top: 0;
             left: -100%;
@@ -315,8 +390,7 @@
 
         .login-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(6, 182, 212, 0.4), 0 4px 10px rgba(139, 92, 246, 0.3);
-            color: white;
+            box-shadow: 0 8px 30px rgba(34, 211, 238, 0.5);
         }
 
         .login-btn:active {
@@ -329,14 +403,10 @@
         }
 
         .login-btn.loading::after {
-            content: "";
+            content: '';
             position: absolute;
             width: 20px;
             height: 20px;
-            top: 50%;
-            left: 50%;
-            margin-left: -10px;
-            margin-top: -10px;
             border: 2px solid white;
             border-radius: 50%;
             border-top-color: transparent;
@@ -344,172 +414,117 @@
         }
 
         @keyframes spinner {
-            to {
-                transform: rotate(360deg);
-            }
+            to { transform: rotate(360deg); }
         }
 
-        /* 错误消息 */
+        /* Error Message */
         .error-message {
             background: rgba(239, 68, 68, 0.1);
-            border: 1px solid rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.3);
             color: var(--accent-error);
-            padding: 1rem;
-            border-radius: 10px;
-            font-size: 0.9rem;
+            padding: 1rem 1.25rem;
+            border-radius: 12px;
+            font-size: 0.875rem;
             text-align: center;
             display: none;
-            /* 默认隐藏 */
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            margin-top: 1rem;
+            margin-top: 1.5rem;
             animation: shake 0.5s ease-in-out;
         }
 
         .error-message.show {
-            display: flex;
-            /* 显示时使用flex */
+            display: block;
         }
 
-        .error-message::before {
-            content: "⚠️";
-            font-size: 1rem;
+        .error-message i {
             margin-right: 0.5rem;
         }
 
         @keyframes shake {
-
-            0%,
-            100% {
-                transform: translateX(0);
-            }
-
-            25% {
-                transform: translateX(-5px);
-            }
-
-            75% {
-                transform: translateX(5px);
-            }
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
         }
 
-        /* 返回首页链接 */
+        /* Back Link */
         .back-link {
             text-align: center;
-            margin-top: 3rem;
-            padding-top: 2rem;
-            border-top: 1px solid var(--border-color);
+            padding: 2rem 2.5rem;
+            border-top: 1px solid var(--border-subtle);
             position: relative;
         }
 
         .back-link::before {
-            content: "←";
+            content: '←';
             position: absolute;
-            top: -12px;
+            top: -10px;
             left: 50%;
             transform: translateX(-50%);
-            background: var(--bg-primary);
+            background: var(--bg-deep);
             color: var(--text-muted);
-            padding: 0 1rem;
-            font-size: 1.2rem;
+            padding: 0 0.75rem;
+            font-size: 1rem;
         }
 
         .back-link a {
-            color: var(--accent-success);
+            color: var(--text-secondary);
             text-decoration: none;
-            font-size: 0.9rem;
+            font-size: 0.875rem;
             font-weight: 500;
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            background: white;
+            padding: 0.625rem 1.25rem;
+            border-radius: 10px;
+            border: 1px solid var(--border-subtle);
+            background: var(--bg-glass);
         }
 
         .back-link a:hover {
-            background: var(--accent-success);
-            color: white;
+            color: var(--accent-cyan);
+            border-color: var(--accent-cyan);
+            background: rgba(34, 211, 238, 0.1);
             transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(16, 185, 129, 0.2);
         }
 
-        /* 装饰性元素 */
-        .decoration {
-            position: absolute;
-            pointer-events: none;
-            z-index: 0;
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
         }
 
-        .decoration-1 {
-            top: 10%;
-            left: 10%;
-            width: 100px;
-            height: 100px;
-            background: radial-gradient(circle, var(--accent-primary) 0%, transparent 70%);
-            opacity: 0.05;
-            border-radius: 50%;
-            animation: float 6s ease-in-out infinite;
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.5);
         }
 
-        .decoration-2 {
-            bottom: 10%;
-            right: 10%;
-            width: 80px;
-            height: 80px;
-            background: radial-gradient(circle, var(--accent-secondary) 0%, transparent 70%);
-            opacity: 0.05;
-            border-radius: 50%;
-            animation: float 8s ease-in-out infinite reverse;
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-subtle);
+            border-radius: 4px;
         }
 
-        @keyframes float {
-
-            0%,
-            100% {
-                transform: translateY(0px);
-            }
-
-            50% {
-                transform: translateY(-20px);
-            }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-cyan);
         }
 
-        /* 响应式设计 */
+        /* Responsive */
         @media (max-width: 768px) {
             .login-container {
                 padding: 1.5rem;
-                max-width: 100%;
+            }
+
+            .login-header {
+                padding: 2.5rem 2rem 1.5rem;
+            }
+
+            .login-form {
+                padding: 0 2rem 2rem;
             }
 
             .login-title {
-                font-size: 2rem;
+                font-size: 1.75rem;
             }
 
-            .login-subtitle {
-                font-size: 0.9rem;
-            }
-
-            .form-input {
-                padding: 0.875rem 0.875rem 0.875rem 2.75rem;
-                font-size: 0.9rem;
-            }
-
-            .login-btn {
-                padding: 0.875rem 1.5rem;
-                font-size: 0.95rem;
-            }
-
-            .login-divider {
-                margin: 2rem 0;
-            }
-
-            .login-divider::before {
-                font-size: 0.8rem;
-                padding: 0 1rem;
+            .back-link {
+                padding: 1.5rem 2rem;
             }
         }
 
@@ -518,120 +533,52 @@
                 padding: 1rem;
             }
 
-            .login-title {
-                font-size: 1.75rem;
+            .login-header {
+                padding: 2rem 1.5rem 1.25rem;
             }
 
             .login-form {
-                gap: 1.5rem;
-            }
-
-            .form-input {
-                padding: 0.75rem 0.75rem 0.75rem 2.5rem;
-                font-size: 0.85rem;
-            }
-
-            .login-btn {
-                padding: 0.75rem 1.25rem;
-                font-size: 0.9rem;
-            }
-
-            .error-message {
-                padding: 0.75rem;
-                font-size: 0.85rem;
+                padding: 0 1.5rem 1.5rem;
             }
 
             .back-link {
-                margin-top: 2rem;
-                padding-top: 1.5rem;
-            }
-        }
-
-        /* 大屏幕优化 */
-        @media (min-width: 1200px) {
-            .login-container {
-                max-width: 520px;
-                padding: 2.5rem;
-            }
-
-            .login-title {
-                font-size: 2.75rem;
-            }
-
-            .form-input {
-                padding: 1.25rem 1.25rem 1.25rem 3.5rem;
-                font-size: 1.05rem;
-            }
-
-            .login-btn {
-                padding: 1.25rem 2.5rem;
-                font-size: 1.05rem;
-            }
-        }
-
-        /* 深色模式支持 */
-        @media (prefers-color-scheme: dark) {
-            /* 保持浅色主题以确保一致性 */
-        }
-
-        /* 无障碍支持 */
-        @media (prefers-reduced-motion: reduce) {
-            * {
-                animation-duration: 0.01ms !important;
-                animation-iteration-count: 1 !important;
-                transition-duration: 0.01ms !important;
-            }
-        }
-
-        /* 打印样式 */
-        @media print {
-
-            body::before,
-            body::after,
-            .decoration {
-                display: none !important;
-            }
-
-            .login-card {
-                box-shadow: none;
-                border: 1px solid #000;
+                padding: 1.25rem 1.5rem;
             }
         }
     </style>
 </head>
-
 <body>
-    <!-- 装饰性背景元素 -->
-    <div class="decoration decoration-1"></div>
-    <div class="decoration decoration-2"></div>
+    <!-- Floating Orbs -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
 
     {% if error %}
     <script>
-        // 服务器返回的错误消息，在页面加载后显示
         window.addEventListener('DOMContentLoaded', function() {
             showError('{{ error }}');
         });
     </script>
     {% endif %}
 
-    <!-- 登录容器 -->
     <div class="login-container">
         <div class="login-card">
-            <!-- 标题区域 -->
+            <!-- Header -->
             <div class="login-header">
+                <div class="logo-container">
+                    <div class="logo-ring"></div>
+                    <i class="fas fa-shield-halved logo-icon"></i>
+                </div>
                 <h1 class="login-title">管理员登录</h1>
-                <p class="login-subtitle">访问管理控制面板</p>
+                <p class="login-subtitle">访问控制台</p>
             </div>
 
-            <!-- 分隔线 -->
+            <!-- Divider -->
             <div class="login-divider"></div>
 
-            <!-- 登录表单 -->
+            <!-- Form -->
             <form id="loginForm" class="login-form" method="post" action="/login">
                 <div class="form-group">
-                    <label for="username" class="form-label">
-                        用户名
-                    </label>
+                    <label for="username" class="form-label">用户名</label>
                     <div class="input-wrapper">
                         <input type="text" name="username" id="username" required placeholder="请输入管理员用户名"
                             class="form-input" autocomplete="username">
@@ -640,9 +587,7 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="password" class="form-label">
-                        密码
-                    </label>
+                    <label for="password" class="form-label">密码</label>
                     <div class="input-wrapper">
                         <input type="password" name="password" id="password" required placeholder="请输入管理员密码"
                             class="form-input" autocomplete="current-password">
@@ -651,37 +596,35 @@
                 </div>
 
                 <button type="submit" class="login-btn" id="loginButton">
-                    <i class="fas fa-sign-in-alt"></i>
+                    <i class="fas fa-arrow-right-to-bracket"></i>
                     <span>登录管理面板</span>
                 </button>
             </form>
 
-            <!-- 错误消息区域 -->
+            <!-- Error Message -->
             <div id="error-message" class="error-message">
+                <i class="fas fa-circle-exclamation"></i>
                 <span id="error-text"></span>
             </div>
 
-            <!-- 返回首页链接 -->
+            <!-- Back Link -->
             <div class="back-link">
                 <a href="/">
                     <i class="fas fa-home"></i>
-                    返回首页
+                    <span>返回首页</span>
                 </a>
             </div>
         </div>
     </div>
 
     <script>
-        // 表单提交处理 - 使用原生表单提交以兼容Firefox
         document.getElementById('loginForm').addEventListener('submit', function(e) {
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
             const loginButton = document.getElementById('loginButton');
 
-            // 隐藏之前的错误消息
             document.getElementById('error-message').classList.remove('show');
 
-            // 验证输入
             if (!username.trim() || !password.trim()) {
                 e.preventDefault();
                 showError('请输入用户名和密码');
@@ -694,12 +637,10 @@
                 return;
             }
 
-            // 验证通过，允许表单正常提交
             loginButton.classList.add('loading');
             loginButton.disabled = true;
         });
 
-        // 显示错误消息
         function showError(message) {
             const errorMessage = document.getElementById('error-message');
             const errorText = document.getElementById('error-text');
@@ -707,52 +648,42 @@
             errorText.textContent = message;
             errorMessage.classList.add('show');
 
-            // 5秒后自动隐藏
             setTimeout(() => {
                 errorMessage.classList.remove('show');
             }, 5000);
         }
 
-        // 输入框聚焦效果
         document.querySelectorAll('.form-input').forEach(input => {
-            input.addEventListener('focus', function () {
-                this.parentElement.querySelector('.input-icon').style.color = 'var(--accent-primary)';
+            input.addEventListener('focus', function() {
+                this.parentElement.querySelector('.input-icon').style.color = 'var(--accent-cyan)';
             });
 
-            input.addEventListener('blur', function () {
+            input.addEventListener('blur', function() {
                 this.parentElement.querySelector('.input-icon').style.color = 'var(--text-muted)';
             });
         });
 
-        // 键盘快捷键支持
         document.addEventListener('keydown', (e) => {
-            // Enter键提交表单 - 使用 requestSubmit 创建受信任事件
             if (e.key === 'Enter' && !e.shiftKey) {
                 const form = document.getElementById('loginForm');
                 const activeElement = document.activeElement;
 
                 if (activeElement.tagName === 'INPUT' && form) {
                     e.preventDefault();
-                    // requestSubmit() 创建受信任的提交事件
                     if (typeof form.requestSubmit === 'function') {
                         form.requestSubmit();
                     } else {
-                        // 降级支持旧浏览器
                         form.submit();
                     }
                 }
             }
 
-            // Escape键清除错误消息
             if (e.key === 'Escape') {
-                const errorMessage = document.getElementById('error-message');
-                errorMessage.classList.remove('show');
+                document.getElementById('error-message').classList.remove('show');
             }
         });
 
-        // 页面加载完成后的动画
-        document.addEventListener('DOMContentLoaded', function () {
-            // 添加卡片淡入效果
+        document.addEventListener('DOMContentLoaded', function() {
             const card = document.querySelector('.login-card');
             card.style.opacity = '0';
             card.style.transform = 'translateY(30px)';
@@ -763,14 +694,11 @@
                 card.style.transform = 'translateY(0)';
             }, 100);
 
-            // 聚焦到用户名输入框
-            const usernameInput = document.getElementById('username');
             setTimeout(() => {
-                usernameInput.focus();
+                document.getElementById('username').focus();
             }, 1000);
         });
 
-        // 防止表单重复提交
         let isSubmitting = false;
         const loginForm = document.getElementById('loginForm');
         loginForm.addEventListener('submit', (e) => {
@@ -783,18 +711,6 @@
                 isSubmitting = false;
             }, 3000);
         });
-
-        // 安全性增强 - 防止密码被自动填充后的自动登录
-        window.addEventListener('load', () => {
-            // 检查是否有浏览器自动填充
-            const passwordInput = document.getElementById('password');
-            if (passwordInput.value) {
-                // 清除自动填充，要求用户手动输入
-                passwordInput.value = '';
-                passwordInput.placeholder = '检测到自动填充，请手动输入密码';
-            }
-        });
     </script>
 </body>
-
 </html>
