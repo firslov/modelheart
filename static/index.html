@@ -1052,6 +1052,10 @@
                 <i class="fas fa-comments"></i>
                 <span>开启对话</span>
             </a>
+            <button onclick="showDownloadModal()" class="nav-btn">
+                <i class="fas fa-download"></i>
+                <span>下载APP</span>
+            </button>
             <button onclick="showUpgradeModal()" class="nav-btn">
                 <i class="fas fa-bolt"></i>
                 <span>升级额度</span>
@@ -1171,9 +1175,6 @@
             <a href="https://github.com/firslov/MyAPI" target="_blank" title="源代码">
                 <i class="fab fa-github"></i>
             </a>
-            <a href="https://www.cherry-ai.com/download" target="_blank" title="下载客户端">
-                <i class="fas fa-download"></i>
-            </a>
             <a href="/dashboard" title="管理面板">
                 <i class="fas fa-chart-bar"></i>
             </a>
@@ -1181,6 +1182,59 @@
                 <i class="fas fa-headset"></i>
             </button>
         </footer>
+    </div>
+
+    <!-- 下载APP弹窗 -->
+    <div id="downloadModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">下载客户端</h3>
+                <button onclick="hideDownloadModal()" class="modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 1.5rem; text-align: center;">
+                    选择您的操作系统平台下载
+                </p>
+
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <!-- macOS 下载 -->
+                    <button onclick="downloadClient('macos')" class="btn" style="padding: 1rem 1.5rem;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                            <div style="display: flex; align-items: center; gap: 1rem;">
+                                <i class="fab fa-apple" style="font-size: 1.5rem; color: var(--accent);"></i>
+                                <div style="text-align: left;">
+                                    <div style="font-size: 0.9rem; color: var(--text-primary);">macOS</div>
+                                    <div style="font-size: 0.7rem; color: var(--text-muted);">macOS 11.0 或更高版本</div>
+                                </div>
+                            </div>
+                            <i class="fas fa-download" style="color: var(--accent);"></i>
+                        </div>
+                    </button>
+
+                    <!-- Windows 下载 -->
+                    <button onclick="downloadClient('windows')" class="btn" style="padding: 1rem 1.5rem;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                            <div style="display: flex; align-items: center; gap: 1rem;">
+                                <i class="fab fa-windows" style="font-size: 1.5rem; color: var(--accent);"></i>
+                                <div style="text-align: left;">
+                                    <div style="font-size: 0.9rem; color: var(--text-primary);">Windows</div>
+                                    <div style="font-size: 0.7rem; color: var(--text-muted);">Windows 10/11</div>
+                                </div>
+                            </div>
+                            <i class="fas fa-download" style="color: var(--accent);"></i>
+                        </div>
+                    </button>
+                </div>
+
+                <div id="downloadStatus" style="display: none; margin-top: 1rem;">
+                    <div class="payment-info" style="text-align: center;">
+                        <p id="downloadMessage" style="color: var(--text-secondary); font-size: 0.75rem;"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- 联系客服弹窗 -->
@@ -1440,6 +1494,42 @@
             document.getElementById('contactModal').classList.add('hidden');
         }
 
+        function showDownloadModal() {
+            document.getElementById('downloadModal').classList.remove('hidden');
+        }
+
+        function hideDownloadModal() {
+            document.getElementById('downloadModal').classList.add('hidden');
+            document.getElementById('downloadStatus').style.display = 'none';
+        }
+
+        async function downloadClient(platform) {
+            const statusDiv = document.getElementById('downloadStatus');
+            const messageP = document.getElementById('downloadMessage');
+
+            statusDiv.style.display = 'block';
+            messageP.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right: 0.5rem;"></i>正在检查下载链接...';
+
+            try {
+                const response = await fetch('/downloads');
+                const data = await response.json();
+
+                // 查找对应平台的文件
+                const file = data.files.find(f => f.platform.toLowerCase() === platform.toLowerCase());
+
+                if (file && file.url) {
+                    messageP.innerHTML = `<i class="fas fa-check" style="margin-right: 0.5rem; color: var(--accent);"></i>正在下载 ${file.filename}...`;
+                    // 触发下载
+                    window.location.href = file.url;
+                } else {
+                    messageP.innerHTML = `<i class="fas fa-exclamation-triangle" style="margin-right: 0.5rem; color: #f59e0b;"></i>暂无 ${platform} 客户端，请联系管理员获取`;
+                }
+            } catch (error) {
+                console.error('Download error:', error);
+                messageP.innerHTML = `<i class="fas fa-times" style="margin-right: 0.5rem; color: #ef4444;"></i>获取下载链接失败，请稍后重试`;
+            }
+        }
+
         function showUpgradeModal() {
             document.getElementById('upgradeModal').classList.remove('hidden');
         }
@@ -1455,12 +1545,16 @@
         document.addEventListener('click', function (event) {
             const contactModal = document.getElementById('contactModal');
             const upgradeModal = document.getElementById('upgradeModal');
+            const downloadModal = document.getElementById('downloadModal');
 
             if (event.target === contactModal) {
                 hideContactModal();
             }
             if (event.target === upgradeModal) {
                 hideUpgradeModal();
+            }
+            if (event.target === downloadModal) {
+                hideDownloadModal();
             }
         });
 

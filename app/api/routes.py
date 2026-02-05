@@ -16,6 +16,7 @@ from fastapi.responses import (
 )
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
+from pathlib import Path
 
 from app.config.settings import settings
 from app.middleware.auth import admin_required, verify_admin
@@ -535,6 +536,81 @@ async def usage_dashboard(
             "api_keys": api_keys,
             "current_time": get_current_time(),
         },
+    )
+
+
+# ========================================
+# 客户端下载
+# ========================================
+
+DOWNLOAD_DIR = Path(__file__).parent.parent.parent / "downloads"
+
+
+@router.get("/downloads")
+async def list_downloads():
+    """获取可下载的客户端列表"""
+    available_files = []
+
+    # 检查 macOS 客户端
+    mac_files = list(DOWNLOAD_DIR.glob("*.dmg")) + list(DOWNLOAD_DIR.glob("*.pkg"))
+    for f in mac_files:
+        available_files.append({
+            "platform": "macOS",
+            "filename": f.name,
+            "url": f"/download/{f.name}",
+            "size": f.stat().st_size if f.exists() else 0
+        })
+
+    # 检查 Windows 客户端
+    win_files = list(DOWNLOAD_DIR.glob("*.exe")) + list(DOWNLOAD_DIR.glob("*.zip"))
+    for f in win_files:
+        available_files.append({
+            "platform": "Windows",
+            "filename": f.name,
+            "url": f"/download/{f.name}",
+            "size": f.stat().st_size if f.exists() else 0
+        })
+
+    return {"files": available_files}
+
+
+@router.get("/download/{filename}")
+async def download_client(filename: str):
+    """安全下载客户端文件"""
+    # 安全检查：确保文件名不包含路径遍历字符
+    if ".." in filename or "/" in filename or "\\" in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    file_path = DOWNLOAD_DIR / filename
+
+    # 检查文件是否存在
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    # 检查文件扩展名是否允许
+    allowed_extensions = {".dmg", ".pkg", ".exe", ".zip"}
+    if file_path.suffix.lower() not in allowed_extensions:
+        raise HTTPException(status_code=403, detail="File type not allowed")
+
+    # 根据平台设置合适的 Content-Type
+    content_type = "application/octet-stream"
+    if filename.endswith(".dmg"):
+        content_type = "application/x-apple-diskimage"
+    elif filename.endswith(".pkg"):
+        content_type = "application/vnd.apple.installer+xml"
+    elif filename.endswith(".exe"):
+        content_type = "application/vnd.microsoft.portable-executable"
+    elif filename.endswith(".zip"):
+        content_type = "application/zip"
+
+    return FileResponse(
+        path=str(file_path),
+        filename=filename,
+        media_type=content_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Content-Type-Options": "nosniff",
+        }
     )
 
 
