@@ -1,53 +1,74 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>管理控制台 - Model Heart</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230a0a0b' rx='4'/%3E%3Ctext x='16' y='22' font-family='JetBrains Mono, monospace' font-size='14' font-weight='500' fill='%2300f5d4' text-anchor='middle'%3EMH%3C/text%3E%3C/svg%3E" type="image/svg+xml">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Manrope:wght@300;400;500;600;700&family=Geist+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
+        /* ========================================
+           HAO WORLD UI DESIGN SYSTEM
+           极简科技风 / Dark Tech / Cyber Minimal
+           ======================================== */
+
         :root {
-            --bg-deep: #0a0e17;
-            --bg-card: rgba(15, 23, 42, 0.6);
-            --bg-glass: rgba(255, 255, 255, 0.03);
-            --bg-glass-hover: rgba(255, 255, 255, 0.06);
+            /* 背景色系 */
+            --bg-primary: #0a0a0b;
+            --bg-secondary: #111113;
+            --bg-card: #18181b;
 
-            --text-primary: #f1f5f9;
-            --text-secondary: #94a3b8;
-            --text-muted: #64748b;
+            /* 边框色系 */
+            --border: #27272a;
+            --border-hover: #3f3f46;
 
-            --accent-cyan: #22d3ee;
-            --accent-purple: #a78bfa;
-            --accent-pink: #f472b6;
-            --accent-gold: #fbbf24;
-            --accent-green: #34d399;
-            --accent-error: #ef4444;
-            --accent-warning: #f59e0b;
+            /* 强调色 */
+            --accent: #00f5d4;
+            --accent-dim: rgba(0, 245, 212, 0.15);
 
-            --border-subtle: rgba(255, 255, 255, 0.06);
-            --border-glow: rgba(34, 211, 238, 0.3);
+            /* 文字色系 */
+            --text-primary: #fafafa;
+            --text-secondary: #a1a1aa;
+            --text-muted: #71717a;
 
-            --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.4);
-            --shadow-glow: 0 0 60px rgba(34, 211, 238, 0.15);
+            /* 装饰元素 */
+            --grid-line: rgba(255, 255, 255, 0.02);
 
-            --gradient-primary: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-purple) 100%);
-            --gradient-surface: linear-gradient(180deg, rgba(15, 23, 42, 0.8) 0%, rgba(15, 23, 42, 0.95) 100%);
+            /* 状态色 */
+            --status-success: #10b981;
+            --status-warning: #f59e0b;
+            --status-error: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
         }
 
         body {
-            font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
-            background: var(--bg-deep);
+            font-family: 'Noto Sans SC', -apple-system, sans-serif;
+            background: var(--bg-primary);
             color: var(--text-primary);
             min-height: 100vh;
             position: relative;
             overflow-x: hidden;
+            line-height: 1.6;
+            padding: 1rem 1.5rem;
         }
 
+        /* ========================================
+           背景效果系统
+           ======================================== */
+
+        /* 网格背景 */
         body::before {
             content: '';
             position: fixed;
@@ -55,19 +76,15 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background:
-                radial-gradient(ellipse 80% 50% at 50% -20%, rgba(34, 211, 238, 0.12), transparent 50%),
-                radial-gradient(ellipse 60% 40% at 100% 50%, rgba(167, 139, 250, 0.08), transparent 50%),
-                radial-gradient(ellipse 50% 30% at 0% 80%, rgba(244, 114, 182, 0.06), transparent 50%);
+            background-image:
+                linear-gradient(var(--grid-line) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+            background-size: 60px 60px;
             z-index: 0;
-            animation: bgShift 20s ease-in-out infinite;
+            pointer-events: none;
         }
 
-        @keyframes bgShift {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.8; }
-        }
-
+        /* 噪点纹理 */
         body::after {
             content: '';
             position: fixed;
@@ -75,71 +92,259 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-image:
-                linear-gradient(rgba(34, 211, 238, 0.02) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(34, 211, 238, 0.02) 1px, transparent 1px);
-            background-size: 80px 80px;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+            opacity: 0.03;
             z-index: 1;
             pointer-events: none;
-            mask-image: radial-gradient(ellipse 80% 50% at 50% 50%, black 0%, transparent 70%);
-            -webkit-mask-image: radial-gradient(ellipse 80% 50% at 50% 50%, black 0%, transparent 70%);
         }
 
-        /* Floating Orbs */
-        .orb {
+        /* 环境光晕 */
+        .ambient-glow {
             position: fixed;
+            width: 600px;
+            height: 600px;
             border-radius: 50%;
+            background: radial-gradient(circle, var(--accent-dim) 0%, transparent 70%);
             filter: blur(80px);
-            opacity: 0.4;
             z-index: 0;
             pointer-events: none;
+            animation: ambientFloat 30s ease-in-out infinite;
         }
 
-        .orb-1 {
-            width: 350px;
-            height: 350px;
-            background: var(--accent-cyan);
-            top: -80px;
-            right: -80px;
-            animation: float1 25s ease-in-out infinite;
+        .ambient-glow-1 {
+            top: -200px;
+            right: -200px;
         }
 
-        .orb-2 {
-            width: 250px;
-            height: 250px;
-            background: var(--accent-purple);
-            bottom: -40px;
-            left: -40px;
-            animation: float2 30s ease-in-out infinite;
+        .ambient-glow-2 {
+            bottom: -200px;
+            left: -200px;
+            animation-delay: -15s;
         }
 
-        @keyframes float1 {
-            0%, 100% { transform: translate(0, 0); }
-            33% { transform: translate(-40px, 40px); }
-            66% { transform: translate(20px, -20px); }
+        @keyframes ambientFloat {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            25% { transform: translate(50px, 30px) scale(1.1); }
+            50% { transform: translate(20px, -40px) scale(0.9); }
+            75% { transform: translate(-30px, 20px) scale(1.05); }
         }
 
-        @keyframes float2 {
-            0%, 100% { transform: translate(0, 0); }
-            33% { transform: translate(30px, -30px); }
-            66% { transform: translate(-20px, 15px); }
+        .content-wrapper {
+            position: relative;
+            z-index: 10;
+            max-width: 1400px;
+            margin: 0 auto;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+        /* ========================================
+           导航栏
+           ======================================== */
+
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
         }
 
-        .fade-in { animation: fadeIn 0.6s ease-out; }
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
 
-        /* Card */
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            position: relative;
+        }
+
+        .logo-icon::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border: 2px solid var(--accent);
+            opacity: 0.3;
+        }
+
+        .logo-icon::after {
+            content: '';
+            position: absolute;
+            inset: 4px;
+            background: var(--accent);
+        }
+
+        .navbar-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 300;
+            font-size: 1rem;
+            color: var(--text-primary);
+            letter-spacing: -0.02em;
+        }
+
+        .navbar-time {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .navbar-actions {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .nav-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .nav-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .nav-btn i {
+            font-size: 0.7rem;
+        }
+
+        /* ========================================
+           统计卡片
+           ======================================== */
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 1.25rem 1.5rem;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 0;
+            background: var(--accent);
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .stat-card:hover {
+            border-color: var(--border-hover);
+        }
+
+        .stat-card:hover::before {
+            width: 3px;
+        }
+
+        .stat-label {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .stat-label i {
+            color: var(--accent);
+            font-size: 0.75rem;
+        }
+
+        .stat-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.75rem;
+            font-weight: 300;
+            color: var(--text-primary);
+        }
+
+        /* ========================================
+           章节标题
+           ======================================== */
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            padding-top: 2rem;
+        }
+
+        .section-number {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--accent);
+            letter-spacing: 0.15em;
+        }
+
+        .section-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            flex: 1;
+        }
+
+        .section-line {
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        .section-action {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 0.5rem 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .section-action:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        /* ========================================
+           卡片
+           ======================================== */
+
         .card {
             background: var(--bg-card);
-            backdrop-filter: blur(24px) saturate(180%);
-            border: 1px solid var(--border-subtle);
-            border-radius: 20px;
-            box-shadow: var(--shadow-card);
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid var(--border);
+            margin-bottom: 2rem;
             position: relative;
             overflow: hidden;
         }
@@ -147,165 +352,327 @@
         .card::before {
             content: '';
             position: absolute;
-            top: 0;
             left: 0;
-            width: 3px;
-            height: 100%;
-            background: var(--gradient-primary);
-            transform: scaleY(0);
-            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .card:hover {
-            border-color: var(--border-glow);
-            box-shadow: var(--shadow-card), var(--shadow-glow);
+            top: 0;
+            bottom: 0;
+            width: 0;
+            background: var(--accent);
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .card:hover::before {
-            transform: scaleY(1);
+            width: 3px;
         }
 
         .card-header {
-            border-bottom: 1px solid var(--border-subtle);
-            padding: 1.5rem 2rem;
-            background: rgba(15, 23, 42, 0.6);
+            padding: 1rem 1.5rem;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .card-header i {
+            color: var(--accent);
+            font-size: 0.9rem;
+        }
+
+        .card-header span {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
             color: var(--text-primary);
+            font-weight: 500;
         }
 
         .card-body {
-            padding: 2rem;
-            position: relative;
-            z-index: 1;
+            padding: 1.5rem;
         }
 
-        /* Progress Bar */
+        /* ========================================
+           使用分布
+           ======================================== */
+
+        .distribution-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+        }
+
+        .distribution-item {
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            text-align: center;
+            position: relative;
+        }
+
+        .distribution-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.5rem;
+            font-weight: 300;
+            margin-bottom: 0.25rem;
+        }
+
+        .distribution-value.green { color: var(--status-success); }
+        .distribution-value.cyan { color: var(--accent); }
+        .distribution-value.purple { color: #a78bfa; }
+
+        .distribution-label {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
         .progress-bar {
-            height: 8px;
-            border-radius: 4px;
-            background-color: var(--border-subtle);
+            height: 4px;
+            background: var(--border);
+            margin-top: 0.75rem;
             overflow: hidden;
-            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
         }
 
-        .progress-bar-fill {
+        .progress-fill {
             height: 100%;
-            background: var(--gradient-primary);
+            background: var(--accent);
             transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-            border-radius: 4px;
+        }
+
+        .progress-fill.green { background: var(--status-success); }
+        .progress-fill.cyan { background: var(--accent); }
+        .progress-fill.purple { background: #a78bfa; }
+
+        /* ========================================
+           LLM 服务器卡片
+           ======================================== */
+
+        .llm-servers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1rem;
+        }
+
+        .server-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            padding: 1rem;
             position: relative;
-            overflow: hidden;
         }
 
-        .progress-bar-fill::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            bottom: 0;
-            right: 0;
-            background: linear-gradient(90deg,
-                transparent,
-                rgba(255, 255, 255, 0.3),
-                transparent);
-            animation: shimmer 2s infinite;
+        .server-url {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--accent);
+            word-break: break-all;
+            margin-bottom: 0.25rem;
         }
 
-        @keyframes shimmer {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
+        .server-device {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
         }
 
-        /* Table */
-        .table-header {
-            background: rgba(15, 23, 42, 0.6);
-            color: var(--text-primary);
-            font-weight: 600;
+        .server-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .server-stat {
+            text-align: center;
+            padding: 0.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+        }
+
+        .server-stat-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1rem;
+            color: var(--accent);
+        }
+
+        .server-stat-label {
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .server-models {
+            margin-bottom: 0.75rem;
+        }
+
+        .server-models-title {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            font-size: 0.75rem;
-            border-bottom: 2px solid var(--border-subtle);
         }
 
-        .table-row {
-            border-bottom: 1px solid var(--border-subtle);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
+        .model-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.25rem 0.5rem;
+            margin: 0.125rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
         }
 
-        .table-row::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 3px;
-            height: 100%;
-            background: var(--accent-cyan);
-            transform: scaleY(0);
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        .model-tag.active {
+            color: var(--status-success);
+            border-color: var(--status-success);
         }
 
-        .table-row:hover {
-            background: rgba(34, 211, 238, 0.05);
+        .model-tag.inactive {
+            color: var(--text-muted);
         }
 
-        .table-row:hover::before {
-            transform: scaleY(1);
+        .server-actions {
+            display: flex;
+            justify-content: space-between;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border);
         }
 
-        /* Button */
-        .btn-primary {
-            background: var(--gradient-primary);
-            color: white;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            font-family: 'Manrope', sans-serif;
-            font-size: 0.875rem;
-            font-weight: 600;
+        .action-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 0.375rem 0.75rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
             cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .action-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .action-btn.delete:hover {
+            border-color: var(--status-error);
+            color: var(--status-error);
+        }
+
+        /* ========================================
+           API 密钥卡片
+           ======================================== */
+
+        .api-keys-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1rem;
+        }
+
+        .api-key-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            padding: 1rem;
             position: relative;
+        }
+
+        .api-key-header {
+            margin-bottom: 1rem;
+        }
+
+        .api-key-display {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--accent);
+            word-break: break-all;
+            margin-bottom: 0.25rem;
+        }
+
+        .api-key-phone {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+        }
+
+        .usage-section {
+            margin-bottom: 1rem;
+        }
+
+        .usage-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.375rem;
+        }
+
+        .usage-value {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .usage-progress {
+            height: 4px;
+            background: var(--border);
             overflow: hidden;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(34, 211, 238, 0.3);
-            letter-spacing: 0.02em;
         }
 
-        .btn-primary::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
+        .usage-progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-            transition: left 0.5s ease;
+            background: var(--accent);
+            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .btn-primary:hover::before {
-            left: 100%;
+        .usage-progress-fill.warning { background: var(--status-warning); }
+        .usage-progress-fill.danger { background: var(--status-error); }
+
+        .usage-details {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            margin-top: 0.5rem;
         }
 
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(34, 211, 238, 0.5);
-            color: white;
+        .metadata {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
         }
 
-        /* Modal */
+        .metadata-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.125rem 0;
+        }
+
+        .api-key-actions {
+            display: flex;
+            justify-content: space-between;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .action-group {
+            display: flex;
+            gap: 0.375rem;
+        }
+
+        /* ========================================
+           模态框
+           ======================================== */
+
         .modal {
-            background: rgba(10, 14, 23, 0.9);
-            backdrop-filter: blur(12px) saturate(180%);
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
+            background: rgba(10, 10, 11, 0.9);
             display: flex;
             align-items: center;
             justify-content: center;
             z-index: 1000;
             padding: 1.5rem;
-            animation: fadeIn 0.2s ease;
         }
 
         .modal.hidden {
@@ -314,604 +681,602 @@
 
         .modal-content {
             background: var(--bg-card);
-            backdrop-filter: blur(30px) saturate(200%);
-            border: 1px solid var(--border-subtle);
-            border-radius: 24px;
-            max-width: 90vw;
-            max-height: 90vh;
+            border: 1px solid var(--border);
+            max-width: 600px;
             width: 100%;
+            max-height: 90vh;
             position: relative;
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            box-shadow: var(--shadow-card), var(--shadow-glow);
-            animation: modalSlide 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        @keyframes modalSlide {
-            from {
-                opacity: 0;
-                transform: translateY(20px) scale(0.98);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-            }
+        .modal-header {
+            padding: 1rem 1.5rem;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        .modal-body-scrollable {
-            flex: 1;
-            overflow-y: auto;
+        .modal-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .modal-close {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            width: 1.75rem;
+            height: 1.75rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+        }
+
+        .modal-close:hover {
+            border-color: var(--status-error);
+            color: var(--status-error);
+        }
+
+        .modal-body {
             padding: 1.5rem;
-            min-height: 0;
+            overflow-y: auto;
+            flex: 1;
+            max-height: calc(90vh - 4rem);
         }
 
         .modal-footer {
-            padding: 1.5rem;
-            border-top: 1px solid var(--border-subtle);
-            background: rgba(15, 23, 42, 0.6);
-            flex-shrink: 0;
+            padding: 1rem 1.5rem;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
         }
 
-        /* Scrollbar */
-        .custom-scrollbar {
-            scrollbar-width: thin;
-            scrollbar-color: var(--accent-cyan) var(--border-subtle);
-        }
-
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: rgba(15, 23, 42, 0.5);
-            border-radius: 4px;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: var(--border-subtle);
-            border-radius: 4px;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: var(--accent-cyan);
-        }
-
-        /* API Key Card */
-        .api-key-card {
-            background: var(--bg-card);
-            backdrop-filter: blur(20px) saturate(180%);
-            border: 1px solid var(--border-subtle);
-            border-radius: 16px;
-            box-shadow: var(--shadow-card);
-            transition: all 0.3s ease;
-            padding: 1.5rem;
-        }
-
-        .api-key-card:hover {
-            border-color: var(--border-glow);
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-card), var(--shadow-glow);
-        }
-
-        /* Server Card */
-        .llm-server-card {
-            background: var(--bg-card);
-            backdrop-filter: blur(20px) saturate(180%);
-            border: 1px solid var(--border-subtle);
-            border-radius: 16px;
-            padding: 1.5rem;
+        /* 表单 */
+        .form-group {
             margin-bottom: 1rem;
-            box-shadow: var(--shadow-card);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .form-label {
+            display: block;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.625rem 0.875rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
             transition: all 0.3s ease;
         }
 
-        .llm-server-card:hover {
-            border-color: var(--border-glow);
-            transform: translateY(-2px);
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            background: var(--bg-card);
         }
 
-        /* Override Tailwind */
-        .font-mono {
-            font-family: 'Geist Mono', monospace !important;
+        .form-input::placeholder {
+            color: var(--text-muted);
         }
 
-        .text-green-600 { color: var(--accent-green) !important; }
-        .text-green-500 { color: var(--accent-green) !important; }
-        .text-green-400 { color: var(--accent-green) !important; }
-        .text-green-100 { color: rgba(52, 211, 153, 0.1) !important; }
-        .text-green-700 { color: var(--accent-green) !important; }
-        .text-green-800 { color: var(--accent-green) !important; }
-
-        .text-blue-600 { color: var(--accent-cyan) !important; }
-        .text-blue-500 { color: var(--accent-cyan) !important; }
-        .text-blue-100 { color: rgba(34, 211, 238, 0.1) !important; }
-        .text-indigo-600 { color: var(--accent-purple) !important; }
-        .text-indigo-700 { color: var(--accent-purple) !important; }
-        .text-indigo-500 { color: var(--accent-purple) !important; }
-        .text-indigo-50 { color: rgba(167, 139, 250, 0.1) !important; }
-        .text-purple-600 { color: var(--accent-purple) !important; }
-        .text-purple-100 { color: rgba(167, 139, 250, 0.1) !important; }
-        .text-red-600 { color: var(--accent-error) !important; }
-        .text-red-500 { color: var(--accent-error) !important; }
-        .text-red-700 { color: var(--accent-error) !important; }
-        .text-red-800 { color: var(--accent-error) !important; }
-        .text-red-50 { color: rgba(239, 68, 68, 0.1) !important; }
-        .text-gray-100 { color: rgba(241, 245, 249, 0.1) !important; }
-        .text-gray-200 { color: rgba(241, 245, 249, 0.2) !important; }
-        .text-gray-400 { color: var(--text-muted) !important; }
-        .text-gray-500 { color: var(--text-secondary) !important; }
-        .text-gray-600 { color: var(--text-secondary) !important; }
-        .text-gray-50 { color: rgba(15, 23, 42, 0.5) !important; }
-        .text-gray-900 { color: var(--text-primary) !important; }
-        .text-white { color: var(--text-primary) !important; }
-        .text-cyan-500 { color: var(--accent-cyan) !important; }
-
-        .bg-white { background: rgba(15, 23, 42, 0.6) !important; }
-        .bg-gray-50 { background: rgba(15, 23, 42, 0.5) !important; }
-        .bg-gray-100 { background: rgba(15, 23, 42, 0.4) !important; }
-        .bg-gray-200 { background: var(--border-subtle) !important; }
-        .bg-green-50 { background: rgba(52, 211, 153, 0.1) !important; }
-        .bg-blue-50 { background: rgba(34, 211, 238, 0.1) !important; }
-        .bg-indigo-50 { background: rgba(167, 139, 250, 0.1) !important; }
-        .bg-red-50 { background: rgba(239, 68, 68, 0.1) !important; }
-        .bg-yellow-400 { background: var(--accent-warning) !important; }
-        .bg-yellow-500 { background: var(--accent-warning) !important; }
-
-        .border { border-color: var(--border-subtle) !important; }
-        .border-gray-200 { border-color: var(--border-subtle) !important; }
-        .border-gray-100 { border-color: var(--border-subtle) !important; }
-
-        .rounded-lg { border-radius: 12px !important; }
-        .rounded-xl { border-radius: 16px !important; }
-        .rounded-full { border-radius: 9999px !important; }
-
-        .shadow-sm { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important; }
-        .shadow-md { box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25) !important; }
-
-        /* Navigation */
-        .nav-link {
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-size: 0.875rem;
-            font-weight: 500;
+        .btn {
+            padding: 0.625rem 1.25rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
-            transition: all 0.3s ease;
-            padding: 0.625rem 1rem;
-            border-radius: 10px;
-            background: var(--bg-glass);
-            border: 1px solid var(--border-subtle);
         }
 
-        .nav-link:hover {
-            color: var(--accent-cyan);
-            background: rgba(34, 211, 238, 0.1);
-            border-color: var(--accent-cyan);
-            transform: translateY(-2px);
+        .btn:hover {
+            border-color: var(--accent);
+            background: var(--bg-card);
         }
 
-        /* Responsive */
+        .btn i {
+            color: var(--accent);
+            font-size: 0.7rem;
+        }
+
+        .btn-primary {
+            background: var(--bg-card);
+            border-color: var(--accent);
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-dim);
+        }
+
+        /* 表格 */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.7rem;
+        }
+
+        .data-table th {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-align: left;
+            padding: 0.625rem 0.5rem;
+            border-bottom: 1px solid var(--border);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .data-table td {
+            padding: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .data-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .data-table input {
+            width: 100%;
+            padding: 0.375rem 0.5rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+        }
+
+        .data-table input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .data-table select {
+            width: 100%;
+            padding: 0.375rem 0.5rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+        }
+
+        /* ========================================
+           滚动条
+           ======================================== */
+
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent);
+        }
+
+        /* ========================================
+           响应式
+           ======================================== */
+
         @media (max-width: 768px) {
-            .card-body {
-                padding: 1.5rem;
+            body {
+                padding: 1rem;
             }
 
-            .card-header {
-                padding: 1.25rem 1.5rem;
+            .navbar {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .llm-servers-grid,
+            .api-keys-grid {
+                grid-template-columns: 1fr;
             }
 
             .modal-content {
                 margin: 0.5rem;
             }
 
-            .modal-body-scrollable {
+            .modal-body {
                 padding: 1rem;
             }
 
             .modal-footer {
-                padding: 1rem;
+                flex-direction: column;
             }
-        }
 
-        /* Loading Spinner */
-        .spinner {
-            width: 20px;
-            height: 20px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-top-color: white;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+            .modal-footer .btn {
+                width: 100%;
+            }
         }
     </style>
 </head>
-<body class="min-h-screen p-4 md:p-6">
-    <!-- Floating Orbs -->
-    <div class="orb orb-1"></div>
-    <div class="orb orb-2"></div>
+<body>
+    <!-- 环境光晕 -->
+    <div class="ambient-glow ambient-glow-1"></div>
+    <div class="ambient-glow ambient-glow-2"></div>
 
-    <div class="max-w-full md:max-w-6xl w-full mx-auto" style="position: relative; z-index: 10;">
-        <!-- Navigation -->
-        <div class="flex flex-col md:flex-row justify-between items-center mb-6 md:mb-8 gap-4">
-            <div class="flex items-center">
-                <div style="background: rgba(34, 211, 238, 0.15); padding: 0.75rem; border-radius: 12px; margin-right: 0.75rem;">
-                    <i class="fas fa-chart-line" style="color: var(--accent-cyan); font-size: 1.25rem;"></i>
+    <div class="content-wrapper">
+        <!-- 导航栏 -->
+        <nav class="navbar">
+            <div class="navbar-brand">
+                <div class="logo-icon"></div>
+                <span class="navbar-title">管理控制台</span>
+            </div>
+            <div class="navbar-time">
+                <i class="far fa-clock" style="margin-right: 0.5rem;"></i>
+                {{ current_time }}
+            </div>
+            <div class="navbar-actions">
+                <a href="/" class="nav-btn">
+                    <i class="fas fa-home"></i>
+                    <span>首页</span>
+                </a>
+                <a href="/logout" class="nav-btn">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>退出</span>
+                </a>
+            </div>
+        </nav>
+
+        <!-- 统计概览 -->
+        <section class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">
+                    <i class="fas fa-key"></i>
+                    <span>密钥总数</span>
                 </div>
-                <h1 class="text-2xl md:text-3xl font-bold"
-                    style="font-family: 'Space Grotesk', sans-serif; background: var(--gradient-primary); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
-                    管理<span class="text-cyan-500">控制台</span>
-                </h1>
+                <div class="stat-value">{{ total_entries }}</div>
             </div>
 
-            <div class="flex items-center gap-4">
-                <div class="flex items-center" style="color: var(--text-secondary);">
-                    <i class="far fa-clock mr-2"></i>
-                    <span style="font-family: 'Geist Mono', monospace; font-size: 0.875rem;">{{ current_time }}</span>
+            <div class="stat-card">
+                <div class="stat-label">
+                    <i class="fas fa-exchange-alt"></i>
+                    <span>请求总数</span>
                 </div>
-                <div class="flex gap-3">
-                    <a href="/" class="nav-link">
-                        <i class="fas fa-home"></i>
-                        <span class="hidden md:inline">首页</span>
-                    </a>
-                    <a href="/logout" class="nav-link" style="--hover-color: var(--accent-error);">
-                        <i class="fas fa-sign-out-alt"></i>
-                        <span class="hidden md:inline">退出</span>
-                    </a>
-                </div>
+                <div class="stat-value">{{ total_reqs }}</div>
             </div>
-        </div>
 
-        <!-- Stats Summary -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-6">
-            <div class="card fade-in">
+            <div class="stat-card">
+                <div class="stat-label">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>使用总量</span>
+                </div>
+                <div class="stat-value">{{ total_usage|int }}</div>
+            </div>
+        </section>
+
+        <!-- 使用分布 -->
+        <section>
+            <div class="section-header">
+                <span class="section-number">01</span>
+                <span class="section-title">USAGE DISTRIBUTION</span>
+                <div class="section-line"></div>
+            </div>
+
+            <div class="card">
                 <div class="card-body">
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <p style="color: var(--text-secondary); font-size: 0.875rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em;">密钥总数</p>
-                            <h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 2rem; font-weight: 700; margin-top: 0.5rem; color: var(--text-primary);">{{ total_entries }}</h3>
+                    <div class="distribution-grid">
+                        <div class="distribution-item">
+                            <div class="distribution-value green">{{ less_than_100 }}</div>
+                            <div class="distribution-label">少于 100</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill green" style="width: 0%" data-value="{{ less_than_100 }}" data-total="{{ total_entries }}"></div>
+                            </div>
                         </div>
-                        <div style="background: rgba(52, 211, 153, 0.15); padding: 0.75rem; border-radius: 12px;">
-                            <i class="fas fa-key" style="color: var(--accent-green); font-size: 1.25rem;"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
-            <div class="card fade-in" style="animation-delay: 0.1s;">
-                <div class="card-body">
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <p style="color: var(--text-secondary); font-size: 0.875rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em;">请求总数</p>
-                            <h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 2rem; font-weight: 700; margin-top: 0.5rem; color: var(--text-primary);">{{ total_reqs }}</h3>
+                        <div class="distribution-item">
+                            <div class="distribution-value cyan">{{ between_100_and_10000 }}</div>
+                            <div class="distribution-label">100 至 10,000</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill cyan" style="width: 0%" data-value="{{ between_100_and_10000 }}" data-total="{{ total_entries }}"></div>
+                            </div>
                         </div>
-                        <div style="background: rgba(34, 211, 238, 0.15); padding: 0.75rem; border-radius: 12px;">
-                            <i class="fas fa-exchange-alt" style="color: var(--accent-cyan); font-size: 1.25rem;"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
-            <div class="card fade-in" style="animation-delay: 0.2s;">
-                <div class="card-body">
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <p style="color: var(--text-secondary); font-size: 0.875rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em;">使用总量</p>
-                            <h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 2rem; font-weight: 700; margin-top: 0.5rem; color: var(--text-primary);">{{ total_usage|int }}</h3>
-                        </div>
-                        <div style="background: rgba(167, 139, 250, 0.15); padding: 0.75rem; border-radius: 12px;">
-                            <i class="fas fa-chart-bar" style="color: var(--accent-purple); font-size: 1.25rem;"></i>
+                        <div class="distribution-item">
+                            <div class="distribution-value purple">{{ more_than_10000 }}</div>
+                            <div class="distribution-label">超过 10,000</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill purple" style="width: 0%" data-value="{{ more_than_10000 }}" data-total="{{ total_entries }}"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <!-- Usage Distribution -->
-        <div class="card fade-in mb-6" style="animation-delay: 0.3s;">
-            <div class="card-header">
-                <div class="flex items-center">
-                    <i class="fas fa-chart-pie" style="color: var(--accent-green); font-size: 1.25rem; margin-right: 0.75rem;"></i>
-                    <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 1.125rem; font-weight: 600; color: var(--text-primary);">使用分布</h2>
-                </div>
-            </div>
-            <div class="card-body grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="flex flex-col items-center p-4 border rounded-lg usage-distribution"
-                    style="border-color: var(--border-subtle); background: var(--bg-glass);"
-                    data-value="{{ less_than_100 }}" data-total="{{ total_entries }}">
-                    <div style="font-family: 'Space Grotesk', sans-serif; font-size: 2rem; font-weight: 700; color: var(--accent-green); margin-bottom: 0.5rem;">{{ less_than_100 }}</div>
-                    <div style="color: var(--text-secondary); font-size: 0.875rem; font-weight: 500;">少于100</div>
-                    <div class="mt-2 w-full" style="background: var(--border-subtle); border-radius: 4px; height: 8px; overflow: hidden;">
-                        <div class="progress-bar-fill" style="background: var(--accent-green); height: 8px; border-radius: 4px;"></div>
-                    </div>
-                </div>
-
-                <div class="flex flex-col items-center p-4 border rounded-lg usage-distribution"
-                    style="border-color: var(--border-subtle); background: var(--bg-glass);"
-                    data-value="{{ between_100_and_10000 }}" data-total="{{ total_entries }}">
-                    <div style="font-family: 'Space Grotesk', sans-serif; font-size: 2rem; font-weight: 700; color: var(--accent-cyan); margin-bottom: 0.5rem;">{{ between_100_and_10000 }}</div>
-                    <div style="color: var(--text-secondary); font-size: 0.875rem; font-weight: 500;">100至10,000</div>
-                    <div class="mt-2 w-full" style="background: var(--border-subtle); border-radius: 4px; height: 8px; overflow: hidden;">
-                        <div class="progress-bar-fill" style="background: var(--accent-cyan); height: 8px; border-radius: 4px;"></div>
-                    </div>
-                </div>
-
-                <div class="flex flex-col items-center p-4 border rounded-lg usage-distribution"
-                    style="border-color: var(--border-subtle); background: var(--bg-glass);"
-                    data-value="{{ more_than_10000 }}" data-total="{{ total_entries }}">
-                    <div style="font-family: 'Space Grotesk', sans-serif; font-size: 2rem; font-weight: 700; color: var(--accent-purple); margin-bottom: 0.5rem;">{{ more_than_10000 }}</div>
-                    <div style="color: var(--text-secondary); font-size: 0.875rem; font-weight: 500;">超过10,000</div>
-                    <div class="mt-2 w-full" style="background: var(--border-subtle); border-radius: 4px; height: 8px; overflow: hidden;">
-                        <div class="progress-bar-fill" style="background: var(--accent-purple); height: 8px; border-radius: 4px;"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- LLM Servers Management -->
-        <div class="card fade-in mb-6" style="animation-delay: 0.4s;">
-            <div class="card-header flex justify-between items-center">
-                <div class="flex items-center">
-                    <i class="fas fa-server" style="color: var(--accent-cyan); font-size: 1.25rem; margin-right: 0.75rem;"></i>
-                    <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 1.125rem; font-weight: 600; color: var(--text-primary);">LLM 服务器</h2>
-                </div>
-                <button onclick="showAddServerModal()" class="btn-primary flex items-center">
-                    <i class="fas fa-plus" style="margin-right: 0.5rem;"></i> 添加服务器
+        <!-- LLM 服务器 -->
+        <section>
+            <div class="section-header">
+                <span class="section-number">02</span>
+                <span class="section-title">LLM SERVERS</span>
+                <div class="section-line"></div>
+                <button class="section-action" onclick="showAddServerModal()">
+                    <i class="fas fa-plus"></i>
+                    <span>添加服务器</span>
                 </button>
             </div>
-            <div class="card-body">
-                <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4" id="llmServersCards">
-                    <!-- Will be populated by JavaScript -->
-                </div>
-            </div>
-        </div>
 
-        <!-- API Keys Information -->
-        <div class="card fade-in" style="animation-delay: 0.5s;">
-            <div class="card-header">
-                <div class="flex items-center">
-                    <i class="fas fa-key" style="color: var(--accent-green); font-size: 1.25rem; margin-right: 0.75rem;"></i>
-                    <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 1.125rem; font-weight: 600; color: var(--text-primary);">API 密钥信息</h2>
+            <div class="card">
+                <div class="card-body">
+                    <div class="llm-servers-grid" id="llmServersCards">
+                        <!-- 由 JavaScript 填充 -->
+                    </div>
                 </div>
             </div>
-            <div class="card-body">
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="apiKeysCards">
-                    {% for api_key in api_keys %}
-                    <div class="api-key-card">
-                        <!-- Header -->
-                        <div class="flex justify-between items-start mb-3">
-                            <div class="flex-1">
-                                <div class="flex items-center">
-                                    <span class="font-mono text-xs px-2 py-1 rounded border break-all max-w-xs" style="background: rgba(167, 139, 250, 0.15); color: var(--accent-purple); border-color: rgba(167, 139, 250, 0.3);">{{ api_key.key }}</span>
-                                    <button onclick="copyToClipboard('{{ api_key.key }}')" class="ml-2 transition-colors" style="color: var(--text-muted); hover: color: var(--accent-cyan);" title="复制完整密钥">
-                                        <i class="fas fa-copy text-xs"></i>
+        </section>
+
+        <!-- API 密钥 -->
+        <section>
+            <div class="section-header">
+                <span class="section-number">03</span>
+                <span class="section-title">API KEYS</span>
+                <div class="section-line"></div>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <div class="api-keys-grid" id="apiKeysCards">
+                        {% for api_key in api_keys %}
+                        <div class="api-key-card">
+                            <div class="api-key-header">
+                                <div class="api-key-display">{{ api_key.key }}</div>
+                                <div class="api-key-phone">{{ api_key.phone or 'N/A' }}</div>
+                            </div>
+
+                            <div class="usage-section">
+                                <div class="usage-header">
+                                    <span>使用量</span>
+                                    <span class="usage-value">{{ api_key.usage }}/{{ api_key.limit }}</span>
+                                </div>
+                                <div class="usage-progress">
+                                    <div class="usage-progress-fill api-key-usage" data-usage="{{ api_key.usage }}" data-limit="{{ api_key.limit }}"></div>
+                                </div>
+                                <div class="usage-details">
+                                    <span>请求: {{ api_key.reqs }}</span>
+                                    {% if api_key.model_usage %}
+                                    <button onclick="toggleModelUsage(`{{ api_key.key }}`)" style="background:none; border:none; color:var(--accent); cursor:pointer; font-family:'JetBrains Mono',monospace; font-size:0.6rem;">
+                                        {{ api_key.model_usage|length }} 个模型
+                                    </button>
+                                    {% else %}
+                                    <span>无模型数据</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="metadata">
+                                <div class="metadata-row">
+                                    <span>创建: {{ api_key.created_at or 'N/A' }}</span>
+                                </div>
+                                <div class="metadata-row">
+                                    <span>最后使用: {{ api_key.last_used or 'N/A' }}</span>
+                                </div>
+                            </div>
+
+                            <div class="api-key-actions">
+                                <div class="action-group">
+                                    <button data-key="{{ api_key.key }}" onclick="resetUsage(this.getAttribute('data-key'))" class="action-btn" title="重置使用量">
+                                        <i class="fas fa-redo"></i>
+                                    </button>
+                                    <button data-key="{{ api_key.key }}" data-limit="{{ api_key.limit }}" onclick="showEditLimit(this.getAttribute('data-key'), this.getAttribute('data-limit'))" class="action-btn" title="编辑限额">
+                                        <i class="fas fa-edit"></i>
                                     </button>
                                 </div>
-                                <div class="mt-1 text-xs" style="color: var(--text-muted);">{{ api_key.phone or 'N/A' }}</div>
-                            </div>
-                        </div>
-
-                        <!-- Usage Stats -->
-                        <div style="margin-bottom: 1rem;">
-                            <!-- Usage Progress -->
-                            <div>
-                                <div class="flex justify-between text-xs mb-1" style="color: var(--text-secondary);">
-                                    <span>使用量</span>
-                                    <span style="font-family: 'Geist Mono', monospace;">{{ api_key.usage }}/{{ api_key.limit }}</span>
-                                </div>
-                                <div class="progress-bar w-full">
-                                    <div class="progress-bar-fill api-key-usage" data-usage="{{ api_key.usage }}" data-limit="{{ api_key.limit }}"></div>
+                                <div class="action-group">
+                                    <button data-key="{{ api_key.key }}" onclick="showChangePasswordModal(this.getAttribute('data-key'))" class="action-btn" title="修改密码">
+                                        <i class="fas fa-key"></i>
+                                    </button>
+                                    <button data-key="{{ api_key.key }}" onclick="revokeKey(this.getAttribute('data-key'))" class="action-btn delete" title="撤销密钥">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
                                 </div>
                             </div>
 
-                            <!-- Requests -->
-                            <div class="flex justify-between text-xs mt-3" style="color: var(--text-secondary);">
-                                <span>请求次数</span>
-                                <span style="font-weight: 600;">{{ api_key.reqs }}</span>
-                            </div>
-
-                            <!-- Model Usage -->
-                            <div class="flex justify-between text-xs mt-2" style="color: var(--text-secondary);">
-                                <span>使用模型</span>
-                                {% if api_key.model_usage %}
-                                <button onclick="toggleModelUsage(`{{ api_key.key }}`)" style="background: none; border: none; color: var(--accent-purple); font-weight: 600; cursor: pointer; font-family: 'Manrope', sans-serif; font-size: 0.75rem;">
-                                    {{ api_key.model_usage|length }} 个模型
-                                </button>
-                                {% else %}
-                                <span style="color: var(--text-muted);">无</span>
-                                {% endif %}
-                            </div>
+                            {% if api_key.model_usage %}
+                            <div class="model-usage-container" data-key="{{ api_key.key }}"></div>
+                            {% endif %}
                         </div>
-
-                        <!-- Metadata -->
-                        <div class="text-xs mb-4" style="color: var(--text-muted);">
-                            <div class="flex justify-between" style="margin-bottom: 0.25rem;">
-                                <span>创建时间</span>
-                                <span>{{ api_key.created_at or 'N/A' }}</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span>最后使用</span>
-                                <span>{{ api_key.last_used or 'N/A' }}</span>
-                            </div>
-                        </div>
-
-                        <!-- Actions -->
-                        <div class="flex justify-between items-center pt-3" style="border-top: 1px solid var(--border-subtle);">
-                            <div class="flex space-x-1">
-                                <button data-key="{{ api_key.key }}" onclick="resetUsage(this.getAttribute('data-key'))" style="background: none; border: none; color: var(--accent-green); cursor: pointer; padding: 0.25rem; border-radius: 6px; transition: all 0.2s;" title="重置使用量">
-                                    <i class="fas fa-redo text-xs"></i>
-                                </button>
-                                <button data-key="{{ api_key.key }}" data-limit="{{ api_key.limit }}" onclick="showEditLimit(this.getAttribute('data-key'), this.getAttribute('data-limit'))" style="background: none; border: none; color: var(--accent-purple); cursor: pointer; padding: 0.25rem; border-radius: 6px; transition: all 0.2s;" title="编辑限额">
-                                    <i class="fas fa-edit text-xs"></i>
-                                </button>
-                            </div>
-                            <div class="flex space-x-1">
-                                <button data-key="{{ api_key.key }}" onclick="showChangePasswordModal(this.getAttribute('data-key'))" style="background: none; border: none; color: var(--accent-cyan); cursor: pointer; padding: 0.25rem; border-radius: 6px; transition: all 0.2s;" title="修改密码">
-                                    <i class="fas fa-key text-xs"></i>
-                                </button>
-                                <button data-key="{{ api_key.key }}" onclick="revokeKey(this.getAttribute('data-key'))" style="background: none; border: none; color: var(--accent-error); cursor: pointer; padding: 0.25rem; border-radius: 6px; transition: all 0.2s;" title="撤销密钥">
-                                    <i class="fas fa-trash text-xs"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Model Usage Details -->
-                        {% if api_key.model_usage %}
-                        <div class="model-usage-container" data-key="{{ api_key.key }}"></div>
-                        {% endif %}
+                        {% endfor %}
                     </div>
-                    {% endfor %}
                 </div>
             </div>
-        </div>
+        </section>
     </div>
 
-    <!-- Add Server Modal -->
-    <div id="addServerModal" class="modal hidden items-center justify-center p-4">
-        <div class="modal-content w-full max-w-4xl">
-            <div class="px-6 py-4" style="border-bottom: 1px solid var(--border-subtle); background: rgba(15, 23, 42, 0.6);">
-                <h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 1.125rem; font-weight: 600; color: var(--text-primary);">添加LLM服务器</h3>
+    <!-- 添加服务器模态框 -->
+    <div id="addServerModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">添加 LLM 服务器</h3>
+                <button onclick="closeAddServerModal()" class="modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
-
-            <div class="modal-body-scrollable">
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
-                    <div>
-                        <label class="block text-sm font-medium mb-2" style="color: var(--text-secondary);">服务器URL</label>
-                        <input type="text" id="serverUrl" class="w-full px-4 py-2 border rounded-lg font-mono" style="background: rgba(15, 23, 42, 0.6); border-color: var(--border-subtle); color: var(--text-primary);" placeholder="https://api.example.com">
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">服务器 URL</label>
+                        <input type="text" id="serverUrl" class="form-input" placeholder="https://api.example.com">
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-2" style="color: var(--text-secondary);">设备信息</label>
-                        <input type="text" id="serverDevice" class="w-full px-4 py-2 border rounded-lg font-mono" style="background: rgba(15, 23, 42, 0.6); border-color: var(--border-subtle); color: var(--text-primary);" placeholder="GPU/CPU 信息">
+                    <div class="form-group">
+                        <label class="form-label">设备信息</label>
+                        <input type="text" id="serverDevice" class="form-input" placeholder="GPU/CPU 信息">
                     </div>
                 </div>
-                <div style="margin-top: 1rem;">
-                    <label class="block text-sm font-medium mb-2" style="color: var(--text-secondary);">API密钥（可选）</label>
-                    <input type="text" id="serverApiKey" class="w-full px-4 py-2 border rounded-lg font-mono" style="background: rgba(15, 23, 42, 0.6); border-color: var(--border-subtle); color: var(--text-primary);" placeholder="可选的API密钥">
+                <div class="form-group">
+                    <label class="form-label">API 密钥（可选）</label>
+                    <input type="text" id="serverApiKey" class="form-input" placeholder="可选的 API 密钥">
                 </div>
 
                 <div style="margin-top: 1.5rem;">
-                    <div class="flex justify-between items-center mb-4">
-                        <label class="block text-sm font-medium" style="color: var(--text-secondary);">模型配置</label>
-                        <button onclick="addNewModelRow('addServer')" class="btn-primary text-sm">
-                            <i class="fas fa-plus" style="margin-right: 0.5rem;"></i> 添加模型
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+                        <label class="form-label" style="margin-bottom:0;">模型配置</label>
+                        <button onclick="addNewModelRow('addServer')" class="btn">
+                            <i class="fas fa-plus"></i>
+                            <span>添加模型</span>
                         </button>
                     </div>
-                    <div class="overflow-x-auto custom-scrollbar">
-                        <table class="w-full border-collapse">
-                            <thead>
-                                <tr class="table-header">
-                                    <th class="px-4 py-2 text-left text-xs font-medium border" style="border-color: var(--border-subtle);">前端模型名称</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium border" style="border-color: var(--border-subtle);">后端模型名称</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium border" style="border-color: var(--border-subtle);">输入权重</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium border" style="border-color: var(--border-subtle);">输出权重</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium border" style="border-color: var(--border-subtle);">状态</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium border" style="border-color: var(--border-subtle);">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="addServerModelsTable"></tbody>
-                        </table>
-                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>前端模型</th>
+                                <th>后端模型</th>
+                                <th>输入权重</th>
+                                <th>输出权重</th>
+                                <th>状态</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="addServerModelsTable"></tbody>
+                    </table>
                 </div>
             </div>
-
             <div class="modal-footer">
-                <div class="flex justify-end space-x-3">
-                    <button onclick="closeAddServerModal()" style="background: transparent; border: 1px solid var(--border-subtle); color: var(--text-secondary); padding: 0.625rem 1.25rem; border-radius: 10px; font-weight: 500; cursor: pointer; transition: all 0.3s;">取消</button>
-                    <button onclick="addServer()" class="btn-primary">添加服务器</button>
-                </div>
+                <button onclick="closeAddServerModal()" class="btn">取消</button>
+                <button onclick="addServer()" class="btn btn-primary">
+                    <i class="fas fa-plus"></i>
+                    <span>添加服务器</span>
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- Edit Server Modal -->
-    <div id="editServerModal" class="modal hidden items-center justify-center p-4">
-        <div class="modal-content w-full max-w-4xl">
-            <div class="px-6 py-4" style="border-bottom: 1px solid var(--border-subtle); background: rgba(15, 23, 42, 0.6);">
-                <h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 1.125rem; font-weight: 600; color: var(--text-primary);">编辑LLM服务器</h3>
+    <!-- 编辑服务器模态框 -->
+    <div id="editServerModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">编辑 LLM 服务器</h3>
+                <button onclick="closeEditServerModal()" class="modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
-
-            <div class="modal-body-scrollable">
+            <div class="modal-body">
                 <input type="hidden" id="editServerUrl">
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
-                    <div>
-                        <label class="block text-sm font-medium mb-2" style="color: var(--text-secondary);">设备信息</label>
-                        <input type="text" id="editServerDevice" class="w-full px-4 py-2 border rounded-lg font-mono" style="background: rgba(15, 23, 42, 0.6); border-color: var(--border-subtle); color: var(--text-primary);" placeholder="GPU/CPU 信息">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">设备信息</label>
+                        <input type="text" id="editServerDevice" class="form-input" placeholder="GPU/CPU 信息">
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-2" style="color: var(--text-secondary);">API密钥（可选）</label>
-                        <input type="text" id="editServerApiKey" class="w-full px-4 py-2 border rounded-lg font-mono" style="background: rgba(15, 23, 42, 0.6); border-color: var(--border-subtle); color: var(--text-primary);" placeholder="可选的API密钥">
+                    <div class="form-group">
+                        <label class="form-label">API 密钥（可选）</label>
+                        <input type="text" id="editServerApiKey" class="form-input" placeholder="可选的 API 密钥">
                     </div>
                 </div>
 
                 <div style="margin-top: 1.5rem;">
-                    <div class="flex justify-between items-center mb-4">
-                        <label class="block text-sm font-medium" style="color: var(--text-secondary);">模型配置</label>
-                        <button onclick="addNewModelRow()" class="btn-primary text-sm">
-                            <i class="fas fa-plus" style="margin-right: 0.5rem;"></i> 添加模型
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+                        <label class="form-label" style="margin-bottom:0;">模型配置</label>
+                        <button onclick="addNewModelRow()" class="btn">
+                            <i class="fas fa-plus"></i>
+                            <span>添加模型</span>
                         </button>
                     </div>
-                    <div class="overflow-x-auto custom-scrollbar">
-                        <table class="w-full border-collapse">
-                            <thead>
-                                <tr class="table-header">
-                                    <th class="px-4 py-2 text-left text-xs font-medium border" style="border-color: var(--border-subtle);">前端模型名称</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium border" style="border-color: var(--border-subtle);">后端模型名称</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium border" style="border-color: var(--border-subtle);">输入权重</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium border" style="border-color: var(--border-subtle);">输出权重</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium border" style="border-color: var(--border-subtle);">状态</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium border" style="border-color: var(--border-subtle);">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="editServerModelsTable"></tbody>
-                        </table>
-                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>前端模型</th>
+                                <th>后端模型</th>
+                                <th>输入权重</th>
+                                <th>输出权重</th>
+                                <th>状态</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="editServerModelsTable"></tbody>
+                    </table>
                 </div>
             </div>
-
             <div class="modal-footer">
-                <div class="flex justify-end space-x-3">
-                    <button onclick="closeEditServerModal()" style="background: transparent; border: 1px solid var(--border-subtle); color: var(--text-secondary); padding: 0.625rem 1.25rem; border-radius: 10px; font-weight: 500; cursor: pointer; transition: all 0.3s;">取消</button>
-                    <button onclick="updateServer()" class="btn-primary">保存更改</button>
-                </div>
+                <button onclick="closeEditServerModal()" class="btn">取消</button>
+                <button onclick="updateServer()" class="btn btn-primary">
+                    <i class="fas fa-save"></i>
+                    <span>保存更改</span>
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- Edit Limit Modal -->
-    <div id="editLimitModal" class="modal hidden items-center justify-center p-4">
-        <div class="modal-content w-full max-w-sm">
-            <div class="p-6">
-                <h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 1.125rem; font-weight: 600; margin-bottom: 1.5rem; color: var(--text-primary);">编辑Token限制</h3>
-                <input type="number" id="newLimit" class="w-full px-4 py-3 border rounded-lg font-mono mb-4" style="background: rgba(15, 23, 42, 0.6); border-color: var(--border-subtle); color: var(--text-primary);" placeholder="输入新的限制">
+    <!-- 编辑限额模态框 -->
+    <div id="editLimitModal" class="modal hidden">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3 class="modal-title">编辑 Token 限制</h3>
+                <button onclick="closeEditModal()" class="modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <input type="number" id="newLimit" class="form-input" placeholder="输入新的限制" style="margin-bottom: 1rem;">
                 <input type="hidden" id="currentApiKey">
-                <div class="flex justify-end space-x-3">
-                    <button onclick="closeEditModal()" style="background: transparent; border: 1px solid var(--border-subtle); color: var(--text-secondary); padding: 0.625rem 1.25rem; border-radius: 10px; font-weight: 500; cursor: pointer; transition: all 0.3s;">取消</button>
-                    <button onclick="updateLimit()" class="btn-primary">保存限制</button>
-                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeEditModal()" class="btn">取消</button>
+                <button onclick="updateLimit()" class="btn btn-primary">保存限制</button>
             </div>
         </div>
     </div>
 
-    <!-- Change Password Modal -->
-    <div id="changePasswordModal" class="modal hidden items-center justify-center p-4">
-        <div class="modal-content w-full max-w-sm">
-            <div class="p-6">
-                <h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 1.125rem; font-weight: 600; margin-bottom: 1.5rem; color: var(--text-primary);">修改用户密码</h3>
-                <div style="margin-bottom: 1rem;">
-                    <label class="block text-sm font-medium mb-2" style="color: var(--text-secondary);">新密码</label>
-                    <input type="password" id="newPassword" class="w-full px-4 py-3 border rounded-lg font-mono" style="background: rgba(15, 23, 42, 0.6); border-color: var(--border-subtle); color: var(--text-primary);" placeholder="请输入新密码（至少6位）">
-                    <p class="text-xs mt-1" style="color: var(--text-muted);">密码长度6-72个字符</p>
+    <!-- 修改密码模态框 -->
+    <div id="changePasswordModal" class="modal hidden">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3 class="modal-title">修改用户密码</h3>
+                <button onclick="closeChangePasswordModal()" class="modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">新密码</label>
+                    <input type="password" id="newPassword" class="form-input" placeholder="请输入新密码（至少6位）">
+                    <div style="font-size: 0.65rem; color: var(--text-muted); margin-top: 0.375rem;">密码长度 6-72 个字符</div>
                 </div>
                 <input type="hidden" id="currentApiKeyForPassword">
-                <div class="flex justify-end space-x-3">
-                    <button onclick="closeChangePasswordModal()" style="background: transparent; border: 1px solid var(--border-subtle); color: var(--text-secondary); padding: 0.625rem 1.25rem; border-radius: 10px; font-weight: 500; cursor: pointer; transition: all 0.3s;">取消</button>
-                    <button onclick="changePassword()" class="btn-primary">修改密码</button>
-                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeChangePasswordModal()" class="btn">取消</button>
+                <button onclick="changePassword()" class="btn btn-primary">修改密码</button>
             </div>
         </div>
     </div>
@@ -920,8 +1285,7 @@
         function copyToClipboard(text) {
             navigator.clipboard.writeText(text).then(() => {
                 const message = document.createElement('div');
-                message.className = 'fixed top-4 right-4 px-4 py-2 rounded-lg shadow-lg z-50';
-                message.style.cssText = 'background: rgba(52, 211, 153, 0.2); border: 1px solid rgba(52, 211, 153, 0.3); color: var(--accent-green); font-family: Manrope, sans-serif; font-size: 0.875rem;';
+                message.style.cssText = 'position:fixed; top:1rem; right:1rem; padding:0.75rem 1rem; background:var(--bg-card); border:1px solid var(--accent); color:var(--accent); font-family:JetBrains Mono,monospace; font-size:0.7rem; z-index:2000;';
                 message.textContent = '已复制到剪贴板!';
                 document.body.appendChild(message);
                 setTimeout(() => message.remove(), 2000);
@@ -938,6 +1302,7 @@
             document.body.appendChild(dataElement);
 
             initializeUsageProgressBars();
+            initializeDistributionBars();
         });
 
         function initializeUsageProgressBars() {
@@ -946,29 +1311,24 @@
                 const usage = parseFloat(bar.getAttribute('data-usage')) || 0;
                 const limit = parseFloat(bar.getAttribute('data-limit')) || 1;
                 let percentage = Math.min((usage / limit) * 100, 100);
-                bar.style.width = '0%';
+                bar.style.width = percentage + '%';
+                if (percentage >= 90) {
+                    bar.classList.add('danger');
+                } else if (percentage >= 70) {
+                    bar.classList.add('warning');
+                }
+            });
+        }
+
+        function initializeDistributionBars() {
+            const distributionBars = document.querySelectorAll('.distribution-item .progress-fill');
+            distributionBars.forEach(bar => {
+                const value = parseInt(bar.getAttribute('data-value')) || 0;
+                const total = parseInt(bar.getAttribute('data-total')) || 1;
+                const percentage = (value / total) * 100;
                 setTimeout(() => {
                     bar.style.width = percentage + '%';
-                    if (percentage >= 90) {
-                        bar.style.background = 'var(--accent-error)';
-                    } else if (percentage >= 70) {
-                        bar.style.background = 'var(--accent-warning)';
-                    } else {
-                        bar.style.background = 'var(--gradient-primary)';
-                    }
-                }, 100);
-            });
-
-            const distributionBars = document.querySelectorAll('.usage-distribution');
-            distributionBars.forEach(container => {
-                const value = parseInt(container.getAttribute('data-value')) || 0;
-                const total = parseInt(container.getAttribute('data-total')) || 1;
-                const progressBar = container.querySelector('.progress-bar-fill');
-                if (progressBar) {
-                    const percentage = (value / total) * 100;
-                    progressBar.style.width = '0%';
-                    setTimeout(() => progressBar.style.width = percentage + '%', 300);
-                }
+                }, 300);
             });
         }
     </script>

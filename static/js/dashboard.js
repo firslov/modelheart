@@ -30,7 +30,7 @@ async function loadConfigs() {
 // Create server card for all screen sizes
 function createServerCard(url, config) {
     const card = document.createElement('div');
-    card.className = 'bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 p-4';
+    card.className = 'server-card';
 
     // Count active and inactive models
     const models = config.model || {};
@@ -40,79 +40,67 @@ function createServerCard(url, config) {
 
     // Create models list HTML
     const modelsList = Object.entries(models).map(([modelName, modelConfig]) => {
-        const statusClass = modelConfig.status ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600';
-        const statusIcon = modelConfig.status ? 'fa-check-circle' : 'fa-times-circle';
+        const isActive = modelConfig.status;
+        const statusIcon = isActive ? 'fa-check-circle' : 'fa-times-circle';
         return `
-            <div class="flex items-center justify-between text-xs py-1 px-2 rounded ${statusClass}">
+            <div class="model-tag ${isActive ? 'active' : 'inactive'}">
                 <span>${modelName}</span>
-                <div class="flex items-center space-x-2">
-                    <span class="text-gray-500">${modelConfig.reqs || 0} reqs</span>
-                    <i class="fas ${statusIcon} text-xs cursor-pointer" 
-                       onclick="toggleModelStatus('${encodeURIComponent(url)}','${encodeURIComponent(modelName)}',${modelConfig.status})"
-                       title="${modelConfig.status ? 'Active' : 'Inactive'}"></i>
-                </div>
+                <span style="font-family:'JetBrains Mono',monospace;">${modelConfig.reqs || 0}</span>
+                <i class="fas ${statusIcon}" style="cursor:pointer;"
+                   onclick="toggleModelStatus('${encodeURIComponent(url)}','${encodeURIComponent(modelName)}',${modelConfig.status})"
+                       title="${isActive ? 'Active' : 'Inactive'}"></i>
             </div>
         `;
     }).join('');
 
     card.innerHTML = `
         <!-- Header -->
-        <div class="flex justify-between items-start mb-3">
-            <div class="flex-1">
-                <div class="flex items-center">
-                    <span class="font-mono text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded border break-all">${url}</span>
-                    <button onclick="copyToClipboard('${url}')"
-                        class="ml-2 text-gray-400 hover:text-indigo-600 transition-colors"
-                        title="Copy URL">
-                        <i class="fas fa-copy text-xs"></i>
-                    </button>
-                </div>
-                <div class="mt-1 text-xs text-gray-500">${config.device || 'N/A'}</div>
-            </div>
+        <div class="server-url">
+            ${url}
+            <button onclick="copyToClipboard('${url}')" style="background:none; border:none; color:var(--text-muted); cursor:pointer; margin-left:0.5rem;" title="复制 URL">
+                <i class="fas fa-copy"></i>
+            </button>
         </div>
+        <div class="server-device">${config.device || 'N/A'}</div>
 
         <!-- Stats -->
-        <div class="grid grid-cols-2 gap-3 mb-4">
-            <div class="text-center p-2 bg-gray-50 rounded-lg">
-                <div class="text-sm font-semibold text-gray-600">Models</div>
-                <div class="text-lg font-bold text-indigo-600">${activeModels}/${totalModels}</div>
-                <div class="text-xs text-gray-500">Active</div>
+        <div class="server-stats">
+            <div class="server-stat">
+                <div class="server-stat-value">${activeModels}/${totalModels}</div>
+                <div class="server-stat-label">活跃模型</div>
             </div>
-            <div class="text-center p-2 bg-gray-50 rounded-lg">
-                <div class="text-sm font-semibold text-gray-600">Requests</div>
-                <div class="text-lg font-bold text-indigo-600">${totalRequests}</div>
-                <div class="text-xs text-gray-500">Total</div>
+            <div class="server-stat">
+                <div class="server-stat-value">${totalRequests}</div>
+                <div class="server-stat-label">请求总数</div>
             </div>
         </div>
 
         <!-- API Key Status -->
-        <div class="flex items-center justify-between text-xs mb-3 p-2 bg-gray-50 rounded">
-            <span class="text-gray-600">API Key</span>
-            <div class="flex items-center">
-                <span class="font-mono text-xs bg-gray-100 px-2 py-1 rounded border" title="${config.apikey || 'Not Set'}">${config.apikey ? formatApiKey(config.apikey) : 'Not Set'}</span>
-                ${config.apikey ? `<button onclick="copyToClipboard('${config.apikey}')" class="ml-1 text-gray-400 hover:text-indigo-600 transition-colors flex-shrink-0" title="Copy API Key"><i class="fas fa-copy text-xs"></i></button>` : ''}
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.65rem; color:var(--text-secondary); padding:0.5rem; background:var(--bg-card); border:1px solid var(--border); margin-bottom:0.75rem;">
+            <span>API Key</span>
+            <div style="display:flex; align-items:center; gap:0.375rem;">
+                <span style="font-family:'JetBrains Mono',monospace;">${config.apikey ? formatApiKey(config.apikey) : 'Not Set'}</span>
+                ${config.apikey ? `<button onclick="copyToClipboard('${config.apikey}')" style="background:none; border:none; color:var(--text-muted); cursor:pointer;" title="复制 API Key"><i class="fas fa-copy"></i></button>` : ''}
             </div>
         </div>
 
         <!-- Models List -->
-        <div class="mb-4">
-            <div class="text-xs font-medium text-gray-600 mb-2">Available Models</div>
-            <div class="space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
+        <div class="server-models">
+            <div class="server-models-title">可用模型</div>
+            <div style="max-height:100px; overflow-y:auto;">
                 ${modelsList}
             </div>
         </div>
 
         <!-- Actions -->
-        <div class="flex justify-between items-center pt-3 border-t border-gray-100">
-            <button onclick="showEditServerModal('${encodeURIComponent(url)}')" 
-                    class="text-indigo-600 hover:text-indigo-800 transition-colors p-1 rounded hover:bg-indigo-50"
-                    title="Edit Server">
-                <i class="fas fa-edit text-xs"></i>
+        <div class="server-actions">
+            <button onclick="showEditServerModal('${encodeURIComponent(url)}')" class="action-btn">
+                <i class="fas fa-edit"></i>
+                <span>编辑</span>
             </button>
-            <button onclick="deleteServer('${encodeURIComponent(url)}')" 
-                    class="text-red-600 hover:text-red-800 transition-colors p-1 rounded hover:bg-red-50"
-                    title="Delete Server">
-                <i class="fas fa-trash text-xs"></i>
+            <button onclick="deleteServer('${encodeURIComponent(url)}')" class="action-btn delete">
+                <i class="fas fa-trash"></i>
+                <span>删除</span>
             </button>
         </div>
     `;
