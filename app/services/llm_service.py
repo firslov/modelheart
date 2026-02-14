@@ -11,7 +11,7 @@ from fastapi import HTTPException
 
 from app.config.settings import settings
 from app.models.api_models import AppState
-from app.utils.logging_config import get_logger
+from app.utils.logging_config import get_logger, log_forward, log_stream_complete, log_error
 from app.utils.circuit_breaker import CircuitBreaker, CircuitState
 from app.database.database import get_db_session
 from app.database.models import LLMServer, ServerModel
@@ -77,7 +77,7 @@ class LLMService:
             "max_connections": 500,
             "adjustment_interval": 30,  # 每30秒检查一次，更频繁调整
         }
-        logger.info("HTTP client initialized")
+        logger.info("HTTP client initialized | connections=500 | http2=enabled")
 
     async def _monitor_connection_pool(self) -> None:
         """监控并动态调整连接池
@@ -127,7 +127,7 @@ class LLMService:
                         keepalive_expiry=300,
                     )
                     self._connection_pool_stats["max_connections"] = new_max
-                    logger.debug(f"Connection pool expanded to {new_max}")
+                    logger.debug(f"pool expanded | connections={new_max} | usage={usage_ratio:.0%}")
                 elif usage_ratio < 0.3:  # 使用率低于30%
                     new_max = max(
                         int(self._connection_pool_stats["max_connections"] * 0.8),
@@ -139,12 +139,12 @@ class LLMService:
                         keepalive_expiry=300,
                     )
                     self._connection_pool_stats["max_connections"] = new_max
-                    logger.debug(f"Connection pool reduced to {new_max}")
+                    logger.debug(f"pool reduced | connections={new_max} | usage={usage_ratio:.0%}")
 
                 self._connection_pool_stats["last_check"] = current_time
 
             except Exception as e:
-                logger.warning(f"Error monitoring connection pool: {e}")
+                logger.warning(f"pool monitor error | error={e}")
 
     async def cleanup(self) -> None:
         """清理资源"""
@@ -354,7 +354,7 @@ class LLMService:
 
         # 熔断器检查：如果服务器处于熔断状态，快速失败
         if not await self.circuit_breaker.can_execute(server_key):
-            logger.warning(f"Circuit breaker OPEN for {server_key}, fast failing")
+            logger.warning(f"request blocked | server={server_key} | reason=circuit_open")
             raise HTTPException(
                 status_code=503,
                 detail=f"Service temporarily unavailable (circuit open for {server_key})"
@@ -399,7 +399,7 @@ class LLMService:
                 await self.circuit_breaker.record_failure(server_key, exc)
 
             self._update_server_health(target, False)
-            logger.error(f"HTTP {exc.response.status_code} for {target}")
+            logger.error(f"upstream error | server={server_key} | status={exc.response.status_code}")
 
             if stream:
                 return exc.response
@@ -412,7 +412,7 @@ class LLMService:
             # 连接协议错误，记录失败但不重建客户端
             await self.circuit_breaker.record_failure(server_key, exc)
             self._update_server_health(target, False)
-            logger.warning(f"HTTP/2 connection terminated for {target}: {exc}")
+            logger.warning(f"connection reset | server={server_key} | error={str(exc)[:50]}")
 
             if stream:
                 raise
@@ -426,7 +426,7 @@ class LLMService:
             # 连接错误（如 DNS 解析失败、连接拒绝等）
             await self.circuit_breaker.record_failure(server_key, exc)
             self._update_server_health(target, False)
-            logger.error(f"Connection error for {target}: {exc}")
+            logger.error(f"connection failed | server={server_key}")
 
             if stream:
                 raise HTTPException(
@@ -443,7 +443,7 @@ class LLMService:
             # 请求超时
             await self.circuit_breaker.record_failure(server_key, exc)
             self._update_server_health(target, False)
-            logger.error(f"Request timeout for {target}: {exc}")
+            logger.error(f"request timeout | server={server_key}")
 
             if stream:
                 raise HTTPException(
@@ -460,7 +460,7 @@ class LLMService:
             # 其他未知错误
             await self.circuit_breaker.record_failure(server_key, exc)
             self._update_server_health(target, False)
-            logger.error(f"Unexpected error for {target}: {exc}", exc_info=True)
+            logger.error(f"unexpected error | server={server_key} | error={str(exc)[:100]}", exc_info=True)
 
             if stream:
                 raise HTTPException(

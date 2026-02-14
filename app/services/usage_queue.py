@@ -91,7 +91,7 @@ class UsageQueue:
         应在应用启动时调用。
         """
         if self._started:
-            logger.warning("UsageQueue worker already started")
+            logger.warning("UsageQueue already running")
             return
 
         self._started = True
@@ -107,7 +107,7 @@ class UsageQueue:
         if not self._started:
             return
 
-        logger.info("Stopping UsageQueue...")
+        logger.info("UsageQueue stopping...")
 
         # 发送停止信号
         self._stop_event.set()
@@ -123,7 +123,7 @@ class UsageQueue:
         # 刷新剩余数据
         if self._grouped_buffer:
             remaining = sum(len(v) for v in self._grouped_buffer.values())
-            logger.info(f"Flushing {remaining} remaining events...")
+            logger.info(f"UsageQueue flush | remaining={remaining}")
             await self._flush_to_database()
 
         self._started = False
@@ -164,7 +164,7 @@ class UsageQueue:
                     last_flush = asyncio.get_event_loop().time()
 
             except Exception as e:
-                logger.error(f"Error in queue worker: {e}", exc_info=True)
+                logger.error(f"worker error | error={str(e)[:100]}", exc_info=True)
                 self.stats.total_errors += 1
                 # 继续运行，不因错误停止
 
@@ -212,19 +212,15 @@ class UsageQueue:
             # 仅在调试模式或异常情况下记录
             rate = total_events / elapsed
             if rate < 100 or elapsed > 1.0:
-                logger.warning(
-                    f"Flush slow | events={total_events} | duration={elapsed:.3f}s | rate={rate:.0f}/s"
-                )
+                logger.warning(f"flush slow | events={total_events} | duration={elapsed:.3f}s | rate={rate:.0f}/s")
             else:
-                logger.debug(
-                    f"Flushed {total_events} events | duration={elapsed:.3f}s | rate={rate:.0f}/s"
-                )
+                logger.debug(f"flush ok | events={total_events} | duration={elapsed:.3f}s | rate={rate:.0f}/s")
 
             # 清空缓冲区
             self._grouped_buffer.clear()
 
         except Exception as e:
-            logger.error(f"Error flushing to database: {e}", exc_info=True)
+            logger.error(f"flush failed | events={total_events} | error={str(e)[:100]}", exc_info=True)
             self.stats.total_errors += 1
             # 注意：数据保留在缓冲区中，下次重试
 

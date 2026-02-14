@@ -18,7 +18,7 @@ from enum import Enum
 from typing import Dict, Optional
 import time
 
-from app.utils.logging_config import get_logger
+from app.utils.logging_config import get_logger, log_circuit
 
 logger = get_logger(__name__)
 
@@ -99,10 +99,8 @@ class CircuitBreaker:
         self._stats_lock = asyncio.Lock()
 
         logger.info(
-            f"CircuitBreaker initialized | "
-            f"failure_threshold={failure_threshold} | "
-            f"recovery_timeout={recovery_timeout}s | "
-            f"half_open_max_calls={half_open_max_calls}"
+            f"CircuitBreaker initialized | threshold={failure_threshold} | "
+            f"recovery={recovery_timeout}s | probes={half_open_max_calls}"
         )
 
     def _get_circuit(self, key: str) -> CircuitStats:
@@ -136,23 +134,16 @@ class CircuitBreaker:
 
                 if time_since_failure >= self.recovery_timeout:
                     # 超过恢复时间，进入半开状态
-                    old_state = circuit.state
                     circuit.state = CircuitState.HALF_OPEN
                     circuit.failures = 0
                     circuit.successes = 0
 
-                    logger.info(
-                        f"Circuit state change | key={key} | "
-                        f"{old_state.value} -> {circuit.state.value} | "
-                        f"recovery_after={time_since_failure:.1f}s"
-                    )
+                    log_circuit(logger, "half_open", key, recovery_after=f"{time_since_failure:.1f}s")
                     return True
 
                 # 仍在熔断期内，快速失败
                 remaining = self.recovery_timeout - time_since_failure
-                logger.debug(
-                    f"Circuit OPEN | key={key} | remaining={remaining:.1f}s"
-                )
+                logger.debug(f"circuit OPEN | server={key} | remaining={remaining:.1f}s")
                 return False
 
             elif circuit.state == CircuitState.HALF_OPEN:
@@ -161,10 +152,7 @@ class CircuitBreaker:
                     return True
 
                 # 已达到半开状态的最大请求数，拒绝新请求
-                logger.debug(
-                    f"Circuit HALF_OPEN max calls reached | key={key} | "
-                    f"successes={circuit.successes}"
-                )
+                logger.debug(f"circuit HALF_OPEN | server={key} | probes={circuit.successes}/{self.half_open_max_calls}")
                 return False
 
         return True
@@ -187,14 +175,10 @@ class CircuitBreaker:
 
                 if circuit.successes >= self.half_open_max_calls:
                     # 半开状态下连续成功，恢复正常
-                    old_state = circuit.state
                     circuit.state = CircuitState.CLOSED
                     circuit.successes = 0
 
-                    logger.info(
-                        f"Circuit RECOVERED | key={key} | "
-                        f"{old_state.value} -> {circuit.state.value}"
-                    )
+                    log_circuit(logger, "close", key, reason="probes_succeeded")
             elif circuit.state == CircuitState.CLOSED:
                 # 正常状态下的成功，无需特殊处理
                 pass
@@ -221,10 +205,7 @@ class CircuitBreaker:
                 circuit.total_circuit_opens += 1
                 circuit.successes = 0
 
-                logger.warning(
-                    f"Circuit RE-OPENED from half-open | key={key} | "
-                    f"error={str(error) if error else 'unknown'}"
-                )
+                log_circuit(logger, "open", key, reason="probe_failed", error=str(error)[:50] if error else None)
 
             elif circuit.state == CircuitState.CLOSED:
                 # 正常状态，检查是否达到熔断阈值
@@ -232,11 +213,7 @@ class CircuitBreaker:
                     circuit.state = CircuitState.OPEN
                     circuit.total_circuit_opens += 1
 
-                    logger.warning(
-                        f"Circuit OPENED | key={key} | "
-                        f"failures={circuit.failures}/{self.failure_threshold} | "
-                        f"error={str(error) if error else 'unknown'}"
-                    )
+                    log_circuit(logger, "open", key, failures=circuit.failures, error=str(error)[:50] if error else None)
 
     def get_state(self, key: str) -> CircuitState:
         """获取指定熔断器的当前状态（非线程安全，仅用于监控）"""
@@ -263,19 +240,15 @@ class CircuitBreaker:
         circuit = self._get_circuit(key)
 
         async with circuit.lock:
-            old_state = circuit.state
             circuit.state = CircuitState.CLOSED
             circuit.failures = 0
             circuit.successes = 0
 
-            logger.info(
-                f"Circuit RESET manually | key={key} | "
-                f"{old_state.value} -> {circuit.state.value}"
-            )
+            log_circuit(logger, "reset", key, reason="manual")
 
     async def reset_all(self):
         """重置所有熔断器"""
         for key in list(self._circuits.keys()):
             await self.reset(key)
 
-        logger.info("All circuits reset")
+        logger.info("All circuit breakers reset")
