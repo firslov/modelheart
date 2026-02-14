@@ -9,6 +9,7 @@
 - 日志辅助函数，简化调用
 """
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import Optional, Any
@@ -354,8 +355,21 @@ def setup_logging(
     # 确保日志目录存在
     log_file.parent.mkdir(parents=True, exist_ok=True)
 
-    # 是否使用颜色（开发环境 + 终端）
-    use_colors = settings.ENV == "development" and sys.stdout.isatty()
+    # 是否使用颜色 - 多种检测方式
+    # 1. NO_COLOR 环境变量优先禁用
+    # 2. FORCE_COLOR 环境变量强制启用
+    # 3. 检测终端环境（isatty 或 TERM/TMUX 变量）
+    if os.getenv("NO_COLOR"):
+        use_colors = False
+    elif os.getenv("FORCE_COLOR") or os.getenv("CLICOLOR_FORCE"):
+        use_colors = True
+    elif sys.stdout.isatty():
+        use_colors = True
+    elif os.getenv("TERM") or os.getenv("TMUX"):
+        # 在 tmux 或有 TERM 设置时也启用颜色（处理管道场景）
+        use_colors = True
+    else:
+        use_colors = False
 
     # 创建格式化器
     console_formatter = ColoredFormatter(use_colors=use_colors, include_request_id=include_request_id)
