@@ -4,6 +4,7 @@ from collections import defaultdict
 from urllib.parse import urlparse
 import time
 import socket
+import asyncio
 
 import httpx
 from fastapi import HTTPException
@@ -44,6 +45,9 @@ class LLMService:
             half_open_max_calls=3,
         )
 
+        # 连接池调整锁，防止并发调整
+        self._pool_adjustment_lock = asyncio.Lock()
+
     async def initialize(self) -> None:
         """初始化HTTP客户端 - 针对云服务器环境优化"""
         self.http_client = httpx.AsyncClient(
@@ -76,45 +80,71 @@ class LLMService:
         logger.info("HTTP client initialized")
 
     async def _monitor_connection_pool(self) -> None:
-        """监控并动态调整连接池 - 优化性能"""
+        """监控并动态调整连接池
+
+        使用非阻塞锁检查，避免在高并发下产生锁竞争。
+        """
         current_time = time.time()
+
+        # 快速检查：如果未到检查时间，直接返回
         if (
             current_time - self._connection_pool_stats["last_check"]
-            > self._connection_pool_stats["adjustment_interval"]
+            <= self._connection_pool_stats["adjustment_interval"]
         ):
-            # 获取当前连接池状态
-            pool = self.http_client._transport._pool
-            active_connections = len(pool.connections)
-            self._connection_pool_stats["active_connections"] = active_connections
+            return
 
-            # 动态调整连接池大小
-            usage_ratio = (
-                active_connections / self._connection_pool_stats["max_connections"]
-            )
-            if usage_ratio > 0.8:  # 使用率超过80%
-                new_max = min(
-                    int(self._connection_pool_stats["max_connections"] * 1.2),
-                    2000,  # 最大不超过2000
-                )
-                self.http_client._limits = httpx.Limits(
-                    max_connections=new_max,
-                    max_keepalive_connections=min(200, int(new_max * 0.1)),
-                    keepalive_expiry=300,
-                )
-                self._connection_pool_stats["max_connections"] = new_max
-            elif usage_ratio < 0.3:  # 使用率低于30%
-                new_max = max(
-                    int(self._connection_pool_stats["max_connections"] * 0.8),
-                    500,  # 最小不少于500
-                )
-                self.http_client._limits = httpx.Limits(
-                    max_connections=new_max,
-                    max_keepalive_connections=min(200, int(new_max * 0.1)),
-                    keepalive_expiry=300,
-                )
-                self._connection_pool_stats["max_connections"] = new_max
+        # 尝试获取锁，如果锁被占用则跳过本次调整
+        if self._pool_adjustment_lock.locked():
+            return
 
-            self._connection_pool_stats["last_check"] = current_time
+        async with self._pool_adjustment_lock:
+            # 双重检查：获取锁后再次确认是否需要调整
+            if (
+                current_time - self._connection_pool_stats["last_check"]
+                <= self._connection_pool_stats["adjustment_interval"]
+            ):
+                return
+
+            try:
+                # 获取当前连接池状态
+                pool = self.http_client._transport._pool
+                active_connections = len(pool.connections)
+                self._connection_pool_stats["active_connections"] = active_connections
+
+                # 动态调整连接池大小
+                usage_ratio = (
+                    active_connections / self._connection_pool_stats["max_connections"]
+                )
+
+                if usage_ratio > 0.8:  # 使用率超过80%
+                    new_max = min(
+                        int(self._connection_pool_stats["max_connections"] * 1.2),
+                        2000,  # 最大不超过2000
+                    )
+                    self.http_client._limits = httpx.Limits(
+                        max_connections=new_max,
+                        max_keepalive_connections=min(200, int(new_max * 0.1)),
+                        keepalive_expiry=300,
+                    )
+                    self._connection_pool_stats["max_connections"] = new_max
+                    logger.debug(f"Connection pool expanded to {new_max}")
+                elif usage_ratio < 0.3:  # 使用率低于30%
+                    new_max = max(
+                        int(self._connection_pool_stats["max_connections"] * 0.8),
+                        500,  # 最小不少于500
+                    )
+                    self.http_client._limits = httpx.Limits(
+                        max_connections=new_max,
+                        max_keepalive_connections=min(200, int(new_max * 0.1)),
+                        keepalive_expiry=300,
+                    )
+                    self._connection_pool_stats["max_connections"] = new_max
+                    logger.debug(f"Connection pool reduced to {new_max}")
+
+                self._connection_pool_stats["last_check"] = current_time
+
+            except Exception as e:
+                logger.warning(f"Error monitoring connection pool: {e}")
 
     async def cleanup(self) -> None:
         """清理资源"""

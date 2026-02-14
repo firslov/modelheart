@@ -347,6 +347,7 @@ class UsageQueue:
         """批量处理 INCREMENT_MODEL_REQS 事件
 
         更新服务器的模型请求计数。
+        优化：先批量加载所有服务器，避免重复查询。
         """
         # 创建Repository实例
         llm_server_repo = LLMServerRepository(session, LLMServer)
@@ -357,8 +358,19 @@ class UsageQueue:
             if event.server_url and event.model:
                 grouped[(event.server_url, event.model)] += 1
 
+        if not grouped:
+            return
+
+        # 批量加载所有需要的服务器（优化：一次查询获取所有服务器）
+        server_urls = set(server_url for (server_url, _) in grouped.keys())
+
+        # 一次性获取所有服务器
+        all_servers = await llm_server_repo.get_all_with_models()
+        server_map = {server.server_url: server for server in all_servers}
+
+        # 更新模型请求计数
         for (server_url, model_name), count in grouped.items():
-            server = await llm_server_repo.get_by_url_with_models(server_url)
+            server = server_map.get(server_url)
 
             if server:
                 for server_model in server.models:

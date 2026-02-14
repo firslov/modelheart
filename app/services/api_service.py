@@ -39,9 +39,9 @@ class ApiService:
         self._token_cache_keys = []  # 用于LRU管理的key列表
         self._max_token_cache_size = 1000  # 最大缓存大小
 
-        # 模型权重缓存
-        self._model_weights_cache = {}  # 模型权重缓存
-        self._model_weights_last_updated = 0  # 最后更新时间
+        # 模型权重缓存 - 每个模型独立缓存时间戳
+        # 格式: {model_name: {"weights": (input_weight, output_weight), "timestamp": float}}
+        self._model_weights_cache: Dict[str, dict] = {}
         self._model_weights_cache_ttl = 60  # 缓存TTL（秒）
 
         self._stats_cache = None  # 统计缓存
@@ -167,7 +167,9 @@ class ApiService:
             await self._update_usage_internal(api_key, request_data, model, session)
 
     async def _get_model_weights(self, model: str, session: AsyncSession) -> tuple[float, float]:
-        """获取模型权重，使用缓存优化
+        """获取模型权重，使用独立缓存优化
+
+        每个模型有独立的缓存时间戳，避免全局失效。
 
         Args:
             model: 模型名称
@@ -178,13 +180,13 @@ class ApiService:
         """
         current_time = time.time()
 
-        # 检查缓存是否有效
-        cache_key = model
-        if (cache_key in self._model_weights_cache and
-            current_time - self._model_weights_last_updated < self._model_weights_cache_ttl):
-            return self._model_weights_cache[cache_key]
+        # 检查该模型的缓存是否有效
+        if model in self._model_weights_cache:
+            cache_entry = self._model_weights_cache[model]
+            if current_time - cache_entry["timestamp"] < self._model_weights_cache_ttl:
+                return cache_entry["weights"]
 
-        # 从数据库获取模型权重配置，支持新旧字段
+        # 从数据库获取模型权重配置
         server_model_repo = self._get_server_model_repo(session)
         server_model = await server_model_repo.get_by_frontend_name(model)
 
@@ -196,9 +198,11 @@ class ApiService:
             input_weight = server_model.input_token_weight
             output_weight = server_model.output_token_weight
 
-        # 更新缓存
-        self._model_weights_cache[cache_key] = (input_weight, output_weight)
-        self._model_weights_last_updated = current_time
+        # 更新该模型的独立缓存
+        self._model_weights_cache[model] = {
+            "weights": (input_weight, output_weight),
+            "timestamp": current_time
+        }
 
         return input_weight, output_weight
 
