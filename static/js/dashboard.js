@@ -499,9 +499,196 @@ function handleResize() {
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function () {
     loadConfigs();
+    loadCircuitBreakerStats();
     // Add resize listener
     window.addEventListener('resize', handleResize);
 });
+
+// ========================================
+// Circuit Breaker Functions
+// ========================================
+
+async function loadCircuitBreakerStats() {
+    try {
+        const response = await fetch('/circuit-breaker-stats');
+        if (!response.ok) {
+            throw new Error('Failed to fetch circuit breaker stats');
+        }
+        const data = await response.json();
+
+        // Update config display
+        updateCircuitConfig(data.config);
+
+        // Update circuits grid
+        updateCircuitBreakersGrid(data.circuits);
+
+    } catch (error) {
+        console.error('Error loading circuit breaker stats:', error);
+        const grid = document.getElementById('circuitBreakersGrid');
+        grid.innerHTML = `
+            <div class="circuit-empty">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span>无法加载熔断器状态</span>
+            </div>
+        `;
+    }
+}
+
+function updateCircuitConfig(config) {
+    document.getElementById('cbFailureThreshold').textContent = config.failure_threshold;
+    document.getElementById('cbRecoveryTimeout').textContent = config.recovery_timeout + 's';
+    document.getElementById('cbHalfOpenMaxCalls').textContent = config.half_open_max_calls;
+}
+
+function updateCircuitBreakersGrid(circuits) {
+    const grid = document.getElementById('circuitBreakersGrid');
+
+    if (!circuits || Object.keys(circuits).length === 0) {
+        grid.innerHTML = `
+            <div class="circuit-empty">
+                <i class="fas fa-check-circle"></i>
+                <span>所有服务正常，暂无熔断记录</span>
+            </div>
+        `;
+        return;
+    }
+
+    grid.innerHTML = '';
+
+    for (const [serverKey, stats] of Object.entries(circuits)) {
+        const card = createCircuitCard(serverKey, stats);
+        grid.appendChild(card);
+    }
+}
+
+function createCircuitCard(serverKey, stats) {
+    const card = document.createElement('div');
+    card.className = `circuit-card ${stats.state}`;
+
+    // Calculate time since last failure
+    let timeSinceFailure = '-';
+    if (stats.last_failure_time > 0) {
+        const seconds = Math.floor(Date.now() / 1000 - stats.last_failure_time);
+        if (seconds < 60) {
+            timeSinceFailure = seconds + 's ago';
+        } else if (seconds < 3600) {
+            timeSinceFailure = Math.floor(seconds / 60) + 'm ago';
+        } else {
+            timeSinceFailure = Math.floor(seconds / 3600) + 'h ago';
+        }
+    }
+
+    // State display text and icon
+    let stateText, stateIcon;
+    switch (stats.state) {
+        case 'closed':
+            stateText = '正常';
+            stateIcon = 'fa-check-circle';
+            break;
+        case 'open':
+            stateText = '熔断';
+            stateIcon = 'fa-times-circle';
+            break;
+        case 'half_open':
+            stateText = '恢复中';
+            stateIcon = 'fa-sync-alt';
+            break;
+        default:
+            stateText = stats.state;
+            stateIcon = 'fa-question-circle';
+    }
+
+    card.innerHTML = `
+        <div class="circuit-server">
+            <span style="flex:1; overflow:hidden; text-overflow:ellipsis;">${serverKey}</span>
+            <span class="circuit-state ${stats.state}">
+                <i class="fas ${stateIcon}"></i>
+                ${stateText}
+            </span>
+        </div>
+        <div class="circuit-stats">
+            <div class="circuit-stat">
+                <div class="circuit-stat-value">${stats.failures}</div>
+                <div class="circuit-stat-label">连续失败</div>
+            </div>
+            <div class="circuit-stat">
+                <div class="circuit-stat-value">${stats.total_failures}</div>
+                <div class="circuit-stat-label">总失败数</div>
+            </div>
+            <div class="circuit-stat">
+                <div class="circuit-stat-value">${stats.total_circuit_opens}</div>
+                <div class="circuit-stat-label">熔断次数</div>
+            </div>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.6rem; color:var(--text-muted); margin-top:0.5rem;">
+            <span>总请求: ${stats.total_requests}</span>
+            <span>${stats.state === 'open' ? '最后失败: ' + timeSinceFailure : ''}</span>
+        </div>
+        <div class="circuit-actions">
+            <button onclick="resetCircuitBreaker('${serverKey}')" class="circuit-reset-btn" title="重置熔断器">
+                <i class="fas fa-undo"></i>
+                <span>重置</span>
+            </button>
+        </div>
+    `;
+
+    return card;
+}
+
+async function resetCircuitBreaker(serverKey) {
+    if (!confirm(`确定要重置服务器 "${serverKey}" 的熔断器状态吗？`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/reset-circuit-breaker', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ server_key: serverKey }),
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to reset circuit breaker');
+        }
+
+        // Refresh the stats
+        await loadCircuitBreakerStats();
+
+        // Show success message
+        showNotification(`熔断器 ${serverKey} 已重置`, 'success');
+
+    } catch (error) {
+        console.error('Error resetting circuit breaker:', error);
+        showNotification('重置熔断器失败', 'error');
+    }
+}
+
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 1rem;
+        right: 1rem;
+        padding: 0.75rem 1rem;
+        background: var(--bg-card);
+        border: 1px solid ${type === 'success' ? 'var(--status-success)' : type === 'error' ? 'var(--status-error)' : 'var(--accent)'};
+        color: ${type === 'success' ? 'var(--status-success)' : type === 'error' ? 'var(--status-error)' : 'var(--accent)'};
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.7rem;
+        z-index: 2000;
+        animation: slideIn 0.3s ease;
+    `;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        notification.style.transition = 'opacity 0.3s ease';
+        setTimeout(() => notification.remove(), 300);
+    }, 2000);
+}
 
 // Original functions
 function showEditLimit(apiKey, currentLimit) {

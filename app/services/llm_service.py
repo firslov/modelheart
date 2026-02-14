@@ -1,6 +1,7 @@
 import json
 from typing import Dict, Optional, Union, List
 from collections import defaultdict
+from urllib.parse import urlparse
 import time
 import socket
 
@@ -10,6 +11,7 @@ from fastapi import HTTPException
 from app.config.settings import settings
 from app.models.api_models import AppState
 from app.utils.logging_config import get_logger
+from app.utils.circuit_breaker import CircuitBreaker, CircuitState
 from app.database.database import get_db_session
 from app.database.models import LLMServer, ServerModel
 from app.database.repositories import LLMServerRepository
@@ -20,13 +22,27 @@ logger = get_logger(__name__)
 
 
 class LLMService:
-    """LLM服务管理类"""
+    """LLM服务管理类
+
+    集成了熔断器模式，防止上游服务故障导致级联失败。
+    """
 
     def __init__(self):
         self.http_client: Optional[httpx.AsyncClient] = None
         self.app_state = AppState()
         self._server_health = defaultdict(lambda: {"healthy": True, "last_check": 0})
         self._server_counters = defaultdict(int)
+
+        # 初始化熔断器
+        # 配置说明：
+        # - failure_threshold: 连续失败 5 次后触发熔断
+        # - recovery_timeout: 熔断后 30 秒尝试恢复
+        # - half_open_max_calls: 半开状态最多 3 个试探请求
+        self.circuit_breaker = CircuitBreaker(
+            failure_threshold=5,
+            recovery_timeout=30.0,
+            half_open_max_calls=3,
+        )
 
     async def initialize(self) -> None:
         """初始化HTTP客户端 - 针对云服务器环境优化"""
@@ -213,6 +229,8 @@ class LLMService:
     def get_target_server(self, model: str) -> str:
         """获取目标服务器，使用加权轮询负载均衡
 
+        结合熔断器状态，排除被熔断的服务器。
+
         Args:
             model: 模型名称
 
@@ -226,7 +244,8 @@ class LLMService:
         if not servers:
             raise HTTPException(400, f"Unsupported model: {model}")
 
-        healthy_servers = self._get_healthy_servers(servers)
+        # 使用熔断器感知的健康检查
+        healthy_servers = self._get_healthy_servers_with_circuit_breaker(servers)
 
         # 计算服务器权重
         weights = []
@@ -269,17 +288,55 @@ class LLMService:
         # 如果权重选择失败，回退到轮询
         return healthy_servers[self._server_counters[model] % len(healthy_servers)]
 
+    def _extract_server_key(self, target: str) -> str:
+        """从目标 URL 提取服务器标识（用于熔断器 key）
+
+        使用 netloc (host:port) 作为标识，忽略路径部分。
+        例如：https://api.example.com/v1/chat -> api.example.com
+        """
+        try:
+            parsed = urlparse(target)
+            return parsed.netloc or target
+        except Exception:
+            return target
+
     async def forward_request(
         self, target: str, data: Dict, headers: Dict, stream: bool = False
     ) -> Union[httpx.Response, str]:
-        """转发请求到目标服务器，如果model有映射关系，则使用映射后的模型名"""
+        """转发请求到目标服务器
+
+        集成熔断器保护，当上游服务故障时快速失败，防止级联错误。
+
+        Args:
+            target: 目标服务器 URL
+            data: 请求数据
+            headers: 请求头
+            stream: 是否为流式请求
+
+        Returns:
+            响应数据或流式客户端
+
+        Raises:
+            HTTPException: 当熔断器处于 OPEN 状态时抛出 503 错误
+        """
+        # 提取服务器标识用于熔断器
+        server_key = self._extract_server_key(target)
+
+        # 熔断器检查：如果服务器处于熔断状态，快速失败
+        if not await self.circuit_breaker.can_execute(server_key):
+            logger.warning(f"Circuit breaker OPEN for {server_key}, fast failing")
+            raise HTTPException(
+                status_code=503,
+                detail=f"Service temporarily unavailable (circuit open for {server_key})"
+            )
+
         # 监控并调整连接池
         await self._monitor_connection_pool()
 
+        # 处理模型名称映射
         if "model" in data and data["model"] in self.app_state.model_name_mapping:
             data = data.copy()
             model_info = self.app_state.model_name_mapping[data["model"]]
-            # 处理新旧格式兼容：如果是字符串直接使用，如果是对象则取name字段
             data["model"] = (
                 model_info if isinstance(model_info, str) else model_info["name"]
             )
@@ -299,78 +356,92 @@ class LLMService:
 
             response = await self.http_client.post(target, json=data, headers=headers)
             response.raise_for_status()
+
+            # 请求成功，更新健康状态和熔断器
             self._update_server_health(target, True)
+            await self.circuit_breaker.record_success(server_key)
+
             return response.text
 
         except httpx.HTTPStatusError as exc:
+            # 服务器错误（5xx）触发熔断记录
+            if exc.response.status_code >= 500:
+                await self.circuit_breaker.record_failure(server_key, exc)
+
             self._update_server_health(target, False)
             logger.error(f"HTTP {exc.response.status_code} for {target}")
 
-            # 仅在服务器错误时重建客户端（500+错误）
-            if exc.response.status_code >= 500:  # 服务器错误
-                if self.http_client:
-                    await self.http_client.aclose()
-                    await self.initialize()  # 重新初始化
-
             if stream:
                 return exc.response
-            return json.dumps(
-                {
-                    "error": f"LLM_SERVER 响应状态码 {exc.response.status_code}",
-                    "message": str(exc),
-                }
-            )
+            return json.dumps({
+                "error": f"LLM_SERVER 响应状态码 {exc.response.status_code}",
+                "message": str(exc),
+            })
 
         except httpx.RemoteProtocolError as exc:
+            # 连接协议错误，记录失败但不重建客户端
+            await self.circuit_breaker.record_failure(server_key, exc)
             self._update_server_health(target, False)
-            logger.warning(f"HTTP/2 connection terminated for {target}, recreating client: {exc}")
+            logger.warning(f"HTTP/2 connection terminated for {target}: {exc}")
 
-            # HTTP/2 连接被终止，重建客户端
-            if self.http_client:
-                try:
-                    await self.http_client.aclose()
-                except Exception:
-                    pass
-                await self.initialize()
-
-            # 流式请求需要让上层重试
             if stream:
                 raise
 
-            return json.dumps(
-                {"error": "与 LLM_SERVER 连接已断开，请重试", "message": str(exc)}
-            )
+            return json.dumps({
+                "error": "与 LLM_SERVER 连接已断开，请重试",
+                "message": str(exc),
+            })
 
-        except Exception as exc:
+        except httpx.ConnectError as exc:
+            # 连接错误（如 DNS 解析失败、连接拒绝等）
+            await self.circuit_breaker.record_failure(server_key, exc)
             self._update_server_health(target, False)
-            logger.error(f"Network error for {target}: {exc}")
-
-            if self.http_client:
-                await self.http_client.aclose()
-                self.http_client = httpx.AsyncClient(
-                    limits=httpx.Limits(
-                        max_connections=1000,
-                        max_keepalive_connections=100,
-                        keepalive_expiry=300,
-                    ),
-                    timeout=httpx.Timeout(
-                        connect=10.0, read=None, write=10.0, pool=10.0
-                    ),
-                    transport=httpx.AsyncHTTPTransport(
-                        retries=3,
-                        http2=True,
-                        socket_options=[
-                            (socket.IPPROTO_TCP, socket.TCP_NODELAY, 1),
-                            (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1),
-                        ],
-                    ),
-                )
+            logger.error(f"Connection error for {target}: {exc}")
 
             if stream:
-                return httpx.Response(status_code=500, text=str(exc))
-            return json.dumps(
-                {"error": "与 LLM_SERVER 通信时出现网络错误", "message": str(exc)}
-            )
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"Failed to connect to upstream server: {server_key}"
+                )
+
+            return json.dumps({
+                "error": "无法连接到 LLM_SERVER",
+                "message": str(exc),
+            })
+
+        except httpx.TimeoutException as exc:
+            # 请求超时
+            await self.circuit_breaker.record_failure(server_key, exc)
+            self._update_server_health(target, False)
+            logger.error(f"Request timeout for {target}: {exc}")
+
+            if stream:
+                raise HTTPException(
+                    status_code=504,
+                    detail=f"Upstream server timeout: {server_key}"
+                )
+
+            return json.dumps({
+                "error": "LLM_SERVER 请求超时",
+                "message": str(exc),
+            })
+
+        except Exception as exc:
+            # 其他未知错误
+            await self.circuit_breaker.record_failure(server_key, exc)
+            self._update_server_health(target, False)
+            logger.error(f"Unexpected error for {target}: {exc}", exc_info=True)
+
+            if stream:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Unexpected error: {str(exc)}"
+                )
+
+            return json.dumps({
+                "error": "与 LLM_SERVER 通信时出现未知错误",
+                "message": str(exc),
+            })
 
     def get_auth_header(self, model: str, api_key: str) -> Dict[str, str]:
         """生成认证头
@@ -386,3 +457,52 @@ class LLMService:
             "Authorization": f"Bearer {self.app_state.cloud_models.get(model, api_key)}",
             "Content-Type": "application/json",
         }
+
+    def _get_healthy_servers_with_circuit_breaker(self, servers: List[str]) -> List[str]:
+        """获取健康且未被熔断的服务器列表
+
+        结合传统的健康检查和熔断器状态来筛选可用服务器。
+
+        Args:
+            servers: 候选服务器列表
+
+        Returns:
+            可用的服务器列表
+        """
+        healthy_servers = self._get_healthy_servers(servers)
+        available_servers = []
+
+        for server in healthy_servers:
+            server_key = self._extract_server_key(server)
+            circuit_state = self.circuit_breaker.get_state(server_key)
+
+            # 排除熔断状态的服务器，保留半开状态（允许试探）
+            if circuit_state != CircuitState.OPEN:
+                available_servers.append(server)
+            else:
+                logger.debug(f"Server {server_key} is circuit-open, skipping")
+
+        # 如果没有可用服务器，降级返回所有服务器（避免完全不可用）
+        return available_servers or servers
+
+    def get_circuit_breaker_stats(self) -> Dict:
+        """获取熔断器统计信息（用于监控）
+
+        Returns:
+            包含所有熔断器状态的字典
+        """
+        return {
+            "config": self.circuit_breaker.get_config(),
+            "circuits": self.circuit_breaker.get_all_stats(),
+        }
+
+    async def reset_circuit_breaker(self, server_key: str = None):
+        """重置熔断器状态（用于运维操作）
+
+        Args:
+            server_key: 要重置的服务器标识，如果为 None 则重置所有
+        """
+        if server_key:
+            await self.circuit_breaker.reset(server_key)
+        else:
+            await self.circuit_breaker.reset_all()

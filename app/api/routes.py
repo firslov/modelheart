@@ -121,6 +121,61 @@ async def get_llm_servers(
         )
 
 
+@router.get("/circuit-breaker-stats")
+@admin_required
+async def get_circuit_breaker_stats(request: Request):
+    """获取熔断器状态（需要管理员权限）
+
+    返回所有服务器的熔断器状态，包括：
+    - 当前状态 (closed/open/half_open)
+    - 失败次数
+    - 最后失败时间
+    - 总请求数和失败数
+    """
+    try:
+        llm_service, _ = get_services(request)
+        return llm_service.get_circuit_breaker_stats()
+    except Exception as e:
+        import logging
+        logging.error(f"Error getting circuit breaker stats: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting circuit breaker stats: {str(e)}"
+        )
+
+
+@router.post("/reset-circuit-breaker")
+@admin_required
+async def reset_circuit_breaker(request: Request):
+    """重置熔断器状态（需要管理员权限）
+
+    用于手动恢复被熔断的服务器。
+
+    请求体：
+    {
+        "server_key": "api.example.com"  // 可选，不传则重置所有
+    }
+    """
+    try:
+        llm_service, _ = get_services(request)
+        data = await request.json() if request.headers.get("content-type") == "application/json" else {}
+        server_key = data.get("server_key")
+
+        await llm_service.reset_circuit_breaker(server_key)
+
+        return {
+            "status": "success",
+            "message": f"Circuit breaker reset for {'all servers' if not server_key else server_key}"
+        }
+    except Exception as e:
+        import logging
+        logging.error(f"Error resetting circuit breaker: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error resetting circuit breaker: {str(e)}"
+        )
+
+
 @router.post("/update-llm-servers")
 @admin_required
 async def update_llm_servers(
