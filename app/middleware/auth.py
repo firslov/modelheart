@@ -2,6 +2,9 @@ from functools import wraps
 from fastapi import HTTPException, Request
 from fastapi.responses import RedirectResponse
 import bcrypt
+import os
+
+from app.config.settings import settings
 
 
 def user_required(func):
@@ -57,10 +60,23 @@ def admin_required(func):
     return wrapper
 
 
-# 管理员凭据
-ADMIN_CREDENTIALS = {"admin": "admin123"}  # 实际应用中应使用更安全的密码存储方式
-
-
 def verify_admin(username: str, password: str) -> bool:
-    """验证管理员凭据"""
-    return ADMIN_CREDENTIALS.get(username) == password
+    """验证管理员凭据
+
+    使用 bcrypt 哈希验证，密码哈希从环境变量 ADMIN_PASSWORD_HASH 读取。
+    生成密码哈希的方式:
+        python -c "import bcrypt; print(bcrypt.hashpw(b'your_password', bcrypt.gensalt()).decode())"
+    """
+    # 检查用户名
+    if username != settings.ADMIN_USERNAME:
+        return False
+
+    # 检查密码哈希是否已配置
+    if not settings.ADMIN_PASSWORD_HASH:
+        return False
+
+    # 使用 bcrypt 验证密码
+    try:
+        return bcrypt.checkpw(password.encode(), settings.ADMIN_PASSWORD_HASH.encode())
+    except Exception:
+        return False

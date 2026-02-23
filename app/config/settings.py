@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     SESSION_COOKIE_SECURE: bool = ENV == "production"  # 仅在生产环境使用HTTPS
     SESSION_COOKIE_SAMESITE: str = "lax"  # Cookie SameSite策略
 
+    # 管理员凭据配置（从环境变量读取，更安全）
+    ADMIN_USERNAME: str = os.getenv("ADMIN_USERNAME", "admin")
+    # 密码哈希值（bcrypt），默认密码为空，生产环境必须设置
+    # 生成方式: python -c "import bcrypt; print(bcrypt.hashpw(b'your_password', bcrypt.gensalt()).decode())"
+    ADMIN_PASSWORD_HASH: str = os.getenv("ADMIN_PASSWORD_HASH", "")
+
     @property
     def HTTP_CLIENT_CONFIG(self) -> Dict[str, Any]:
         """HTTP客户端配置"""

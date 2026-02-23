@@ -6,6 +6,12 @@ PORT=${PORT:-8087}
 HOST=${HOST:-0.0.0.0}
 LOG_LEVEL=${LOG_LEVEL:-warning}  # 默认使用 warning，屏蔽 winch 信号日志
 
+# 加载 .env 文件（如果存在）
+if [ -f ".env" ]; then
+    echo "Loading environment from .env file..."
+    export $(grep -v '^#' .env | xargs)
+fi
+
 # 开发模式：单进程 + 热重载
 if [ "$DEV" = "1" ]; then
     echo "Starting Model Heart (DEV mode)..."
