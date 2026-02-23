@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Model Heart - LLM 大模型服务平台</title>
+    <title>Model Heart - LLM 大模型服务聚合平台</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230a0a0b' rx='4'/%3E%3Ctext x='16' y='22' font-family='JetBrains Mono, monospace' font-size='14' font-weight='500' fill='%2300f5d4' text-anchor='middle'%3EMH%3C/text%3E%3C/svg%3E" type="image/svg+xml">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -525,6 +525,328 @@
             color: var(--accent);
         }
 
+        /* 认证切换标签 */
+        .auth-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: 0.875rem 1rem;
+            background: var(--bg-secondary);
+            border: none;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            font-weight: 500;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-right: 1px solid var(--border);
+        }
+
+        .auth-tab:last-child {
+            border-right: none;
+        }
+
+        .auth-tab:hover {
+            background: var(--bg-card);
+            color: var(--text-secondary);
+        }
+
+        .auth-tab.active {
+            background: var(--accent-dim);
+            color: var(--accent);
+        }
+
+        /* 认证容器 - 左右分栏 */
+        .auth-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 3rem;
+        }
+
+        @media (max-width: 768px) {
+            .auth-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* 左侧特性面板 */
+        .auth-features {
+            padding: 2.5rem;
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-card) 100%);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+        }
+
+        @media (max-width: 768px) {
+            .auth-features {
+                display: none;
+            }
+        }
+
+        .auth-features-header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .auth-features-icon {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 1rem;
+            background: var(--accent-dim);
+            border: 2px solid var(--accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .auth-features-icon i {
+            font-size: 1.5rem;
+            color: var(--accent);
+        }
+
+        .auth-features-header h3 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .auth-features-header p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .auth-features-list {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .auth-features-simple {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .feature-simple {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: var(--bg-primary);
+            border-left: 2px solid var(--accent);
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .feature-simple i {
+            color: var(--accent);
+            font-size: 0.9rem;
+            width: 20px;
+            text-align: center;
+        }
+
+        /* 右侧表单面板 */
+        .auth-form-panel {
+            padding: 2.5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+
+        .form-label i {
+            color: var(--accent);
+            margin-right: 0.5rem;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 1rem 1.25rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            background: var(--bg-primary);
+        }
+
+        .form-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .auth-submit-btn {
+            width: 100%;
+            padding: 1rem;
+            background: var(--accent);
+            border: none;
+            color: var(--bg-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            margin-top: 0.5rem;
+        }
+
+        .auth-submit-btn:hover {
+            background: #00dfc7;
+            transform: translateY(-1px);
+        }
+
+        .auth-submit-btn:active {
+            transform: translateY(0);
+        }
+
+        .auth-footer {
+            text-align: center;
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border);
+            font-size: 0.85rem;
+        }
+
+        .auth-footer span {
+            color: var(--text-muted);
+        }
+
+        .auth-footer a {
+            color: var(--accent);
+            text-decoration: none;
+            margin-left: 0.25rem;
+            font-weight: 500;
+        }
+
+        .auth-footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* 登录成功状态 */
+        .user-success-state {
+            text-align: center;
+            padding: 2rem 0;
+        }
+
+        .user-avatar {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1.5rem;
+            background: var(--accent-dim);
+            border: 2px solid var(--accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .user-avatar i {
+            font-size: 2rem;
+            color: var(--accent);
+        }
+
+        .user-success-state h4 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.1rem;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .user-success-state p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .user-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+        }
+
+        .user-action-btn {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+
+        .user-action-btn:hover {
+            border-color: var(--accent);
+            background: var(--bg-card);
+        }
+
+        .user-action-btn.primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: var(--bg-primary);
+        }
+
+        .user-action-btn.primary:hover {
+            background: #00dfc7;
+        }
+
+        .user-action-btn i {
+            color: var(--accent);
+        }
+
+        .user-action-btn.primary i {
+            color: var(--bg-primary);
+        }
+
         /* 使用结果 */
         #usage_result {
             display: none;
@@ -1039,7 +1361,7 @@
         <!-- Header -->
         <header class="header">
             <h1 class="hero-title">MODEL HEART</h1>
-            <p class="hero-subtitle">LLM 大模型服务平台</p>
+            <p class="hero-subtitle">LLM 大模型服务聚合平台</p>
             <div class="hero-status">
                 <span class="hero-status-dot"></span>
                 <span class="hero-status-text">SYSTEM ONLINE</span>
@@ -1062,41 +1384,99 @@
             </button>
         </nav>
 
-        <!-- 01 密钥生成终端 -->
+        <!-- 01 用户认证 -->
         <section>
             <div class="section-header">
                 <span class="section-number">01</span>
-                <span class="section-title">KEY GENERATION TERMINAL</span>
+                <span class="section-title">USER AUTHENTICATION</span>
                 <div class="section-line"></div>
             </div>
 
-            <div class="card terminal-card">
-                <div class="terminal-header">
-                    <div class="terminal-dot red"></div>
-                    <div class="terminal-dot yellow"></div>
-                    <div class="terminal-dot green"></div>
-                    <div class="terminal-title">terminal</div>
+            <div class="auth-container">
+                <!-- 左侧：品牌信息 -->
+                <div class="auth-features">
+                    <div class="auth-features-header">
+                        <div class="auth-features-icon">
+                            <i class="fas fa-bolt"></i>
+                        </div>
+                        <h3>Model Heart</h3>
+                        <p>企业级大模型服务聚合平台</p>
+                    </div>
+                    <div class="auth-features-simple">
+                        <div class="feature-simple">
+                            <i class="fas fa-cube"></i>
+                            <span>支持 Claude / GPT / Gemini / Deepseek 等</span>
+                        </div>
+                        <div class="feature-simple">
+                            <i class="fas fa-code"></i>
+                            <span>支持 Claude Code / OpenCode / Kimi Code 等</span>
+                        </div>
+                        <div class="feature-simple">
+                            <i class="fas fa-shield-alt"></i>
+                            <span>OpenAI / Anthropic 兼容 API</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="terminal-body">
+
+                <!-- 右侧：登录/注册表单 -->
+                <div class="auth-form-panel">
                     <div id="message_area" class="message"></div>
 
-                    <div class="input-group">
-                        <input type="tel" id="phone_input" class="input-field" placeholder="手机号码">
-                        <input type="password" id="password_input" class="input-field" placeholder="登录密码">
+                    <!-- 登录/注册表单 -->
+                    <div id="auth_form">
+                        <!-- 模式切换 -->
+                        <div class="auth-tabs">
+                            <button class="auth-tab active" onclick="switchAuthMode('login')" id="login_tab">登录</button>
+                            <button class="auth-tab" onclick="switchAuthMode('register')" id="register_tab">注册</button>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label"><i class="fas fa-mobile-alt"></i> 手机号码</label>
+                            <input type="tel" id="phone_input" class="form-input" placeholder="请输入手机号">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label"><i class="fas fa-lock"></i> 密码</label>
+                            <input type="password" id="password_input" class="form-input" placeholder="请输入密码">
+                        </div>
+
+                        <!-- 确认密码 - 仅注册时显示 -->
+                        <div class="form-group" id="confirm_password_group" style="display: none;">
+                            <label class="form-label"><i class="fas fa-check-double"></i> 确认密码</label>
+                            <input type="password" id="confirm_password_input" class="form-input" placeholder="请再次输入密码">
+                        </div>
+
+                        <button onclick="handleAuth()" class="auth-submit-btn" id="auth_submit_btn">
+                            <i class="fas fa-sign-in-alt"></i>
+                            <span>登录</span>
+                        </button>
+
+                        <div class="auth-footer">
+                            <span id="auth_switch_text">还没有账号？</span>
+                            <a href="javascript:void(0)" onclick="switchAuthMode(authMode === 'login' ? 'register' : 'login')" id="auth_switch_link">立即注册</a>
+                        </div>
                     </div>
 
-                    <div class="button-group">
-                        <button onclick="generateApiKey()" class="btn">
-                            <i class="fas fa-key"></i>
-                            <span>生成密钥</span>
-                        </button>
-                        <button onclick="checkUsage()" class="btn">
-                            <i class="fas fa-chart-line"></i>
-                            <span>查询额度</span>
-                        </button>
+                    <!-- 登录成功后的用户信息 -->
+                    <div id="user_info" style="display: none;">
+                        <div class="user-success-state">
+                            <div class="user-avatar">
+                                <i class="fas fa-user-check"></i>
+                            </div>
+                            <h4>登录成功</h4>
+                            <p id="user_welcome_text">欢迎回来</p>
+                        </div>
+                        <div class="user-actions">
+                            <button onclick="goToUserPage()" class="user-action-btn primary">
+                                <i class="fas fa-chart-line"></i>
+                                <span>进入控制台</span>
+                            </button>
+                            <button onclick="userLogout()" class="user-action-btn">
+                                <i class="fas fa-sign-out-alt"></i>
+                                <span>退出登录</span>
+                            </button>
+                        </div>
                     </div>
-
-                    <div id="usage_result"></div>
                 </div>
             </div>
         </section>
@@ -1110,17 +1490,6 @@
             </div>
 
             <div class="info-grid">
-                <div class="info-card">
-                    <div>
-                        <div class="info-label">
-                            <i class="fas fa-key"></i>
-                            <span>API 密钥</span>
-                        </div>
-                        <div class="info-value" id="api_key_display">等待生成...</div>
-                    </div>
-                    <button onclick="copyToClipboard('api_key_display')" class="copy-btn">复制</button>
-                </div>
-
                 <div class="info-card">
                     <div>
                         <div class="info-label">
@@ -1274,34 +1643,45 @@
                         <li>高级模型（Claude、GPT-5等）需要更多积分</li>
                         <li>仅收取最低服务费用用于平台运营</li>
                         <li>积分根据实际模型定价进行换算</li>
-                        <li>付款时请务必注明注册手机号</li>
-                        <li>确认付款后 5-15 分钟内生效</li>
                     </ul>
-                </div>
-
-                <button onclick="showPaymentQR()" class="btn" style="width: 100%;">
-                    <i class="fas fa-qrcode"></i>
-                    <span>显示付款二维码</span>
-                </button>
-
-                <div id="paymentSection" style="display: none; margin-top: 1.5rem;">
-                    <div class="payment-info">
-                        <p style="color: #fbbf24;"><i class="fas fa-exclamation-triangle" style="margin-right: 0.5rem;"></i>重要：付款时请备注手机号</p>
-                        <div class="qr-code">
-                            <div style="background: var(--bg-primary); padding: 0.75rem; display: inline-block;">
-                                <img src="/static/wxtrade.jpg" alt="微信支付二维码" style="border: none;">
-                            </div>
-                            <p style="margin-top: 0.75rem; color: var(--text-secondary); font-size: 0.7rem;">扫码完成支付</p>
-                            <p style="font-size: 0.65rem; color: var(--text-muted);">支付后请等待 5-15 分钟生效</p>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        async function generateApiKey() {
+        // 当前认证模式
+        let authMode = 'login';
+
+        // 切换登录/注册模式
+        function switchAuthMode(mode) {
+            authMode = mode;
+            const loginTab = document.getElementById('login_tab');
+            const registerTab = document.getElementById('register_tab');
+            const confirmPasswordGroup = document.getElementById('confirm_password_group');
+            const submitBtn = document.getElementById('auth_submit_btn');
+            const switchText = document.getElementById('auth_switch_text');
+            const switchLink = document.getElementById('auth_switch_link');
+
+            if (mode === 'login') {
+                loginTab.classList.add('active');
+                registerTab.classList.remove('active');
+                confirmPasswordGroup.style.display = 'none';
+                submitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i><span>登录</span>';
+                switchText.textContent = '还没有账号？';
+                switchLink.textContent = '立即注册';
+            } else {
+                loginTab.classList.remove('active');
+                registerTab.classList.add('active');
+                confirmPasswordGroup.style.display = 'block';
+                submitBtn.innerHTML = '<i class="fas fa-user-plus"></i><span>注册</span>';
+                switchText.textContent = '已有账号？';
+                switchLink.textContent = '立即登录';
+            }
+        }
+
+        // 处理登录/注册
+        async function handleAuth() {
             const phone = document.getElementById('phone_input').value;
             const password = document.getElementById('password_input').value;
 
@@ -1318,89 +1698,107 @@
                 return;
             }
 
-            try {
-                const response = await fetch('/generate-api-key', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ phone, password }),
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.detail || `Server response error: ${response.status}`);
+            if (authMode === 'register') {
+                const confirmPassword = document.getElementById('confirm_password_input').value;
+                if (password !== confirmPassword) {
+                    showMessage('两次输入的密码不一致', true);
+                    return;
                 }
-
-                const data = await response.json();
-                if (data.error) {
-                    showMessage(data.error, true);
-                } else {
-                    const apiKey = data.api_key;
-                    document.getElementById('api_key_display').textContent = apiKey;
-                    showMessage('API密钥生成成功!');
-                }
-            } catch (error) {
-                console.error('Generating API key failed:', error);
-                showMessage('生成API密钥失败: ' + error.message, true);
+                await register(phone, password);
+            } else {
+                await login(phone, password);
             }
         }
 
-        async function checkUsage() {
-            const phone = document.getElementById('phone_input').value;
-            const password = document.getElementById('password_input').value;
-
-            if (!phone || !password) {
-                showMessage('请输入手机号和密码', true);
-                return;
-            }
-            if (!/^1[3-9]\d{9}$/.test(phone)) {
-                showMessage('请输入有效的手机号', true);
-                return;
-            }
-
+        // 用户注册
+        async function register(phone, password) {
             try {
-                const response = await fetch('/check-usage', {
+                const response = await fetch('/user/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ phone, password }),
+                    credentials: 'include',
                 });
 
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.detail || `Server response error: ${response.status}`);
-                }
-
                 const data = await response.json();
-                if (data.error) {
-                    showMessage(data.error, true);
-                } else {
-                    const apiKey = data.api_key;
-                    const usage = data.usage;
-                    const limit = data.limit;
-                    const remaining = data.remaining;
 
-                    document.getElementById('usage_result').innerHTML = `
-                        <div class="terminal-output">
-                            <div class="line">> AUTH_SUCCESS: ${phone}</div>
-                            <div class="line">> API_KEY: ${apiKey}</div>
-                            <div class="line">> USAGE: ${usage.toLocaleString()} / ${limit.toLocaleString()} credits</div>
-                            <div class="line success">> REMAINING: ${remaining.toLocaleString()} credits</div>
-                        </div>
-                    `;
-
-                    document.getElementById('usage_result').style.display = 'block';
-                    showMessage('ACCESS GRANTED');
+                if (!response.ok) {
+                    throw new Error(data.detail || `注册失败: ${response.status}`);
                 }
+
+                // 注册成功，直接跳转到用户页面
+                showMessage('注册成功！正在跳转...');
+                setTimeout(() => {
+                    window.location.replace('/user');
+                }, 500);
             } catch (error) {
-                console.error('Checking usage failed:', error);
-                showMessage('ACCESS DENIED: ' + error.message, true);
+                console.error('Registration failed:', error);
+                showMessage('注册失败: ' + error.message, true);
             }
         }
 
-        function copyToClipboard(elementId) {
-            const text = document.getElementById(elementId).innerText;
-            navigator.clipboard.writeText(text).then(() => {
-                showMessage('已复制到剪贴板!');
-            });
+        // 用户登录
+        async function login(phone, password) {
+            try {
+                const response = await fetch('/user/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone, password }),
+                    credentials: 'include',
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || `登录失败: ${response.status}`);
+                }
+
+                // 登录成功，直接跳转到用户页面
+                showMessage('登录成功！正在跳转...');
+                setTimeout(() => {
+                    window.location.replace('/user');
+                }, 500);
+            } catch (error) {
+                console.error('Login failed:', error);
+                showMessage('登录失败: ' + error.message, true);
+            }
+        }
+
+        // 显示用户信息（登录成功后）
+        function showUserInfo(phone) {
+            document.getElementById('auth_form').style.display = 'none';
+            document.getElementById('user_info').style.display = 'block';
+            document.getElementById('user_welcome_text').textContent = `欢迎，${phone}`;
+        }
+
+        // 进入用户页面
+        function goToUserPage() {
+            window.location.replace('/user');
+        }
+
+        // 用户退出登录
+        async function userLogout() {
+            try {
+                window.location.href = '/user/logout';
+            } catch (error) {
+                console.error('Logout failed:', error);
+                showMessage('退出失败，请重试', true);
+            }
+        }
+
+        // 检查登录状态
+        async function checkLoginStatus() {
+            try {
+                const response = await fetch('/user/info', {
+                    credentials: 'include'
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    showUserInfo(data.phone);
+                }
+            } catch (error) {
+                // 未登录，不处理
+            }
         }
 
         function copyToClipboardText(text) {
@@ -1538,10 +1936,6 @@
             document.getElementById('upgradeModal').classList.add('hidden');
         }
 
-        function showPaymentQR() {
-            document.getElementById('paymentSection').style.display = 'block';
-        }
-
         document.addEventListener('click', function (event) {
             const contactModal = document.getElementById('contactModal');
             const upgradeModal = document.getElementById('upgradeModal');
@@ -1558,7 +1952,10 @@
             }
         });
 
-        document.addEventListener('DOMContentLoaded', loadModels);
+        document.addEventListener('DOMContentLoaded', function() {
+            loadModels();
+            checkLoginStatus();
+        });
     </script>
 </body>
 </html>

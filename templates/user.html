@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户控制台 - Model Heart</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230a0a0b' rx='4'/%3E%3Ctext x='16' y='22' font-family='JetBrains Mono, monospace' font-size='14' font-weight='500' fill='%2300f5d4' text-anchor='middle'%3EMH%3C/text%3E%3C/svg%3E" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --bg-primary: #0a0a0b;
+            --bg-secondary: #111113;
+            --bg-card: #18181b;
+            --border: #27272a;
+            --border-hover: #3f3f46;
+            --accent: #00f5d4;
+            --accent-dim: rgba(0, 245, 212, 0.15);
+            --text-primary: #fafafa;
+            --text-secondary: #a1a1aa;
+            --text-muted: #71717a;
+            --grid-line: rgba(255, 255, 255, 0.02);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Noto Sans SC', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        /* 网格背景 */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                linear-gradient(var(--grid-line) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+            background-size: 60px 60px;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        /* 噪点纹理 */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+            opacity: 0.03;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        /* 环境光晕 */
+        .ambient-glow {
+            position: fixed;
+            width: 600px;
+            height: 600px;
+            border-radius: 50%;
+            background: radial-gradient(circle, var(--accent-dim) 0%, transparent 70%);
+            filter: blur(80px);
+            z-index: 0;
+            pointer-events: none;
+            animation: ambientFloat 30s ease-in-out infinite;
+        }
+
+        .ambient-glow-1 {
+            top: -200px;
+            right: -200px;
+        }
+
+        .ambient-glow-2 {
+            bottom: -200px;
+            left: -200px;
+            animation-delay: -15s;
+        }
+
+        @keyframes ambientFloat {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            25% { transform: translate(50px, 30px) scale(1.1); }
+            50% { transform: translate(20px, -40px) scale(0.9); }
+            75% { transform: translate(-30px, 20px) scale(1.05); }
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 2rem;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* 导航栏 */
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+        }
+
+        .navbar-logo {
+            width: 32px;
+            height: 32px;
+            background: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--bg-primary);
+        }
+
+        .navbar-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            letter-spacing: 0.05em;
+        }
+
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .navbar-time {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        .logout-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+
+        .logout-btn:hover {
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+
+        /* 章节标题 */
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .section-number {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--accent);
+            letter-spacing: 0.15em;
+        }
+
+        .section-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+        }
+
+        .section-line {
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        /* 卡片 */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 0;
+            background: var(--accent);
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .card:hover {
+            border-color: var(--border-hover);
+        }
+
+        .card:hover::before {
+            width: 3px;
+        }
+
+        /* API Key 卡片 */
+        .api-key-card {
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .api-key-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-bottom: 0.75rem;
+        }
+
+        .api-key-label i {
+            color: var(--accent);
+        }
+
+        .api-key-value {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+        }
+
+        .api-key-text {
+            flex: 1;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--accent);
+            word-break: break-all;
+        }
+
+        .copy-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 0.5rem 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .copy-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        /* 统计网格 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .stat-card {
+            padding: 1.25rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            position: relative;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 0;
+            background: var(--accent);
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .stat-card:hover::before {
+            width: 3px;
+        }
+
+        .stat-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label i {
+            color: var(--accent);
+            font-size: 0.75rem;
+        }
+
+        .stat-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .stat-unit {
+            font-size: 0.7rem;
+            font-weight: 400;
+            color: var(--text-muted);
+            margin-left: 0.25rem;
+        }
+
+        /* 进度条 */
+        .progress-container {
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            margin-bottom: 1rem;
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .progress-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+        }
+
+        .progress-percent {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--accent);
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), #00d4aa);
+            transition: width 0.5s ease;
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 0.75rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+
+        /* 模型使用表格 */
+        .model-table-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .model-table-header {
+            padding: 1rem 1.5rem;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.3s ease;
+        }
+
+        .model-table-header:hover {
+            background: var(--bg-card);
+        }
+
+        .model-table-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--text-primary);
+        }
+
+        .model-table-title i {
+            color: var(--accent);
+        }
+
+        .model-count-badge {
+            background: var(--accent-dim);
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            padding: 0.25rem 0.625rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            font-weight: 500;
+            border-radius: 2px;
+        }
+
+        .expand-icon {
+            color: var(--text-muted);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: 0.7rem;
+        }
+
+        .model-table-container.expanded .expand-icon {
+            transform: rotate(180deg);
+        }
+
+        .model-table-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .model-table-container.expanded .model-table-content {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .model-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .model-table th,
+        .model-table td {
+            padding: 0.875rem 1rem;
+            text-align: left;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .model-table th {
+            background: var(--bg-secondary);
+            color: var(--text-muted);
+            font-weight: 500;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .model-table td {
+            color: var(--text-secondary);
+        }
+
+        .model-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .model-table tr:hover td {
+            background: var(--bg-secondary);
+        }
+
+        .model-name-cell {
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .model-tag {
+            background: var(--accent-dim);
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            padding: 0.125rem 0.5rem;
+            font-size: 0.6rem;
+            border-radius: 2px;
+            text-transform: uppercase;
+        }
+
+        /* 空状态 */
+        .empty-state {
+            padding: 3rem;
+            text-align: center;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+        }
+
+        .empty-state i {
+            font-size: 2rem;
+            color: var(--border);
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        /* 快捷操作 */
+        .quick-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.875rem 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            text-decoration: none;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            font-weight: 500;
+            letter-spacing: 0.05em;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+
+        .action-btn:hover {
+            border-color: var(--accent);
+            background: var(--bg-secondary);
+        }
+
+        .action-btn i {
+            color: var(--accent);
+        }
+
+        /* 消息提示 */
+        .message {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            padding: 0.75rem 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            border-radius: 2px;
+            display: none;
+            z-index: 1000;
+            animation: fadeSlideDown 0.3s ease-out;
+        }
+
+        .message.success {
+            background: rgba(0, 245, 212, 0.1);
+            border: 1px solid var(--accent);
+            color: var(--accent);
+        }
+
+        .message.error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid #ef4444;
+            color: #ef4444;
+        }
+
+        /* 弹窗隐藏类 */
+        .modal.hidden {
+            display: none !important;
+        }
+
+        @keyframes fadeSlideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 滚动条 */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent);
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .container {
+                padding: 1.5rem;
+            }
+
+            .navbar {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: flex-start;
+            }
+
+            .navbar-right {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .quick-actions {
+                flex-direction: column;
+            }
+
+            .action-btn {
+                justify-content: center;
+            }
+
+            .model-table th,
+            .model-table td {
+                padding: 0.625rem 0.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="ambient-glow ambient-glow-1"></div>
+    <div class="ambient-glow ambient-glow-2"></div>
+
+    <div class="container">
+        <!-- 导航栏 -->
+        <nav class="navbar">
+            <a href="/" class="navbar-brand">
+                <div class="navbar-logo">MH</div>
+                <span class="navbar-title">用户控制台</span>
+            </a>
+            <div class="navbar-right">
+                <span class="navbar-time">{{ current_time }}</span>
+                <a href="/user/logout" class="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>退出登录</span>
+                </a>
+            </div>
+        </nav>
+
+        <!-- API Key 卡片 -->
+        <div class="section-header">
+            <span class="section-number">01</span>
+            <span class="section-title">API KEY</span>
+            <div class="section-line"></div>
+        </div>
+
+        <div class="card api-key-card">
+            <div class="api-key-label">
+                <i class="fas fa-key"></i>
+                <span>您的 API 密钥</span>
+            </div>
+            <div class="api-key-value">
+                <span class="api-key-text" id="api_key">{{ api_key }}</span>
+                <button onclick="copyApiKey()" class="copy-btn">
+                    <i class="fas fa-copy"></i> 复制
+                </button>
+            </div>
+        </div>
+
+        <!-- 用量统计 -->
+        <div class="section-header">
+            <span class="section-number">02</span>
+            <span class="section-title">USAGE STATISTICS</span>
+            <div class="section-line"></div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">
+                    <i class="fas fa-mobile-alt"></i>
+                    <span>手机号</span>
+                </div>
+                <div class="stat-value">{{ phone }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">
+                    <i class="fas fa-paper-plane"></i>
+                    <span>请求次数</span>
+                </div>
+                <div class="stat-value">{{ "{:,}".format(reqs) }}<span class="stat-unit">次</span></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>注册时间</span>
+                </div>
+                <div class="stat-value" style="font-size: 0.85rem;">{{ created_at }}</div>
+            </div>
+        </div>
+
+        <!-- 用量进度 -->
+        <div class="progress-container">
+            {% set usage_percent = (usage / limit * 100) if limit > 0 else 0 %}
+            {% set display_percent = usage_percent if usage_percent < 100 else 100 %}
+            <div class="progress-header">
+                <span class="progress-title"><i class="fas fa-chart-pie" style="color: var(--accent); margin-right: 0.5rem;"></i>积分使用</span>
+                <span class="progress-percent">{{ "{:.1f}".format(usage_percent) }}%</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: {{ "{:.1f}".format(display_percent) }}%;"></div>
+            </div>
+            <div class="progress-info">
+                <span>已使用: {{ "{:,}".format(usage|int) }}</span>
+                <span>剩余: {{ "{:,}".format(remaining|int) }}</span>
+                <span>总额度: {{ "{:,}".format(limit|int) }}</span>
+            </div>
+        </div>
+
+        <!-- 模型使用详情 -->
+        <div class="section-header">
+            <span class="section-number">03</span>
+            <span class="section-title">MODEL USAGE DETAILS</span>
+            <div class="section-line"></div>
+        </div>
+
+        <div class="model-table-container" id="model_table_container">
+            <div class="model-table-header" onclick="toggleModelTable()">
+                <div class="model-table-title">
+                    <i class="fas fa-cube"></i>
+                    <span>模型使用详情</span>
+                    <span class="model-count-badge">{{ model_usage|length }} 个模型</span>
+                </div>
+                <div class="expand-icon">
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+            </div>
+            <div class="model-table-content">
+                {% if model_usage and model_usage|length > 0 %}
+                <table class="model-table">
+                    <thead>
+                        <tr>
+                            <th>模型名称</th>
+                            <th>请求数</th>
+                            <th>Tokens</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mu in model_usage %}
+                        <tr>
+                            <td>
+                                <div class="model-name-cell">
+                                    <span>{{ mu.name }}</span>
+                                    {%- set model_name_lower = mu.name.lower() -%}
+                                    {%- if 'claude' in model_name_lower -%}
+                                        <span class="model-tag">Claude</span>
+                                    {%- elif 'gpt' in model_name_lower -%}
+                                        <span class="model-tag">GPT</span>
+                                    {%- elif 'llama' in model_name_lower -%}
+                                        <span class="model-tag">Llama</span>
+                                    {%- elif 'gemini' in model_name_lower -%}
+                                        <span class="model-tag">Gemini</span>
+                                    {%- elif 'deepseek' in model_name_lower -%}
+                                        <span class="model-tag">DeepSeek</span>
+                                    {%- elif 'qwen' in model_name_lower -%}
+                                        <span class="model-tag">Qwen</span>
+                                    {%- elif 'kimi' in model_name_lower -%}
+                                        <span class="model-tag">Kimi</span>
+                                    {%- elif 'grok' in model_name_lower -%}
+                                        <span class="model-tag">Grok</span>
+                                    {%- elif 'embedding' in model_name_lower -%}
+                                        <span class="model-tag">Embed</span>
+                                    {%- else -%}
+                                        <span class="model-tag">LLM</span>
+                                    {%- endif -%}
+                                </div>
+                            </td>
+                            <td>{{ "{:,}".format(mu.requests) }}</td>
+                            <td>{{ "{:,}".format(mu.tokens|int) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-inbox"></i>
+                    <p>暂无使用记录</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 快捷操作 -->
+        <div class="quick-actions">
+            <a href="/" class="action-btn">
+                <i class="fas fa-home"></i>
+                <span>返回首页</span>
+            </a>
+            <button onclick="showUpgradeModal()" class="action-btn">
+                <i class="fas fa-bolt"></i>
+                <span>升级额度</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 升级额度弹窗 -->
+    <div id="upgradeModal" class="modal hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 10, 11, 0.9); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 1.5rem;">
+        <div style="background: var(--bg-card); border: 1px solid var(--border); max-width: 450px; width: 100%;">
+            <div style="padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary);">
+                <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; font-weight: 500; color: var(--text-primary);">升级账户额度</span>
+                <button onclick="hideUpgradeModal()" style="background: transparent; border: 1px solid var(--border); color: var(--text-muted); cursor: pointer; padding: 0.375rem; font-size: 0.75rem;">X</button>
+            </div>
+            <div style="padding: 1.5rem;">
+                <div style="background: var(--bg-secondary); border: 1px solid var(--border); padding: 1rem; margin-bottom: 1rem;">
+                    <p style="color: var(--accent); font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; margin-bottom: 0.5rem;"><i class="fas fa-coins" style="margin-right: 0.5rem;"></i>兑换费率: 100 万积分 / ¥1</p>
+                </div>
+                <div style="background: var(--bg-secondary); border: 1px solid var(--border); padding: 1rem;">
+                    <ul style="list-style: none; padding: 0; margin: 0;">
+                        <li style="margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.75rem; padding-left: 1rem; position: relative;">高级模型（Claude、GPT-5等）需要更多积分</li>
+                        <li style="color: var(--text-secondary); font-size: 0.75rem; padding-left: 1rem; position: relative;">仅收取最低服务费用用于平台运营</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 消息提示 -->
+    <div id="message" class="message"></div>
+
+    <script>
+        function copyApiKey() {
+            const apiKey = document.getElementById('api_key').textContent;
+            navigator.clipboard.writeText(apiKey).then(() => {
+                showMessage('API Key 已复制到剪贴板');
+            }).catch(() => {
+                showMessage('复制失败，请手动复制', true);
+            });
+        }
+
+        function showMessage(message, isError) {
+            const messageEl = document.getElementById('message');
+            messageEl.textContent = message;
+            messageEl.className = isError ? 'message error' : 'message success';
+            messageEl.style.display = 'block';
+
+            setTimeout(() => {
+                messageEl.style.display = 'none';
+            }, 3000);
+        }
+
+        function toggleModelTable() {
+            const container = document.getElementById('model_table_container');
+            container.classList.toggle('expanded');
+        }
+
+        function showUpgradeModal() {
+            document.getElementById('upgradeModal').style.display = 'flex';
+        }
+
+        function hideUpgradeModal() {
+            document.getElementById('upgradeModal').style.display = 'none';
+        }
+
+        // 点击弹窗外部关闭
+        document.getElementById('upgradeModal').addEventListener('click', function(event) {
+            if (event.target === this) {
+                hideUpgradeModal();
+            }
+        });
+
+        // 默认展开模型表格
+        document.addEventListener('DOMContentLoaded', function() {
+            {% if model_usage and model_usage|length > 0 %}
+            document.getElementById('model_table_container').classList.add('expanded');
+            {% endif %}
+        });
+    </script>
+</body>
+</html>

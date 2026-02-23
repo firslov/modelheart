@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pathlib import Path
 
 from app.config.settings import settings
-from app.middleware.auth import admin_required, verify_admin
+from app.middleware.auth import admin_required, verify_admin, user_required, verify_user
 from app.models.api_models import ApiKeyUsage
 from app.models.queue_models import UsageEventData, UsageEventType
 from app.services.api_service import ApiService
@@ -321,6 +321,201 @@ async def logout(request: Request):
     """退出登录"""
     request.session.clear()
     return RedirectResponse(url="/")
+
+
+# ========================================
+# 用户认证路由
+# ========================================
+
+
+@router.post("/user/register")
+async def user_register(
+    request: Request,
+    session: AsyncSession = Depends(get_db_session),
+    api_key_repo: ApiKeyRepository = Depends(get_api_key_repo),
+):
+    """用户注册"""
+    try:
+        data = await request.json()
+        phone = data.get("phone", "")
+        password = data.get("password", "")
+
+        if not phone or not password:
+            raise HTTPException(status_code=400, detail="手机号和密码不能为空")
+
+        if not re.match(r"^1[3-9]\d{9}$", phone):
+            raise HTTPException(status_code=400, detail="请输入有效的手机号")
+
+        if len(password) < 6:
+            raise HTTPException(status_code=400, detail="密码长度至少6位")
+        if len(password) > 72:
+            raise HTTPException(status_code=400, detail="密码长度不能超过72个字符")
+
+        _, api_service = get_services(request)
+
+        # 检查是否已存在该手机号
+        existing_key = await api_key_repo.get_by_phone(phone)
+
+        if existing_key:
+            raise HTTPException(status_code=400, detail="该手机号已注册")
+
+        # 生成新的API密钥
+        new_key = await api_service.generate_api_key(session)
+
+        # 更新记录，添加手机号和密码
+        api_key_record = await api_key_repo.get_by_api_key(new_key)
+        if api_key_record:
+            api_key_record.phone = phone
+            api_key_record.password_hash = bcrypt.hashpw(
+                password.encode(), bcrypt.gensalt()
+            ).decode()
+            await session.commit()
+
+        # 设置session
+        request.session["user_authenticated"] = True
+        request.session["user_phone"] = phone
+        request.session["user_api_key"] = new_key
+
+        return {"status": "success", "api_key": new_key}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"User registration failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"注册失败: {str(e)}")
+
+
+@router.post("/user/login")
+async def user_login(
+    request: Request,
+    api_key_repo: ApiKeyRepository = Depends(get_api_key_repo),
+):
+    """用户登录"""
+    try:
+        data = await request.json()
+        phone = data.get("phone", "")
+        password = data.get("password", "")
+
+        if not phone or not password:
+            raise HTTPException(status_code=400, detail="手机号和密码不能为空")
+
+        if not re.match(r"^1[3-9]\d{9}$", phone):
+            raise HTTPException(status_code=400, detail="请输入有效的手机号")
+
+        # 检查用户是否存在
+        api_key_record = await api_key_repo.get_by_phone(phone)
+
+        if not api_key_record:
+            raise HTTPException(status_code=404, detail="用户不存在")
+
+        # 验证密码
+        if not api_key_record.password_hash:
+            raise HTTPException(status_code=401, detail="账户异常，请联系管理员")
+
+        if not verify_user(password, api_key_record.password_hash):
+            raise HTTPException(status_code=401, detail="密码错误")
+
+        # 设置session
+        request.session["user_authenticated"] = True
+        request.session["user_phone"] = phone
+        request.session["user_api_key"] = api_key_record.api_key
+
+        return {"status": "success", "redirect": "/user"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"User login failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"登录失败: {str(e)}")
+
+
+@router.get("/user/logout")
+async def user_logout(request: Request):
+    """用户退出登录"""
+    # 只清除用户相关的session
+    request.session.pop("user_authenticated", None)
+    request.session.pop("user_phone", None)
+    request.session.pop("user_api_key", None)
+    return RedirectResponse(url="/", status_code=303)
+
+
+@router.get("/user/info")
+async def get_user_info(
+    request: Request,
+    api_key_repo: ApiKeyRepository = Depends(get_api_key_repo),
+):
+    """获取用户信息"""
+    if not request.session.get("user_authenticated"):
+        raise HTTPException(status_code=401, detail="请先登录")
+
+    phone = request.session.get("user_phone")
+    if not phone:
+        raise HTTPException(status_code=401, detail="会话已过期，请重新登录")
+
+    api_key_record = await api_key_repo.get_by_phone_with_usages(phone)
+    if not api_key_record:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    # 获取模型使用统计
+    model_usage = {}
+    for mu in api_key_record.model_usages:
+        model_usage[mu.model_name] = {
+            "requests": mu.requests,
+            "tokens": mu.tokens
+        }
+
+    return {
+        "phone": api_key_record.phone,
+        "api_key": api_key_record.api_key,
+        "usage": api_key_record.usage or 0,
+        "limit": api_key_record.limit_value or 1000000,
+        "remaining": max(0, (api_key_record.limit_value or 1000000) - (api_key_record.usage or 0)),
+        "reqs": api_key_record.reqs or 0,
+        "created_at": api_key_record.created_at_str or (api_key_record.created_at.strftime("%Y-%m-%d %H:%M:%S") if api_key_record.created_at else None),
+        "model_usage": model_usage,
+    }
+
+
+@router.get("/user", response_class=HTMLResponse)
+@user_required
+async def user_page(
+    request: Request,
+    api_key_repo: ApiKeyRepository = Depends(get_api_key_repo),
+):
+    """用户页面"""
+    phone = request.session.get("user_phone")
+    if not phone:
+        return RedirectResponse(url="/", status_code=303)
+
+    api_key_record = await api_key_repo.get_by_phone_with_usages(phone)
+    if not api_key_record:
+        request.session.clear()
+        return RedirectResponse(url="/", status_code=303)
+
+    # 获取模型使用统计
+    model_usage = []
+    for mu in api_key_record.model_usages:
+        model_usage.append({
+            "name": mu.model_name,
+            "requests": mu.requests,
+            "tokens": mu.tokens
+        })
+
+    return templates.TemplateResponse(
+        "user.html",
+        {
+            "request": request,
+            "phone": api_key_record.phone,
+            "api_key": api_key_record.api_key,
+            "usage": api_key_record.usage or 0,
+            "limit": api_key_record.limit_value or 1000000,
+            "remaining": max(0, (api_key_record.limit_value or 1000000) - (api_key_record.usage or 0)),
+            "reqs": api_key_record.reqs or 0,
+            "created_at": api_key_record.created_at_str or (api_key_record.created_at.strftime("%Y-%m-%d %H:%M:%S") if api_key_record.created_at else "未知"),
+            "model_usage": model_usage,
+            "current_time": get_current_time(),
+        },
+    )
 
 
 @router.post("/generate-api-key")

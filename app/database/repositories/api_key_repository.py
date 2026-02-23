@@ -42,6 +42,22 @@ class ApiKeyRepository(BaseRepository[ApiKey]):
         )
         return result.scalar_one_or_none()
 
+    async def get_by_phone_with_usages(self, phone: str) -> Optional[ApiKey]:
+        """通过手机号查询记录，预加载 model_usages 关系
+
+        Args:
+            phone: 手机号
+
+        Returns:
+            ApiKey对象（含model_usages），不存在时返回None
+        """
+        result = await self.session.execute(
+            select(ApiKey)
+            .options(selectinload(ApiKey.model_usages))
+            .where(ApiKey.phone == phone)
+        )
+        return result.scalar_one_or_none()
+
     async def update_usage(self, api_key: str, usage_delta: float) -> bool:
         """原子增量更新usage字段
 

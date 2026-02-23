@@ -24,13 +24,13 @@ class Settings(BaseSettings):
     READ_TIMEOUT: float = 300.0  # 读取超时时间
 
     # 环境配置
-    ENV: str = os.getenv("ENV", "production")  # 环境: development/production
+    ENV: str = os.getenv("ENV", "development")  # 环境: development/production
 
     # Session配置
     SESSION_SECRET_KEY: str = os.getenv(
         "SESSION_SECRET_KEY", "your-secret-key-here"
     )  # 从环境变量获取密钥
-    SESSION_MAX_AGE: int = 3600  # session过期时间(秒)
+    SESSION_MAX_AGE: int = 86400  # session过期时间(秒)，24小时
     SESSION_COOKIE_SECURE: bool = ENV == "production"  # 仅在生产环境使用HTTPS
     SESSION_COOKIE_SAMESITE: str = "lax"  # Cookie SameSite策略
 
