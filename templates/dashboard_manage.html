@@ -829,6 +829,90 @@
         }
 
         /* ========================================
+           模型用量详情
+           ======================================== */
+
+        .model-usage-details {
+            margin-top: 0.75rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .model-usage-table-wrapper {
+            overflow-x: auto;
+            max-height: 200px;
+        }
+
+        .model-usage-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.65rem;
+        }
+
+        .model-usage-table thead {
+            position: sticky;
+            top: 0;
+            background: var(--bg-card);
+            z-index: 10;
+        }
+
+        .model-usage-table th {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-align: left;
+            padding: 0.5rem 0.625rem;
+            border-bottom: 1px solid var(--border);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            white-space: nowrap;
+        }
+
+        .model-usage-table td {
+            padding: 0.375rem 0.625rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+
+        .model-usage-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .model-usage-table tr:hover td {
+            background: var(--bg-card);
+        }
+
+        .model-usage-table .model-name {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-primary);
+            max-width: 180px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .model-usage-table .numeric {
+            text-align: right;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .model-usage-table .tokens {
+            color: var(--accent);
+        }
+
+        .model-usage-summary {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0.625rem;
+            background: var(--bg-card);
+            border-top: 1px solid var(--border);
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* ========================================
            模态框
            ======================================== */
 

@@ -1281,7 +1281,7 @@ async def anthropic_options_handler():
 async def anthropic_proxy_handler(
     request: Request, session: AsyncSession = Depends(get_db_session)
 ):
-    """Anthropic API转发处理 - 不记录token使用，但统计请求数量"""
+    """Anthropic API转发处理 - 按请求数和模型权重计算用量"""
     llm_service, api_service = get_services(request)
     usage_queue = get_usage_queue(request)
 
@@ -1301,6 +1301,9 @@ async def anthropic_proxy_handler(
 
     # 获取目标服务器
     target_server = llm_service.get_target_server(model)
+
+    # 获取模型权重（用于用量计算）
+    input_weight, output_weight = await api_service._get_model_weights(model, session)
 
     # 记录请求日志
     masked_key = f"{api_key[:8]}...{api_key[-4:]}"
@@ -1344,6 +1347,8 @@ async def anthropic_proxy_handler(
                                 event_type=UsageEventType.UPDATE_ANTHROPIC_USAGE,
                                 api_key=api_key,
                                 model=model,
+                                input_token_weight=input_weight,
+                                output_token_weight=output_weight,
                             )
                         )
                         await usage_queue.enqueue(
@@ -1396,12 +1401,14 @@ async def anthropic_proxy_handler(
             # 普通响应成功
             logger.info(f"anthropic response completed | model={model} | key={masked_key}")
 
-            # 将统计事件加入队列 - Anthropic 只记录请求次数
+            # 将统计事件加入队列 - Anthropic 按请求数和权重计算用量
             await usage_queue.enqueue(
                 UsageEventData(
                     event_type=UsageEventType.UPDATE_ANTHROPIC_USAGE,
                     api_key=api_key,
                     model=model,
+                    input_token_weight=input_weight,
+                    output_token_weight=output_weight,
                 )
             )
             await usage_queue.enqueue(

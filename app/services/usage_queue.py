@@ -295,7 +295,8 @@ class UsageQueue:
     ) -> None:
         """批量处理 UPDATE_ANTHROPIC_USAGE 事件
 
-        Anthropic 接口不计算 token 用量，只增加请求计数。
+        Anthropic 接口用量计算公式：
+        用量 = 请求数 × max(输入权重, 输出权重)
         """
         # 创建Repository实例
         api_key_repo = ApiKeyRepository(session, ApiKey)
@@ -312,30 +313,43 @@ class UsageQueue:
             if not api_key_record:
                 continue
 
-            # 只更新请求计数和时间
+            # 更新请求计数和时间
             api_key_record.reqs += len(key_events)
             api_key_record.last_used = datetime.now()
             api_key_record.last_used_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-            # 按模型更新统计
-            model_requests: Dict[str, int] = defaultdict(int)
+            # 按模型分组计算用量
+            # 每个事件：用量 = 1 × max(input_weight, output_weight)
+            model_updates: Dict[str, Dict[str, float]] = defaultdict(
+                lambda: {"tokens": 0, "requests": 0}
+            )
+
             for event in key_events:
                 if event.model:
-                    model_requests[event.model] += 1
+                    # 计算单次请求的用量
+                    usage_per_request = max(event.input_token_weight, event.output_token_weight)
+                    model_updates[event.model]["tokens"] += usage_per_request
+                    model_updates[event.model]["requests"] += 1
 
-            for model_name, request_count in model_requests.items():
+            # 计算总用量
+            total_usage = sum(m["tokens"] for m in model_updates.values())
+            api_key_record.usage += total_usage
+
+            # 更新模型使用统计
+            for model_name, model_data in model_updates.items():
                 model_usage = await model_usage_repo.get_for_update(api_key_record.id, model_name)
 
                 if not model_usage:
                     model_usage = ModelUsage(
                         api_key_id=api_key_record.id,
                         model_name=model_name,
-                        requests=request_count,
-                        tokens=0,  # Anthropic 不计算 token
+                        requests=int(model_data["requests"]),
+                        tokens=model_data["tokens"],
                     )
                     session.add(model_usage)
                 else:
-                    model_usage.requests += request_count
+                    model_usage.requests += int(model_data["requests"])
+                    model_usage.tokens += model_data["tokens"]
 
     async def _process_increment_model_reqs(
         self, session: AsyncSessionLocal, events: List[UsageEventData]

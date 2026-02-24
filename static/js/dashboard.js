@@ -939,28 +939,26 @@ async function toggleModelUsage(apiKey) {
 
 function createModelUsageDetails(modelUsage) {
     const details = document.createElement('div');
-    details.className = 'model-usage-details mt-3 bg-gray-50 rounded-lg border border-gray-200';
+    details.className = 'model-usage-details';
 
     // Create a scrollable container for the table
     const tableContainer = document.createElement('div');
-    tableContainer.className = 'overflow-x-auto max-h-64 custom-scrollbar';
+    tableContainer.className = 'model-usage-table-wrapper';
 
     const table = document.createElement('table');
-    table.className = 'w-full text-xs min-w-full';
+    table.className = 'model-usage-table';
 
     const header = document.createElement('thead');
-    header.className = 'sticky top-0 bg-gray-100 z-10';
     header.innerHTML = `
         <tr>
-            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider border-b">Model</th>
-            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider border-b">Requests</th>
-            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider border-b">Tokens</th>
-            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider border-b">Avg/Req</th>
+            <th>Model</th>
+            <th>Requests</th>
+            <th>Tokens</th>
+            <th>Avg/Req</th>
         </tr>
     `;
 
     const body = document.createElement('tbody');
-    body.className = 'bg-white divide-y divide-gray-200';
 
     // Sort models by usage (highest tokens first)
     const sortedModels = Object.entries(modelUsage).sort((a, b) => b[1].tokens - a[1].tokens);
@@ -970,13 +968,13 @@ function createModelUsageDetails(modelUsage) {
         const avgTokens = usage.requests > 0 ? (usage.tokens / usage.requests).toFixed(1) : '0';
 
         // Truncate long model names
-        const displayModel = model.length > 20 ? model.substring(0, 17) + '...' : model;
+        const displayModel = model.length > 25 ? model.substring(0, 22) + '...' : model;
 
         row.innerHTML = `
-            <td class="px-2 py-1 whitespace-nowrap font-medium text-gray-900" title="${model}">${displayModel}</td>
-            <td class="px-2 py-1 whitespace-nowrap text-gray-500 text-right">${usage.requests}</td>
-            <td class="px-2 py-1 whitespace-nowrap text-gray-500 text-right">${usage.tokens.toFixed(0)}</td>
-            <td class="px-2 py-1 whitespace-nowrap text-gray-500 text-right">${avgTokens}</td>
+            <td class="model-name" title="${model}">${displayModel}</td>
+            <td class="numeric">${usage.requests}</td>
+            <td class="numeric tokens">${usage.tokens.toFixed(0)}</td>
+            <td class="numeric">${avgTokens}</td>
         `;
         body.appendChild(row);
     });
@@ -987,17 +985,15 @@ function createModelUsageDetails(modelUsage) {
     details.appendChild(tableContainer);
 
     // Add summary row if there are many models
-    if (sortedModels.length > 5) {
+    if (sortedModels.length > 3) {
         const totalRequests = sortedModels.reduce((sum, [_, usage]) => sum + usage.requests, 0);
         const totalTokens = sortedModels.reduce((sum, [_, usage]) => sum + usage.tokens, 0);
 
         const summaryDiv = document.createElement('div');
-        summaryDiv.className = 'px-3 py-2 bg-gray-100 border-t border-gray-200 text-xs text-gray-600';
+        summaryDiv.className = 'model-usage-summary';
         summaryDiv.innerHTML = `
-            <div class="flex justify-between">
-                <span>Total: ${sortedModels.length} models</span>
-                <span>${totalRequests} requests, ${totalTokens.toFixed(0)} tokens</span>
-            </div>
+            <span>Total: ${sortedModels.length} models</span>
+            <span>${totalRequests} reqs · ${totalTokens.toFixed(0)} tokens</span>
         `;
         details.appendChild(summaryDiv);
     }
