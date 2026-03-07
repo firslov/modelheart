@@ -552,7 +552,7 @@ class ApiService:
 
         try:
             # 先删除所有现有服务器配置（使用Repository的delete_all方法）
-            llm_server_repo.delete_all()
+            await llm_server_repo.delete_all()
 
             # 添加新的服务器配置
             for server_url, server_data in servers_data.items():

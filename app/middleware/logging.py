@@ -56,13 +56,13 @@ class RequestTrackingMiddleware(BaseHTTPMiddleware):
 
 
 class DetailedRequestLoggingMiddleware(BaseHTTPMiddleware):
-    """详细请求日志中间件
+    """请求日志中间件
 
-    记录每个请求的详细信息，帮助排查问题：
-    - 请求方法、路径、客户端IP
-    - User-Agent
+    记录每个请求的关键信息：
+    - 请求方法、路径
     - 响应状态码
     - 请求处理时间
+    - 客户端IP（用于安全审计）
     """
 
     def __init__(self, app: ASGIApp, log_level: str = "INFO"):
@@ -72,34 +72,13 @@ class DetailedRequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         start_time = time.time()
 
-        # 获取客户端信息
+        # 获取客户端IP（用于安全审计）
         client_host = request.client.host if request.client else "unknown"
-        client_port = request.client.port if request.client else 0
 
-        # 获取 User-Agent
-        user_agent = request.headers.get("user-agent", "unknown")
-        referer = request.headers.get("referer", "-")
-        authorization = request.headers.get("authorization", "")
-
-        # 构建 authorization 的脱敏显示
-        auth_display = "-"
-        if authorization:
-            parts = authorization.split(" ", 1)
-            if len(parts) == 2:
-                auth_type, token = parts
-                if len(token) > 12:
-                    auth_display = f"{auth_type} {token[:8]}...{token[-4:]}"
-                else:
-                    auth_display = f"{auth_type} ***"
-            else:
-                auth_display = "***"
-
-        # 记录请求开始
-        logger.info(
-            f"Request started | {request.method} {request.url.path} | "
-            f"client={client_host}:{client_port} | ua=\"{user_agent[:100]}\" | "
-            f"auth={auth_display} | referer={referer[:100]}"
-        )
+        # 只记录 API 请求（静态资源不记录）
+        path = request.url.path
+        if path.startswith("/static/") or path == "/favicon.ico":
+            return await call_next(request)
 
         try:
             # 处理请求
@@ -108,10 +87,9 @@ class DetailedRequestLoggingMiddleware(BaseHTTPMiddleware):
             # 计算处理时间
             process_time = time.time() - start_time
 
-            # 记录请求完成
+            # 简化日志：只保留关键信息
             logger.info(
-                f"Request completed | {request.method} {request.url.path} | "
-                f"status={response.status_code} | duration={process_time:.3f}s"
+                f"{request.method} {path} | {response.status_code} | {process_time:.3f}s | {client_host}"
             )
 
             return response
@@ -120,9 +98,38 @@ class DetailedRequestLoggingMiddleware(BaseHTTPMiddleware):
             # 计算处理时间
             process_time = time.time() - start_time
 
-            # 记录请求异常
-            logger.error(
-                f"Request failed | {request.method} {request.url.path} | "
-                f"error={type(e).__name__}: {str(e)[:100]} | duration={process_time:.3f}s"
-            )
+            # 收集错误排查关键信息
+            error_info = {
+                "type": type(e).__name__,
+                "message": str(e)[:200] if str(e) else "No message",
+            }
+
+            # 根据错误类型添加额外信息
+            if hasattr(e, "status_code"):
+                error_info["status_code"] = e.status_code
+
+            # 添加请求上下文信息（帮助复现问题）
+            context_info = {
+                "query_params": dict(request.query_params) if request.query_params else None,
+                "content_type": request.headers.get("content-type"),
+            }
+
+            # 构建详细错误日志
+            log_parts = [
+                f"{request.method} {path}",
+                f"ERROR",
+                f"{process_time:.3f}s",
+                f"{client_host}",
+                f"{error_info['type']}: {error_info['message']}",
+            ]
+
+            # 添加状态码（如果有）
+            if "status_code" in error_info:
+                log_parts.insert(2, f"status={error_info['status_code']}")
+
+            # 添加上下文（如果有助于排查）
+            if context_info["query_params"]:
+                log_parts.append(f"query={context_info['query_params']}")
+
+            logger.error(" | ".join(log_parts))
             raise

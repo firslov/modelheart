@@ -39,44 +39,30 @@
 ### 环境要求
 
 - Python 3.8+
-- SQLite数据库（内置）
+- SQLite（内置）
 
 ### 安装部署
 
 ```bash
-# 1. 克隆项目
-git clone <repository-url>
-cd myapi
-
-# 2. 安装依赖
+# 安装依赖
 pip install -r requirements.txt
 
-# 3. 初始化数据库
+# 初始化数据库
 python scripts/init_database.py
 
-# 4. 启动服务
-./start.sh
+# 启动服务
+./start.sh                    # 生产环境（多进程）
+DEV=1 ./start.sh             # 开发环境（单进程+热重载）
 ```
 
-服务启动后访问：**<http://localhost:8087>**
+访问：**<http://localhost:8087>**
 
-### 启动说明
+### 启动参数
 
-| 模式 | 命令 | 说明 |
-|------|------|------|
-| 生产环境 | `./start.sh` | 多进程，高性能（默认） |
-| 开发环境 | `DEV=1 ./start.sh` | 单进程 + 热重载 |
-
-可选参数：
 ```bash
-# 自定义 worker 数量
-WORKERS=8 ./start.sh
-
-# 自定义端口
-PORT=9000 ./start.sh
-
-# 调整日志级别
-LOG_LEVEL=debug ./start.sh
+WORKERS=8 ./start.sh         # 自定义 worker 数量
+PORT=9000 ./start.sh         # 自定义端口
+LOG_LEVEL=debug ./start.sh   # 调整日志级别
 ```
 
 推荐安装高性能依赖：
@@ -87,39 +73,39 @@ pip install uvloop httptools gunicorn
 ### 生产环境
 
 ```bash
-# 使用systemd服务管理
-sudo cp scripts/myapi.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable myapi
-sudo systemctl start myapi
+# 安装高性能依赖（推荐）
+pip install uvloop httptools gunicorn
 
-# 或使用docker（推荐）
-docker build -t model-heart .
-docker run -d -p 8087:8087 --name model-heart model-heart
+# 启动服务
+./start.sh
 ```
 
-## 📋 API接口
+## 📋 API 接口
 
-### 🔑 用户接口
+### 用户接口
+- `GET /` - 用户注册页面
+- `POST /generate-api-key` - 生成API密钥
+- `POST /check-usage` - 查询使用额度
 
-- `GET /` - 用户注册页面，生成API密钥
-- `POST /generate-api-key` - 生成新API密钥（需手机号+密码）
-- `POST /check-usage` - 查询个人使用额度
-
-### 🛠️ 管理接口
-
-- `GET /login` - 管理员登录页面
-- `GET /dashboard` - 管理控制台（需要认证）
-- `GET /models` - 获取所有可用模型列表
-- `GET /get-llm-servers` - 获取LLM服务器配置
+### 管理接口
+- `GET /login` - 管理员登录
+- `GET /dashboard` - 管理控制台
+- `GET /models` - 获取模型列表
 - `POST /update-llm-servers` - 更新服务器配置
 
-### 🤖 LLM转发接口
+### LLM转发接口
 
-- `POST /v1/chat/completions` - OpenAI兼容聊天接口
-- `POST /v1/completions` - OpenAI兼容文本补全
-- `POST /v1/embeddings` - OpenAI兼容向量化接口
-- `POST /anthropic/v1/messages` - Anthropic原生接口
+| Endpoint | 请求格式 | 用量计算 | 适用场景 |
+|----------|---------|---------|---------|
+| `/v1/chat/completions` | OpenAI | Token × 权重 | OpenAI API |
+| `/v1/completions` | OpenAI | Token × 权重 | OpenAI API |
+| `/v1/embeddings` | OpenAI | Token × 权重 | OpenAI Embeddings |
+| `/anthropic/v1/messages` | Anthropic | 请求数 × max(输入权重, 输出权重) | Anthropic API |
+| `/coding` | OpenAI | 请求数 × max(输入权重, 输出权重) | 智谱AI、通义千问等 |
+
+**用量计算示例：**
+- OpenAI: `(输入Token × 输入权重) + (输出Token × 输出权重)`
+- Anthropic/Coding: `请求数 × max(输入权重, 输出权重)`
 
 ## 🏗️ 系统架构
 
@@ -140,28 +126,22 @@ myapi/
 └── requirements.txt       # Python依赖包列表
 ```
 
-## ⚙️ 配置说明
+## ⚙️ 配置
 
 ### 环境变量
 
 ```bash
-# 必需配置
-export SESSION_SECRET_KEY="your-secret-key-here"  # Session加密密钥
-
-# 可选配置
-export DEFAULT_LIMIT=1000000                        # 默认用户Token限额
-export ENV=production                               # 运行环境（development/production）
+export SESSION_SECRET_KEY="your-secret-key-here"  # Session加密密钥（必需）
+export DEFAULT_LIMIT=1000000                      # 默认用户Token限额
+export ENV=production                             # 运行环境
 ```
 
-### 数据库设计
+### 数据库表结构
 
-- **存储引擎**：SQLite（轻量化，易部署）
-- **ORM框架**：SQLAlchemy 2.0（异步支持）
-- **核心表**：
-  - `api_keys` - API密钥和用户信息
-  - `llm_servers` - LLM服务器配置
-  - `server_models` - 模型映射关系
-  - `model_usage` - 使用统计记录
+- `api_keys` - API密钥和用户信息
+- `llm_servers` - LLM服务器配置
+- `server_models` - 模型映射关系
+- `model_usage` - 使用统计记录
 
 ## 🎯 使用场景
 

@@ -177,10 +177,13 @@ class LLMService:
                 "enabled": True,  # 默认启用
             }
 
-            # 手动构建模型映射 - 现在key是前端使用的模型名称，value是包含后端模型名称和token权重的对象
+            # 手动构建模型映射 - 优先使用新字段，兼容旧字段
             for model in server.models:
-                server_config["model"][model.actual_model_name] = {
-                    "name": model.client_model_name,
+                frontend_name = model.frontend_model_name or model.actual_model_name
+                backend_name = model.backend_model_name or model.client_model_name
+                
+                server_config["model"][frontend_name] = {
+                    "name": backend_name,
                     "input_token_weight": model.input_token_weight or 1.0,
                     "output_token_weight": model.output_token_weight or 1.0,
                 }

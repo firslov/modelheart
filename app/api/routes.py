@@ -1490,3 +1490,198 @@ async def anthropic_proxy_handler(
     except Exception as e:
         logger.error(f"anthropic error: {e}", exc_info=True)
         return JSONResponse({"error": "Internal server error"}, status_code=500)
+
+
+# ========================================
+# Coding endpoint - OpenAI格式 + Anthropic用量统计
+# ========================================
+
+
+@router.options("/coding")
+@router.options("/coding/chat/completions")
+async def coding_options_handler():
+    """处理 /coding OPTIONS 请求"""
+    return Response(status_code=200)
+
+
+@router.post("/coding")
+@router.post("/coding/chat/completions")
+async def coding_proxy_handler(
+    request: Request, session: AsyncSession = Depends(get_db_session)
+):
+    """Coding API转发处理 - OpenAI格式请求 + Anthropic用量统计
+    
+    特点：
+    - 请求格式：兼容 /v1/chat/completions
+    - 用量统计：按请求数 × 权重，不统计token（与 /anthropic 相同）
+    - 适用场景：智谱AI等按请求计费的OpenAI兼容API
+    
+    用量计算公式：
+    单次请求用量 = max(input_token_weight, output_token_weight)
+    """
+    llm_service, api_service = get_services(request)
+    usage_queue = get_usage_queue(request)
+
+    # 身份验证 - 同时支持 x-api-key 和 Authorization: Bearer
+    api_key = request.headers.get("x-api-key", "")
+    
+    if not api_key:
+        auth_header = request.headers.get("Authorization", "")
+        _, _, api_key = auth_header.partition(" ")
+
+    if not api_key:
+        raise HTTPException(status_code=401, detail="Invalid API Key")
+
+    # 验证API密钥有效性和用量限额
+    await api_service.validate_api_key(api_key, session)
+    await api_service.check_usage_limit(api_key, session)
+
+    # 请求处理
+    req_data = await request.json()
+    model = req_data.get("model")
+
+    # 获取目标服务器
+    target_server = llm_service.get_target_server(model)
+    
+    # 获取模型权重（用于Anthropic方式用量计算）
+    input_weight, output_weight = await api_service._get_model_weights(model, session)
+
+    # 记录请求日志
+    masked_key = f"{api_key[:8]}...{api_key[-4:]}"
+    logger.info(f"coding request | model={model} | key={masked_key} | server={target_server}")
+
+    # 构建目标URL - 去掉 /coding 前缀，保留后续路径
+    original_path = request.url.path
+    if original_path.startswith("/coding/"):
+        path = original_path.replace("/coding", "", 1)
+    else:
+        path = "/chat/completions"
+    target = f"{target_server}{path}"
+
+    # 构造请求头 - 使用 OpenAI 兼容格式
+    upstream_api_key = llm_service.app_state.cloud_models.get(model, api_key)
+    headers = {
+        "Authorization": f"Bearer {upstream_api_key}",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        # 流式响应处理
+        if req_data.get("stream", False):
+            async def stream_wrapper():
+                max_retries = 1
+
+                for attempt in range(max_retries + 1):
+                    try:
+                        client_stream = await llm_service.forward_request(
+                            target, req_data, headers, stream=True
+                        )
+
+                        async with client_stream as response:
+                            async for chunk in response.aiter_text():
+                                yield chunk
+
+                        # 流式响应成功完成
+                        logger.info(f"coding stream completed | model={model} | key={masked_key}")
+                        
+                        # 使用 Anthropic 方式统计用量（按请求数，不统计token）
+                        await usage_queue.enqueue(
+                            UsageEventData(
+                                event_type=UsageEventType.UPDATE_ANTHROPIC_USAGE,
+                                api_key=api_key,
+                                model=model,
+                                server_url=target_server,
+                                input_token_weight=input_weight,
+                                output_token_weight=output_weight,
+                            )
+                        )
+                        await usage_queue.enqueue(
+                            UsageEventData(
+                                event_type=UsageEventType.INCREMENT_MODEL_REQS,
+                                api_key=api_key,
+                                model=model,
+                                server_url=target_server,
+                            )
+                        )
+                        break  # 成功完成
+
+                    except httpx.RemoteProtocolError as exc:
+                        logger.warning(
+                            f"Stream connection error (attempt {attempt + 1}/{max_retries + 1}) model={model}: {exc}"
+                        )
+                        if attempt < max_retries:
+                            await asyncio.sleep(0.5)
+                            continue
+                        else:
+                            error_data = {
+                                "error": {
+                                    "message": f"上游服务连接中断: {str(exc)}",
+                                    "type": "connection_error",
+                                    "code": "connection_terminated"
+                                }
+                            }
+                            yield f"data: {json.dumps(error_data)}\n\n"
+                            yield "data: [DONE]\n\n"
+
+                    except Exception as exc:
+                        logger.error(f"Stream error model={model}: {exc}")
+                        error_data = {
+                            "error": {
+                                "message": f"流式响应错误: {str(exc)}",
+                                "type": "stream_error"
+                            }
+                        }
+                        yield f"data: {json.dumps(error_data)}\n\n"
+                        yield "data: [DONE]\n\n"
+
+            return StreamingResponse(
+                stream_wrapper(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "X-Accel-Buffering": "no",
+                },
+            )
+
+        # 普通响应处理
+        response_text = await llm_service.forward_request(target, req_data, headers)
+
+        try:
+            response = json.loads(response_text)
+
+            # 普通响应成功
+            logger.info(f"coding response completed | model={model} | key={masked_key}")
+
+            # 使用 Anthropic 方式统计用量（按请求数，不统计token）
+            await usage_queue.enqueue(
+                UsageEventData(
+                    event_type=UsageEventType.UPDATE_ANTHROPIC_USAGE,
+                    api_key=api_key,
+                    model=model,
+                    server_url=target_server,
+                    input_token_weight=input_weight,
+                    output_token_weight=output_weight,
+                )
+            )
+            await usage_queue.enqueue(
+                UsageEventData(
+                    event_type=UsageEventType.INCREMENT_MODEL_REQS,
+                    api_key=api_key,
+                    model=model,
+                    server_url=target_server,
+                )
+            )
+
+            return JSONResponse(response)
+        except json.JSONDecodeError as e:
+            return JSONResponse(
+                {"error": "Invalid response from upstream server", "message": str(e)},
+                status_code=500,
+            )
+
+    except HTTPException as e:
+        return JSONResponse({"error": str(e.detail)}, status_code=e.status_code)
+    except Exception as e:
+        logger.error(f"coding error: {e}", exc_info=True)
+        return JSONResponse({"error": "Internal server error"}, status_code=500)
