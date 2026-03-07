@@ -1285,9 +1285,13 @@ async def anthropic_proxy_handler(
     llm_service, api_service = get_services(request)
     usage_queue = get_usage_queue(request)
 
-    # 身份验证 - 验证API密钥存在
-    auth_header = request.headers.get("Authorization", "")
-    _, _, api_key = auth_header.partition(" ")
+    # 身份验证 - 同时支持 x-api-key 和 Authorization: Bearer 两种认证方式
+    api_key = request.headers.get("x-api-key", "")
+
+    # 如果没有 x-api-key，尝试从 Authorization: Bearer 获取
+    if not api_key:
+        auth_header = request.headers.get("Authorization", "")
+        _, _, api_key = auth_header.partition(" ")
 
     if not api_key:
         raise HTTPException(status_code=401, detail="Invalid API Key")
@@ -1316,9 +1320,11 @@ async def anthropic_proxy_handler(
     else:
         target = f"{target_server}"
 
-    # 构造请求头 - 使用Anthropic格式的认证头
+    # 构造请求头 - 同时提供 x-api-key 和 Authorization: Bearer 两种认证方式
+    upstream_api_key = llm_service.app_state.cloud_models.get(model, api_key)
     headers = {
-        "Authorization": f"Bearer {llm_service.app_state.cloud_models.get(model, api_key)}",
+        "x-api-key": upstream_api_key,
+        "Authorization": f"Bearer {upstream_api_key}",
         "Content-Type": "application/json",
         "anthropic-version": "2023-06-01",  # 添加Anthropic版本头
     }
