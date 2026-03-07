@@ -59,6 +59,11 @@ class Settings(BaseSettings):
     HEALTH_CHECK_INTERVAL: int = 60  # 健康检查间隔时间(秒)
     MAX_RETRIES: int = 3  # HTTP请求最大重试次数
 
+    # API Key 缓存配置
+    API_KEY_CACHE_TTL: int = 300  # API Key 缓存有效期（秒），默认5分钟
+    USAGE_CACHE_TTL: int = 60  # 用量缓存有效期（秒），默认1分钟
+    MAX_CACHE_SIZE: int = 10000  # 最大缓存条目数
+
     class Config:
         case_sensitive = True
 

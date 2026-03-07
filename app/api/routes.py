@@ -31,6 +31,7 @@ from app.database.repositories import (
     get_api_key_repo,
     ApiKeyRepository,
 )
+from app.utils.response_cache import response_cache
 import bcrypt
 
 logger = get_logger(__name__)
@@ -97,6 +98,9 @@ async def _handle_llm_server_action(request, api_service, data, session: AsyncSe
     # 重新初始化LLM资源
     llm_service = request.app.state.app.llm_service
     await llm_service.init_llm_resources_from_db(session)
+
+    # 使模型列表缓存失效
+    llm_service.invalidate_models_cache()
 
     return {"status": "success"}
 
@@ -203,10 +207,10 @@ async def update_llm_servers(
 async def list_models(
     request: Request, session: AsyncSession = Depends(get_db_session)
 ):
-    """Get available models list - 使用数据库数据优化性能"""
+    """Get available models list - 使用缓存优化性能"""
     try:
-        _, api_service = get_services(request)
-        config = await api_service.load_llm_servers(session)
+        llm_service, _ = get_services(request)
+        config = await llm_service.get_cached_models(session)
 
         models = []
         for server_url, server_info in config.items():
@@ -245,10 +249,10 @@ def get_usage_queue(request: Request):
 
 @router.get("/get-models")
 async def get_models(request: Request, session: AsyncSession = Depends(get_db_session)):
-    """获取可用的模型列表 - 使用数据库数据优化性能"""
+    """获取可用的模型列表 - 使用缓存优化性能"""
     try:
-        _, api_service = get_services(request)
-        config = await api_service.load_llm_servers(session)
+        llm_service, _ = get_services(request)
+        config = await llm_service.get_cached_models(session)
 
         # 获取所有活跃模型
         models = []
@@ -649,6 +653,10 @@ async def update_api_key_limit(
     # 提交事务
     await session.commit()
 
+    # 使API Key缓存失效
+    _, api_service = get_services(request)
+    await api_service.invalidate_api_key_cache(api_key)
+
     return {"status": "success"}
 
 
@@ -673,6 +681,10 @@ async def reset_api_key_usage(
     # 提交事务
     await session.commit()
 
+    # 使API Key缓存失效
+    _, api_service = get_services(request)
+    await api_service.invalidate_api_key_cache(api_key)
+
     return {"status": "success"}
 
 
@@ -696,6 +708,10 @@ async def revoke_api_key(
 
     # 提交事务
     await session.commit()
+
+    # 使API Key缓存失效
+    _, api_service = get_services(request)
+    await api_service.invalidate_api_key_cache(api_key)
 
     return {"status": "success"}
 
@@ -1053,7 +1069,7 @@ async def proxy_handler_chat(
 async def proxy_handler_embeddings(
     request: Request, session: AsyncSession = Depends(get_db_session)
 ):
-    """处理embeddings请求转发"""
+    """处理embeddings请求转发（带响应缓存）"""
     llm_service, api_service = get_services(request)
     usage_queue = get_usage_queue(request)
 
@@ -1067,6 +1083,37 @@ async def proxy_handler_embeddings(
     req_data = await request.json()
     model = req_data.get("model")
 
+    # 尝试从缓存获取（仅对非流式请求启用缓存）
+    if not req_data.get("stream", False):
+        cached_response = await response_cache.get(req_data)
+        if cached_response:
+            logger.debug(f"embeddings cache hit | model={model}")
+            # 更新用量统计（即使命中缓存也要记录）
+            target_server = llm_service.get_target_server(model)
+            input_weight, output_weight = await api_service._get_model_weights(model, session)
+            if "usage" in cached_response and "prompt_tokens" in cached_response["usage"]:
+                await usage_queue.enqueue(
+                    UsageEventData(
+                        event_type=UsageEventType.UPDATE_USAGE,
+                        api_key=api_key,
+                        model=model,
+                        server_url=target_server,
+                        prompt_tokens=cached_response["usage"]["prompt_tokens"],
+                        completion_tokens=0,
+                        input_token_weight=input_weight,
+                        output_token_weight=output_weight,
+                    )
+                )
+            await usage_queue.enqueue(
+                UsageEventData(
+                    event_type=UsageEventType.INCREMENT_MODEL_REQS,
+                    api_key=api_key,
+                    model=model,
+                    server_url=target_server,
+                )
+            )
+            return JSONResponse(cached_response)
+
     # 获取目标服务器
     target_server = llm_service.get_target_server(model)
     target = f"{target_server}{request.url.path.replace('/v1', '', 1)}"
@@ -1078,6 +1125,11 @@ async def proxy_handler_embeddings(
         # 转发请求
         response_text = await llm_service.forward_request(target, req_data, headers)
         response = json.loads(response_text)
+
+        # 缓存响应（仅缓存非流式请求）
+        if not req_data.get("stream", False):
+            await response_cache.set(req_data, response)
+            logger.debug(f"embeddings cache set | model={model}")
 
         # 获取模型权重
         input_weight, output_weight = await api_service._get_model_weights(model, session)

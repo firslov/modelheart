@@ -1,10 +1,12 @@
 import os
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy import event
 from app.config.settings import settings
 from app.database.models import Base
 
 # 数据库文件路径 - 使用app/database目录下的数据库
-DATABASE_URL = f"sqlite+aiosqlite:///{os.path.join(settings.BASE_DIR, 'app', 'database', 'myapi.db')}"
+DATABASE_PATH = os.path.join(settings.BASE_DIR, 'app', 'database', 'myapi.db')
+DATABASE_URL = f"sqlite+aiosqlite:///{DATABASE_PATH}"
 
 # 创建异步引擎
 # SQLite连接池配置：
@@ -22,6 +24,23 @@ engine = create_async_engine(
         "check_same_thread": False,  # 允许多线程访问（FastAPI异步场景需要）
     },
 )
+
+
+@event.listens_for(engine.sync_engine, "connect")
+def set_sqlite_pragma(dbapi_conn, connection_record):
+    """设置SQLite性能优化参数
+
+    启用WAL模式提升并发性能：
+    - WAL (Write-Ahead Logging) 允许读取和写入并发执行
+    - 写入不阻塞读取，适合读多写少场景
+    - 提升并发吞吐量
+    """
+    cursor = dbapi_conn.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA synchronous=NORMAL")  # 平衡性能和数据安全
+    cursor.execute("PRAGMA cache_size=10000")  # 增加缓存页数
+    cursor.execute("PRAGMA temp_store=MEMORY")  # 临时表存储在内存
+    cursor.close()
 
 # 创建异步会话工厂
 AsyncSessionLocal = async_sessionmaker(

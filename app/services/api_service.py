@@ -1,8 +1,10 @@
+import asyncio
 from typing import Dict, Optional, List
 import json
 import os
 import time
 from datetime import datetime
+from collections import OrderedDict
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, and_
 from fastapi import HTTPException
@@ -47,6 +49,18 @@ class ApiService:
         self._stats_cache = None  # 统计缓存
         self._stats_last_updated = 0
 
+        # API Key 缓存 - 使用 OrderedDict 实现 LRU
+        # 格式: {api_key: {"valid": bool, "limit": float, "usage": float, "timestamp": float}}
+        self._api_key_cache: OrderedDict[str, Dict] = OrderedDict()
+        self._api_key_cache_ttl = getattr(settings, 'API_KEY_CACHE_TTL', 300)  # 默认5分钟
+        self._api_key_cache_max_size = getattr(settings, 'MAX_CACHE_SIZE', 10000)  # 最大缓存条目
+        self._api_key_cache_lock = asyncio.Lock()  # 线程安全锁
+
+        # 用量缓存 - 用于 check_usage_limit
+        # 格式: {api_key: {"usage": float, "limit": float, "timestamp": float}}
+        self._usage_cache: Dict[str, Dict] = {}
+        self._usage_cache_ttl = getattr(settings, 'USAGE_CACHE_TTL', 60)  # 默认1分钟
+
     def _get_api_key_repo(self, session: AsyncSession) -> ApiKeyRepository:
         """获取ApiKeyRepository实例"""
         return ApiKeyRepository(session, ApiKey)
@@ -64,7 +78,9 @@ class ApiService:
         return ModelUsageRepository(session, ModelUsage)
 
     async def validate_api_key(self, api_key: str, session: AsyncSession) -> None:
-        """验证API密钥
+        """验证API密钥（带缓存优化）
+
+        优先从缓存验证，缓存未命中时查询数据库并写入缓存。
 
         Args:
             api_key: API密钥
@@ -77,11 +93,38 @@ class ApiService:
             if not api_key:
                 raise HTTPException(401, "Invalid API Key")
 
+            # 1. 检查缓存
+            current_time = time.time()
+            async with self._api_key_cache_lock:
+                cached = self._api_key_cache.get(api_key)
+                if cached and current_time - cached["timestamp"] < self._api_key_cache_ttl:
+                    # 缓存命中，移动到末尾（LRU）
+                    self._api_key_cache.move_to_end(api_key)
+                    if not cached["valid"]:
+                        raise HTTPException(401, "Invalid API Key")
+                    return
+
+            # 2. 缓存未命中，查询数据库
             api_key_repo = self._get_api_key_repo(session)
             api_key_record = await api_key_repo.get_by_api_key(api_key)
 
+            # 3. 写入缓存
+            async with self._api_key_cache_lock:
+                # LRU 淘汰
+                if len(self._api_key_cache) >= self._api_key_cache_max_size:
+                    self._api_key_cache.popitem(last=False)
+
+                self._api_key_cache[api_key] = {
+                    "valid": api_key_record is not None,
+                    "limit": float(api_key_record.limit_value) if api_key_record else 0,  # type: ignore
+                    "usage": float(api_key_record.usage) if api_key_record else 0,  # type: ignore
+                    "timestamp": current_time
+                }
+                self._api_key_cache.move_to_end(api_key)
+
             if not api_key_record:
                 raise HTTPException(401, "Invalid API Key")
+
         except HTTPException:
             raise
         except Exception as e:
@@ -91,7 +134,9 @@ class ApiService:
             raise HTTPException(500, "Internal server error during API key validation")
 
     async def check_usage_limit(self, api_key: str, session: AsyncSession) -> None:
-        """检查使用限额
+        """检查使用限额（带缓存优化）
+
+        优先从缓存检查，缓存未命中或接近限额时查询数据库。
 
         Args:
             api_key: API密钥
@@ -101,11 +146,47 @@ class ApiService:
             HTTPException: 超出使用限额
         """
         try:
+            current_time = time.time()
+
+            # 1. 检查 API Key 缓存
+            async with self._api_key_cache_lock:
+                cached = self._api_key_cache.get(api_key)
+                if cached and current_time - cached["timestamp"] < self._api_key_cache_ttl:
+                    # 缓存命中
+                    if cached["usage"] >= cached["limit"]:
+                        raise HTTPException(402, "Usage limit exceeded")
+                    # 如果用量超过 90% 限额，强制刷新缓存（避免超额）
+                    if cached["usage"] >= cached["limit"] * 0.9:
+                        pass  # 继续查询数据库刷新
+                    else:
+                        return
+
+            # 2. 缓存未命中或接近限额，查询数据库
             api_key_repo = self._get_api_key_repo(session)
             api_key_record = await api_key_repo.get_by_api_key(api_key)
 
-            if api_key_record and api_key_record.usage >= api_key_record.limit_value:
+            if not api_key_record:
+                # API Key 不存在，让 validate_api_key 处理
+                return
+
+            usage = float(api_key_record.usage)
+            limit = float(api_key_record.limit_value)
+
+            # 更新缓存
+            async with self._api_key_cache_lock:
+                if len(self._api_key_cache) >= self._api_key_cache_max_size:
+                    self._api_key_cache.popitem(last=False)
+                self._api_key_cache[api_key] = {
+                    "valid": True,
+                    "limit": limit,
+                    "usage": usage,
+                    "timestamp": current_time
+                }
+                self._api_key_cache.move_to_end(api_key)
+
+            if usage >= limit:
                 raise HTTPException(402, "Usage limit exceeded")
+
         except HTTPException:
             raise
         except Exception as e:
@@ -113,6 +194,22 @@ class ApiService:
             import logging
             logging.error(f"Database error in check_usage_limit: {e}")
             raise HTTPException(500, "Internal server error during usage limit check")
+
+    async def invalidate_api_key_cache(self, api_key: str) -> None:
+        """使指定 API Key 的缓存失效
+
+        在密钥更新、删除、重置时调用。
+
+        Args:
+            api_key: API密钥
+        """
+        async with self._api_key_cache_lock:
+            self._api_key_cache.pop(api_key, None)
+
+    async def clear_api_key_cache(self) -> None:
+        """清空所有 API Key 缓存"""
+        async with self._api_key_cache_lock:
+            self._api_key_cache.clear()
 
     async def generate_api_key(self, session: AsyncSession) -> str:
         """生成新的API密钥

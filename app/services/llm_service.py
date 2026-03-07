@@ -48,6 +48,12 @@ class LLMService:
         # 连接池调整锁，防止并发调整
         self._pool_adjustment_lock = asyncio.Lock()
 
+        # 模型列表缓存
+        self._models_cache: Optional[Dict] = None
+        self._models_cache_time: float = 0
+        self._models_cache_ttl = 60  # 1分钟TTL
+        self._models_cache_lock = asyncio.Lock()
+
     async def initialize(self) -> None:
         """初始化HTTP客户端 - 针对云服务器环境优化"""
         self.http_client = httpx.AsyncClient(
@@ -212,6 +218,80 @@ class LLMService:
                     self.app_state.model_mapping[model].append(server)
                     if "apikey" in config:
                         self.app_state.cloud_models[model] = config["apikey"]
+
+    async def get_cached_models(self, session: AsyncSession) -> Dict:
+        """获取缓存的模型列表
+
+        使用内存缓存减少数据库查询次数，TTL为1分钟。
+
+        Args:
+            session: 数据库会话
+
+        Returns:
+            服务器配置数据
+        """
+        current_time = time.time()
+
+        async with self._models_cache_lock:
+            # 缓存有效，直接返回
+            if (self._models_cache is not None and
+                current_time - self._models_cache_time < self._models_cache_ttl):
+                logger.debug("Models cache hit")
+                return self._models_cache
+
+        # 缓存过期或不存在，从数据库加载
+        logger.debug("Models cache miss, loading from database")
+        config = await self.load_llm_servers_from_db(session)
+
+        # 更新缓存
+        async with self._models_cache_lock:
+            self._models_cache = config
+            self._models_cache_time = current_time
+
+        return config
+
+    def invalidate_models_cache(self) -> None:
+        """使模型列表缓存失效
+
+        在LLM服务器配置变更时调用。
+        """
+        self._models_cache = None
+        self._models_cache_time = 0
+        logger.debug("Models cache invalidated")
+
+    async def load_llm_servers_from_db(self, session: AsyncSession) -> Dict:
+        """从数据库加载LLM服务器配置（供缓存使用）
+
+        Args:
+            session: 数据库会话
+
+        Returns:
+            服务器配置数据
+        """
+        llm_server_repo = LLMServerRepository(session, LLMServer)
+        servers = await llm_server_repo.get_all_with_models()
+
+        servers_data = {}
+        for server in servers:
+            server_config = {
+                "server_url": server.server_url,
+                "model": {},
+                "apikey": server.apikey,
+                "device": server.device,
+                "enabled": True,
+            }
+
+            for model in server.models:
+                server_config["model"][model.actual_model_name] = {
+                    "name": model.client_model_name,
+                    "input_token_weight": model.input_token_weight or 1.0,
+                    "output_token_weight": model.output_token_weight or 1.0,
+                    "status": model.status,
+                }
+
+            servers_data[server.server_url] = server_config
+
+        return servers_data
 
     def _update_server_health(self, server: str, is_healthy: bool) -> None:
         """更新服务器健康状态"""
