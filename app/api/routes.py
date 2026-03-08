@@ -901,6 +901,7 @@ async def proxy_handler_chat(
     # 身份验证
     auth_header = request.headers.get("Authorization", "")
     _, _, api_key = auth_header.partition(" ")
+
     await api_service.validate_api_key(api_key, session)
     await api_service.check_usage_limit(api_key, session)
 
@@ -1337,13 +1338,16 @@ async def anthropic_proxy_handler(
     llm_service, api_service = get_services(request)
     usage_queue = get_usage_queue(request)
 
-    # 身份验证 - 同时支持 x-api-key 和 Authorization: Bearer 两种认证方式
-    api_key = request.headers.get("x-api-key", "")
-
-    # 如果没有 x-api-key，尝试从 Authorization: Bearer 获取
-    if not api_key:
-        auth_header = request.headers.get("Authorization", "")
+    # 身份验证 - 优先使用 Authorization: Bearer，其次 x-api-key
+    api_key = ""
+    auth_header = request.headers.get("Authorization", "")
+    
+    if auth_header.startswith("Bearer "):
         _, _, api_key = auth_header.partition(" ")
+    
+    # 如果没有 Authorization，再尝试 x-api-key
+    if not api_key:
+        api_key = request.headers.get("x-api-key", "")
 
     if not api_key:
         raise HTTPException(status_code=401, detail="Invalid API Key")
@@ -1522,12 +1526,16 @@ async def coding_proxy_handler(
     llm_service, api_service = get_services(request)
     usage_queue = get_usage_queue(request)
 
-    # 身份验证 - 同时支持 x-api-key 和 Authorization: Bearer
-    api_key = request.headers.get("x-api-key", "")
-    
-    if not api_key:
-        auth_header = request.headers.get("Authorization", "")
+    # 身份验证 - 优先使用 Authorization: Bearer，其次 x-api-key
+    api_key = ""
+    auth_header = request.headers.get("Authorization", "")
+
+    if auth_header.startswith("Bearer "):
         _, _, api_key = auth_header.partition(" ")
+
+    # 如果没有 Authorization，再尝试 x-api-key
+    if not api_key:
+        api_key = request.headers.get("x-api-key", "")
 
     if not api_key:
         raise HTTPException(status_code=401, detail="Invalid API Key")
