@@ -665,6 +665,37 @@
             text-align: center;
         }
 
+        .config-btn {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            margin-top: auto;
+            background: var(--accent);
+            border: none;
+            color: var(--bg-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+
+        .config-btn:hover {
+            background: #00dfc7;
+            transform: translateY(-1px);
+        }
+
+        .config-btn:active {
+            transform: translateY(0);
+        }
+
+        .config-btn i {
+            font-size: 0.9rem;
+        }
+
         /* 右侧表单面板 */
         .auth-form-panel {
             padding: 2.5rem;
@@ -1393,16 +1424,13 @@
             </div>
 
             <div class="auth-container">
-                <!-- 左侧：品牌信息 -->
+                <!-- 左侧：特性信息 -->
                 <div class="auth-features">
-                    <div class="auth-features-header">
-                        <div class="auth-features-icon">
-                            <i class="fas fa-bolt"></i>
-                        </div>
-                        <h3>Model Heart</h3>
-                        <p>企业级大模型服务聚合平台</p>
-                    </div>
                     <div class="auth-features-simple">
+                        <div class="feature-simple">
+                            <i class="fas fa-desktop"></i>
+                            <span>支持 Chatbox / Cherry Studio / Dify 等</span>
+                        </div>
                         <div class="feature-simple">
                             <i class="fas fa-cube"></i>
                             <span>支持 Claude / GPT / Gemini / Deepseek 等</span>
@@ -1415,7 +1443,16 @@
                             <i class="fas fa-shield-alt"></i>
                             <span>OpenAI / Anthropic 兼容 API</span>
                         </div>
+                        <div class="feature-simple">
+                            <i class="fas fa-vector-square"></i>
+                            <span>支持 Embedding Model</span>
+                        </div>
                     </div>
+                    <!-- 配置说明按钮 -->
+                    <button onclick="showConfigModal()" class="config-btn">
+                        <i class="fas fa-cog"></i>
+                        <span>配置说明</span>
+                    </button>
                 </div>
 
                 <!-- 右侧：登录/注册表单 -->
@@ -1481,43 +1518,10 @@
             </div>
         </section>
 
-        <!-- 02 信息展示 -->
+        <!-- 02 支持模型 -->
         <section>
             <div class="section-header">
                 <span class="section-number">02</span>
-                <span class="section-title">INFORMATION DISPLAY</span>
-                <div class="section-line"></div>
-            </div>
-
-            <div class="info-grid">
-                <div class="info-card">
-                    <div>
-                        <div class="info-label">
-                            <i class="fas fa-link"></i>
-                            <span>接口地址</span>
-                        </div>
-                        <div class="info-value">https://api.aihao.world</div>
-                    </div>
-                    <button onclick="copyToClipboardText('https://api.aihao.world')" class="copy-btn">复制</button>
-                </div>
-
-                <div class="info-card">
-                    <div>
-                        <div class="info-label">
-                            <i class="fas fa-chart-pie"></i>
-                            <span>额度限制</span>
-                        </div>
-                        <div class="info-value">100 万积分 / 密钥</div>
-                    </div>
-                    <button onclick="showUpgradeModal()" class="copy-btn">升级</button>
-                </div>
-            </div>
-        </section>
-
-        <!-- 03 支持模型 -->
-        <section>
-            <div class="section-header">
-                <span class="section-number">03</span>
                 <span class="section-title">SUPPORTED MODELS</span>
                 <div class="section-line"></div>
             </div>
@@ -1644,6 +1648,104 @@
                         <li>仅收取最低服务费用用于平台运营</li>
                         <li>积分根据实际模型定价进行换算</li>
                     </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 配置说明弹窗 -->
+    <div id="configModal" class="modal hidden">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3 class="modal-title">客户端配置说明</h3>
+                <button onclick="hideConfigModal()" class="modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- OpenAI 兼容客户端通用配置 -->
+                <div class="payment-info" style="margin-bottom: 1.5rem;">
+                    <p style="margin-bottom: 0.75rem; font-weight: 500;">
+                        <i class="fas fa-plug" style="margin-right: 0.5rem;"></i>OpenAI 兼容客户端通用配置
+                    </p>
+                    <p style="color: var(--text-muted); font-size: 0.7rem; margin-bottom: 0.5rem;">
+                        适用于 Chatbox / Cherry Studio / Dify 等客户端
+                    </p>
+                    <pre style="background: var(--bg-primary); padding: 1rem; border: 1px solid var(--border); overflow-x: auto; font-size: 0.7rem; line-height: 1.5; color: var(--text-secondary); margin: 0;">base_url: https://api.aihao.world
+api_key: your key</pre>
+                    <button onclick="copyConfig('openai')" class="copy-btn" style="margin-top: 0.75rem;">
+                        <i class="fas fa-copy"></i> 复制配置
+                    </button>
+                </div>
+
+                <!-- Claude Code 配置 -->
+                <div class="payment-info" style="margin-bottom: 1.5rem;">
+                    <p style="margin-bottom: 0.75rem; font-weight: 500;">
+                        <i class="fas fa-terminal" style="margin-right: 0.5rem;"></i>Claude Code 配置
+                    </p>
+                    <p style="color: var(--text-muted); font-size: 0.7rem; margin-bottom: 0.5rem;">
+                        文件路径: ~/.claude/settings.json
+                    </p>
+                    <pre style="background: var(--bg-primary); padding: 1rem; border: 1px solid var(--border); overflow-x: auto; font-size: 0.7rem; line-height: 1.5; color: var(--text-secondary); margin: 0;">{
+  "env": {
+    "ANTHROPIC_AUTH_TOKEN": "your key",
+    "ANTHROPIC_BASE_URL": "https://api.aihao.world/anthropic",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "haoai/glm4.5-air",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "haoai/glm4.7",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "haoai/glm5"
+  },
+  "model": "haoai/glm4.7",
+  "outputStyle": "Default"
+}</pre>
+                    <button onclick="copyConfig('claude')" class="copy-btn" style="margin-top: 0.75rem;">
+                        <i class="fas fa-copy"></i> 复制配置
+                    </button>
+                </div>
+
+                <!-- OpenCode 配置 -->
+                <div class="payment-info">
+                    <p style="margin-bottom: 0.75rem; font-weight: 500;">
+                        <i class="fas fa-code" style="margin-right: 0.5rem;"></i>OpenCode 配置
+                    </p>
+                    <p style="color: var(--text-muted); font-size: 0.7rem; margin-bottom: 0.5rem;">
+                        文件路径: ~/.config/opencode/opencode.json
+                    </p>
+                    <pre style="background: var(--bg-primary); padding: 1rem; border: 1px solid var(--border); overflow-x: auto; font-size: 0.7rem; line-height: 1.5; color: var(--text-secondary); margin: 0;">{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "HaoAI": {
+      "models": {
+        "haoai/kimi": {
+          "name": "haoai/kimi"
+        }
+      },
+      "npm": "@ai-sdk/anthropic",
+      "options": {
+        "apiKey": "your key",
+        "baseURL": "https://api.aihao.world/anthropic/v1"
+      }
+    },
+    "HaoAICoding": {
+      "models": {
+        "haoai/glm5": {
+          "name": "haoai/glm5"
+        },
+        "haoai/glm4.7": {
+          "name": "haoai/glm4.7"
+        }
+      },
+      "name": "HaoAI Coding",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "apiKey": "your key",
+        "baseURL": "https://api.aihao.world/coding"
+      }
+    }
+  }
+}</pre>
+                    <button onclick="copyConfig('opencode')" class="copy-btn" style="margin-top: 0.75rem;">
+                        <i class="fas fa-copy"></i> 复制配置
+                    </button>
                 </div>
             </div>
         </div>
@@ -1840,17 +1942,9 @@
                         const div = document.createElement('div');
                         div.className = 'model-item';
 
-                        let tag = 'LLM';
-                        if (model.toLowerCase().includes('claude')) tag = 'Claude';
-                        else if (model.toLowerCase().includes('gpt')) tag = 'GPT';
-                        else if (model.toLowerCase().includes('llama')) tag = 'Llama';
-                        else if (model.toLowerCase().includes('gemini')) tag = 'Gemini';
-                        else if (model.toLowerCase().includes('embedding')) tag = 'Embed';
-                        else if (model.toLowerCase().includes('dall')) tag = 'Image';
-                        else if (model.toLowerCase().includes('deepseek')) tag = 'DeepSeek';
-                        else if (model.toLowerCase().includes('grok')) tag = 'Grok';
-                        else if (model.toLowerCase().includes('qwen')) tag = 'Qwen';
-                        else if (model.toLowerCase().includes('kimi')) tag = 'Kimi';
+                        let tag = 'chat';
+                        if (model.startsWith('haoai/')) tag = 'coding';
+                        else if (model.toLowerCase().includes('embedding')) tag = 'embedding';
 
                         div.innerHTML = `
                             <div class="model-index">${index + 1}</div>
@@ -1936,10 +2030,77 @@
             document.getElementById('upgradeModal').classList.add('hidden');
         }
 
+        function showConfigModal() {
+            document.getElementById('configModal').classList.remove('hidden');
+        }
+
+        function hideConfigModal() {
+            document.getElementById('configModal').classList.add('hidden');
+        }
+
+        function copyConfig(type) {
+            let config = '';
+            if (type === 'openai') {
+                config = `base_url: https://api.aihao.world
+api_key: your key`;
+            } else if (type === 'claude') {
+                config = `{
+  "env": {
+    "ANTHROPIC_AUTH_TOKEN": "your key",
+    "ANTHROPIC_BASE_URL": "https://api.aihao.world/anthropic",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "haoai/glm4.5-air",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "haoai/glm4.7",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "haoai/glm5"
+  },
+  "model": "haoai/glm4.7",
+  "outputStyle": "Default"
+}`;
+            } else if (type === 'opencode') {
+                config = `{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "HaoAI": {
+      "models": {
+        "haoai/kimi": {
+          "name": "haoai/kimi"
+        }
+      },
+      "npm": "@ai-sdk/anthropic",
+      "options": {
+        "apiKey": "your key",
+        "baseURL": "https://api.aihao.world/anthropic/v1"
+      }
+    },
+    "HaoAICoding": {
+      "models": {
+        "haoai/glm5": {
+          "name": "haoai/glm5"
+        },
+        "haoai/glm4.7": {
+          "name": "haoai/glm4.7"
+        }
+      },
+      "name": "HaoAI Coding",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "apiKey": "your key",
+        "baseURL": "https://api.aihao.world/coding"
+      }
+    }
+  }
+}`;
+            }
+            
+            navigator.clipboard.writeText(config).then(() => {
+                showMessage('配置已复制到剪贴板!');
+            });
+        }
+
         document.addEventListener('click', function (event) {
             const contactModal = document.getElementById('contactModal');
             const upgradeModal = document.getElementById('upgradeModal');
             const downloadModal = document.getElementById('downloadModal');
+            const configModal = document.getElementById('configModal');
 
             if (event.target === contactModal) {
                 hideContactModal();
@@ -1949,6 +2110,9 @@
             }
             if (event.target === downloadModal) {
                 hideDownloadModal();
+            }
+            if (event.target === configModal) {
+                hideConfigModal();
             }
         });
 
