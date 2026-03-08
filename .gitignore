@@ -1,17 +1,48 @@
+# macOS
 .DS_Store
-__pycache__
-*.json
-*.conf
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
 *.log
-static/contact-qr.jpg
+logs/
+
+# Environment and secrets
+.env
+.env.local
+cookies.txt
+
+# Temporary files
 tmp.py
+*.tmp
+*.swp
+*.swo
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Specific files
+static/contact-qr.jpg
 templates/dashboard_manage_clean.html
 templates/test_media_query.css
-app/database/myapi.db
-app/database/api_keys.db
-app/database/database.db
-app/database/api_service.db
-database.db
-app/database.db
-cookies.txt
 UI_DESIGN_SPEC.md
+
+# Config files with sensitive data
+api.conf
