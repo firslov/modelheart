@@ -2,75 +2,79 @@
 
 ![Model Heart](static/index.jpeg)
 
-企业级 LLM API 网关系统，支持多模型聚合、智能路由和统一认证。
+An enterprise-grade LLM API gateway system supporting multi-model aggregation, intelligent routing, and unified authentication.
 
-🌐 **在线演示**: [https://api.aihao.world](https://api.aihao.world)
+🌐 **Live Demo**: [https://api.aihao.world](https://api.aihao.world)
 
-## ✨ 核心特性
+[🇨🇳 中文文档](README_CN.md)
 
-- 🔄 **智能负载均衡** - 加权轮询、健康检查、自动故障转移
-- 🔐 **统一认证** - API Key 管理、Session 控制、权限管理
-- 📊 **用量监控** - Token 级统计、实时限额、多维度分析
-- 🌐 **多协议支持** - OpenAI / Anthropic 兼容接口
-- 🚀 **高性能** - HTTP/2 支持、流式响应、连接池优化
+---
 
-## 🚀 快速部署
+## ✨ Core Features
 
-### 1. 安装依赖
+- 🔄 **Intelligent Load Balancing** - Weighted round-robin, health checks, automatic failover
+- 🔐 **Unified Authentication** - API Key management, Session control, permission management
+- 📊 **Usage Monitoring** - Token-level statistics, real-time quotas, multi-dimensional analysis
+- 🌐 **Multi-Protocol Support** - OpenAI / Anthropic compatible interfaces
+- 🚀 **High Performance** - HTTP/2 support, streaming response, connection pool optimization
+
+## 🚀 Quick Start
+
+### 1. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. 配置环境
+### 2. Configure Environment
 
 ```bash
-# 复制配置模板
+# Copy configuration template
 cp .env.example .env
 
-# 编辑配置文件
+# Edit configuration file
 vim .env
 ```
 
-**必需配置项**:
+**Required Configuration**:
 
 ```bash
-# 域名配置
+# Domain configuration
 DOMAIN=your-domain.com
 API_BASE_URL=https://api.your-domain.com
 
-# Session 密钥（必须修改为随机字符串）
+# Session secret key (must be changed to a random string)
 SESSION_SECRET_KEY=your-random-secret-key
 
-# 管理员密码（生成哈希）
-# 生成方式: python -c "import bcrypt; print(bcrypt.hashpw(b'your_password', bcrypt.gensalt()).decode())"
+# Admin password (generate hash)
+# Generate with: python -c "import bcrypt; print(bcrypt.hashpw(b'your_password', bcrypt.gensalt()).decode())"
 ADMIN_PASSWORD_HASH=$2b$12$...
 ```
 
-### 3. 初始化数据库
+### 3. Initialize Database
 
 ```bash
 python scripts/init_database.py
 ```
 
-### 4. 启动服务
+### 4. Start Service
 
 ```bash
-# 生产环境
+# Production
 ./start.sh
 
-# 开发环境（自动重载）
+# Development (auto-reload)
 DEV=1 ./start.sh
 
-# 自定义参数
+# Custom parameters
 WORKERS=8 PORT=9000 LOG_LEVEL=debug ./start.sh
 ```
 
-访问: http://localhost:8087
+Visit: http://localhost:8087
 
-## 📖 API 使用
+## 📖 API Usage
 
-### OpenAI 兼容接口
+### OpenAI Compatible Interface
 
 ```bash
 # Chat Completions
@@ -92,7 +96,7 @@ curl https://api.your-domain.com/v1/embeddings \
   }'
 ```
 
-### Anthropic 兼容接口
+### Anthropic Compatible Interface
 
 ```bash
 curl https://api.your-domain.com/anthropic/v1/messages \
@@ -106,55 +110,47 @@ curl https://api.your-domain.com/anthropic/v1/messages \
   }'
 ```
 
-## 🔧 环境变量
+## 🔧 Environment Variables
 
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `ENV` | 运行环境 | `development` |
-| `DOMAIN` | 域名 | `localhost` |
-| `API_BASE_URL` | API 基础 URL | `http://localhost:8087` |
-| `SESSION_SECRET_KEY` | Session 密钥 | - |
-| `ADMIN_USERNAME` | 管理员用户名 | `admin` |
-| `ADMIN_PASSWORD_HASH` | 管理员密码哈希 | - |
-| `DEFAULT_LIMIT` | 默认 API 限额 | `1000000` |
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `ENV` | Runtime environment | `development` |
+| `DOMAIN` | Domain name | `localhost` |
+| `API_BASE_URL` | API base URL | `http://localhost:8087` |
+| `SESSION_SECRET_KEY` | Session secret key | - |
+| `ADMIN_USERNAME` | Admin username | `admin` |
+| `ADMIN_PASSWORD_HASH` | Admin password hash | - |
+| `DEFAULT_LIMIT` | Default API limit | `1000000` |
 
-## 🏗️ 项目结构
+## 🏗️ Project Structure
 
 ```
 myapi/
 ├── app/
-│   ├── api/              # API 路由
-│   ├── config/           # 配置管理
-│   ├── core/             # 应用核心
-│   ├── database/         # 数据层
-│   ├── middleware/       # 中间件
-│   ├── models/           # 数据模型
-│   ├── services/         # 业务逻辑
-│   └── utils/            # 工具函数
-├── static/               # 静态资源
-├── templates/            # HTML 模板
-├── scripts/              # 脚本文件
-├── .env.example          # 配置模板
-├── requirements.txt      # 依赖列表
-└── start.sh              # 启动脚本
+│   ├── api/              # API routes
+│   ├── config/           # Configuration management
+│   ├── core/             # Application core
+│   ├── database/         # Data layer
+│   ├── middleware/       # Middleware
+│   ├── models/           # Data models
+│   ├── services/         # Business logic
+│   └── utils/            # Utility functions
+├── static/               # Static assets
+├── templates/            # HTML templates
+├── scripts/              # Scripts
+├── .env.example          # Configuration template
+├── requirements.txt      # Dependencies
+└── start.sh              # Startup script
 ```
 
-## 🛡️ 安全建议
-
-- ✅ 生产环境必须修改 `SESSION_SECRET_KEY` 为强随机字符串
-- ✅ 使用 bcrypt 生成管理员密码哈希
-- ✅ 配置 HTTPS（推荐使用 Let's Encrypt）
-- ✅ 定期更新依赖包
-- ⚠️ 不要将 `.env` 文件提交到版本控制
-
-## 📄 许可证
+## 📄 License
 
 MIT License
 
-## 🤝 贡献
+## 🤝 Contributing
 
-欢迎提交 Issue 和 Pull Request！
+Issues and Pull Requests are welcome!
 
 ---
 
-**Made with ❤️ by Model Heart Team**
+**Made with ❤️ by [firslov](https://github.com/firslov)**

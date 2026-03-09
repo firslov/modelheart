@@ -123,18 +123,13 @@ def create_application() -> FastAPI:
     # 添加详细请求日志中间件（用于排查问题）
     fastapi_app.add_middleware(DetailedRequestLoggingMiddleware)
 
-    # 添加受信任主机中间件
-    allowed_hosts = [
-        settings.DOMAIN,
-        "localhost",
-        "localhost:8087",
-        "0.0.0.0:8087",
-        "0.0.0.0",
-    ]
-    fastapi_app.add_middleware(
-        TrustedHostMiddleware,
-        allowed_hosts=allowed_hosts,
-    )
+    # 注意：TrustedHostMiddleware 已禁用，因为它会导致 "Invalid host header" 错误
+    # 如果需要启用，请取消下面的注释并配置正确的 allowed_hosts
+    # if settings.ENV == "production":
+    #     fastapi_app.add_middleware(
+    #         TrustedHostMiddleware,
+    #         allowed_hosts=["*"],  # 或指定具体的域名列表
+    #     )
 
     # 配置静态文件和模板
     fastapi_app.mount(
