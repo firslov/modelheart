@@ -74,10 +74,25 @@ WORKERS=8 PORT=9000 LOG_LEVEL=debug ./start.sh
 
 ## 📖 API 使用
 
+### 📊 计费方式
+
+用量根据消耗的 Token 数计费，不同端点的计费方式不同：
+
+| 端点 | 计费方式 | 详细说明 |
+|------|----------|----------|
+| `/v1/chat/completions` | 按 Token 计费 | 输入 + 输出 Token × 模型权重 |
+| `/v1/completions` | 按 Token 计费 | 输入 + 输出 Token × 模型权重 |
+| `/v1/embeddings` | 按 Token 计费 | 输入 Token × 模型权重 |
+| `/anthropic/v1/messages` | 按请求计费 | max(输入权重, 输出权重) × 服务器权重 |
+| `/coding/chat/completions` | 按请求计费 | max(输入权重, 输出权重) × 服务器权重 |
+
 ### OpenAI 兼容接口
 
+#### Chat Completions - `/v1/chat/completions`
+- **计费**: 按 Token 计费（输入 + 输出）
+- **适用场景**: 通用对话应用
+
 ```bash
-# Chat Completions
 curl https://api.your-domain.com/v1/chat/completions \
   -H "Authorization: Bearer your-api-key" \
   -H "Content-Type: application/json" \
@@ -85,8 +100,13 @@ curl https://api.your-domain.com/v1/chat/completions \
     "model": "gpt-3.5-turbo",
     "messages": [{"role": "user", "content": "Hello"}]
   }'
+```
 
-# Embeddings
+#### Embeddings - `/v1/embeddings`
+- **计费**: 按 Token 计费（仅输入）
+- **适用场景**: 文本嵌入和相似度搜索
+
+```bash
 curl https://api.your-domain.com/v1/embeddings \
   -H "Authorization: Bearer your-api-key" \
   -H "Content-Type: application/json" \
@@ -96,7 +116,26 @@ curl https://api.your-domain.com/v1/embeddings \
   }'
 ```
 
+#### Coding 接口 - `/coding/chat/completions`
+- **计费**: 按请求计费（输入/输出权重的最大值）
+- **适用场景**: 代码生成、智谱 AI Coding Plan 等
+- **说明**: OpenAI 兼容格式，但按请求计费
+
+```bash
+curl https://api.your-domain.com/coding/chat/completions \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "zhipu-coding-model",
+    "messages": [{"role": "user", "content": "编写一个 Python 函数"}]
+  }'
+```
+
 ### Anthropic 兼容接口
+
+#### Messages - `/anthropic/v1/messages`
+- **计费**: 按请求计费（输入/输出权重的最大值）
+- **适用场景**: Claude 模型和按请求计费的其他模型
 
 ```bash
 curl https://api.your-domain.com/anthropic/v1/messages \

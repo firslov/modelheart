@@ -74,10 +74,25 @@ Visit: http://localhost:8087
 
 ## 📖 API Usage
 
+### 📊 Billing
+
+Usage is charged based on tokens consumed. The billing method varies by endpoint:
+
+| Endpoint | Billing Method | Details |
+|----------|----------------|---------|
+| `/v1/chat/completions` | Token-based | Input + Output tokens × Model weight |
+| `/v1/completions` | Token-based | Input + Output tokens × Model weight |
+| `/v1/embeddings` | Token-based | Input tokens × Model weight |
+| `/anthropic/v1/messages` | Request-based | Max(input_weight, output_weight) × Server weight |
+| `/coding/chat/completions` | Request-based | Max(input_weight, output_weight) × Server weight |
+
 ### OpenAI Compatible Interface
 
+#### Chat Completions - `/v1/chat/completions`
+- **Billing**: Token-based (input + output tokens)
+- **Use Case**: General chat applications
+
 ```bash
-# Chat Completions
 curl https://api.your-domain.com/v1/chat/completions \
   -H "Authorization: Bearer your-api-key" \
   -H "Content-Type: application/json" \
@@ -85,8 +100,13 @@ curl https://api.your-domain.com/v1/chat/completions \
     "model": "gpt-3.5-turbo",
     "messages": [{"role": "user", "content": "Hello"}]
   }'
+```
 
-# Embeddings
+#### Embeddings - `/v1/embeddings`
+- **Billing**: Token-based (input tokens only)
+- **Use Case**: Text embedding and similarity search
+
+```bash
 curl https://api.your-domain.com/v1/embeddings \
   -H "Authorization: Bearer your-api-key" \
   -H "Content-Type: application/json" \
@@ -96,7 +116,26 @@ curl https://api.your-domain.com/v1/embeddings \
   }'
 ```
 
+#### Coding Interface - `/coding/chat/completions`
+- **Billing**: Request-based (max of input/output weights)
+- **Use Case**: Code generation, Zhipu AI Coding Plan, etc.
+- **Note**: OpenAI-compatible format but charged per request
+
+```bash
+curl https://api.your-domain.com/coding/chat/completions \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "zhipu-coding-model",
+    "messages": [{"role": "user", "content": "Write a Python function"}]
+  }'
+```
+
 ### Anthropic Compatible Interface
+
+#### Messages - `/anthropic/v1/messages`
+- **Billing**: Request-based (max of input/output weights)
+- **Use Case**: Claude models and request-based billing models
 
 ```bash
 curl https://api.your-domain.com/anthropic/v1/messages \
