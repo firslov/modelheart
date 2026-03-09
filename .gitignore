@@ -17,6 +17,9 @@ __pycache__/
 *.log
 logs/
 
+# Upload and download directories
+downloads/
+
 # Environment and secrets
 .env
 .env.local
@@ -42,7 +45,6 @@ build/
 static/contact-qr.jpg
 templates/dashboard_manage_clean.html
 templates/test_media_query.css
-UI_DESIGN_SPEC.md
 
 # Config files with sensitive data
 api.conf

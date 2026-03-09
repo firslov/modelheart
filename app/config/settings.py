@@ -26,6 +26,24 @@ class Settings(BaseSettings):
     # 环境配置
     ENV: str = os.getenv("ENV", "development")  # 环境: development/production
 
+    # 域名和URL配置
+    DOMAIN: str = os.getenv("DOMAIN", "localhost")
+    API_BASE_URL: str = os.getenv("API_BASE_URL", "http://localhost:8087")
+    CHAT_URL: str = os.getenv("CHAT_URL", "")
+    
+    # CORS允许的源
+    @property
+    def CORS_ORIGINS(self) -> list:
+        """获取CORS允许的源列表"""
+        origins = [
+            self.API_BASE_URL,
+            f"https://{self.DOMAIN}",
+            f"http://{self.DOMAIN}",
+            "http://localhost:8087",
+            "http://0.0.0.0:8087",
+        ]
+        return list(set(origins))  # 去重
+
     # Session配置
     SESSION_SECRET_KEY: str = os.getenv(
         "SESSION_SECRET_KEY", "your-secret-key-here"
@@ -66,6 +84,8 @@ class Settings(BaseSettings):
 
     class Config:
         case_sensitive = True
+        env_file = ".env"
+        env_file_encoding = "utf-8"
 
 
 # 创建全局设置实例

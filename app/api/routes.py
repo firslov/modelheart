@@ -247,6 +247,16 @@ def get_usage_queue(request: Request):
     return request.app.state.app.usage_queue
 
 
+@router.get("/get-config")
+async def get_public_config():
+    """获取公共配置信息"""
+    return {
+        "api_base_url": settings.API_BASE_URL,
+        "chat_url": settings.CHAT_URL,
+        "domain": settings.DOMAIN,
+    }
+
+
 @router.get("/get-models")
 async def get_models(request: Request, session: AsyncSession = Depends(get_db_session)):
     """获取可用的模型列表 - 使用缓存优化性能"""

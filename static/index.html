@@ -1671,7 +1671,7 @@
                     <p style="color: var(--text-muted); font-size: 0.7rem; margin-bottom: 0.5rem;">
                         适用于 Chatbox / Cherry Studio / Dify 等客户端
                     </p>
-                    <pre style="background: var(--bg-primary); padding: 1rem; border: 1px solid var(--border); overflow-x: auto; font-size: 0.7rem; line-height: 1.5; color: var(--text-secondary); margin: 0;">base_url: https://api.aihao.world
+                    <pre id="openai-config" style="background: var(--bg-primary); padding: 1rem; border: 1px solid var(--border); overflow-x: auto; font-size: 0.7rem; line-height: 1.5; color: var(--text-secondary); margin: 0;">base_url: {{API_BASE_URL}}
 api_key: your key</pre>
                     <button onclick="copyConfig('openai')" class="copy-btn" style="margin-top: 0.75rem;">
                         <i class="fas fa-copy"></i> 复制配置
@@ -1686,15 +1686,15 @@ api_key: your key</pre>
                     <p style="color: var(--text-muted); font-size: 0.7rem; margin-bottom: 0.5rem;">
                         文件路径: ~/.claude/settings.json
                     </p>
-                    <pre style="background: var(--bg-primary); padding: 1rem; border: 1px solid var(--border); overflow-x: auto; font-size: 0.7rem; line-height: 1.5; color: var(--text-secondary); margin: 0;">{
+                    <pre id="claude-config" style="background: var(--bg-primary); padding: 1rem; border: 1px solid var(--border); overflow-x: auto; font-size: 0.7rem; line-height: 1.5; color: var(--text-secondary); margin: 0;">{
   "env": {
     "ANTHROPIC_AUTH_TOKEN": "your key",
-    "ANTHROPIC_BASE_URL": "https://api.aihao.world/anthropic",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "haoai/glm4.5-air",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "haoai/glm4.7",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "haoai/glm5"
+    "ANTHROPIC_BASE_URL": "{{API_BASE_URL}}/anthropic",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "kimi-claude",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "kimi-claude",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "kimi-claude"
   },
-  "model": "haoai/glm4.7",
+  "model": "kimi-claude",
   "outputStyle": "Default"
 }</pre>
                     <button onclick="copyConfig('claude')" class="copy-btn" style="margin-top: 0.75rem;">
@@ -1710,7 +1710,7 @@ api_key: your key</pre>
                     <p style="color: var(--text-muted); font-size: 0.7rem; margin-bottom: 0.5rem;">
                         文件路径: ~/.config/opencode/opencode.json
                     </p>
-                    <pre style="background: var(--bg-primary); padding: 1rem; border: 1px solid var(--border); overflow-x: auto; font-size: 0.7rem; line-height: 1.5; color: var(--text-secondary); margin: 0;">{
+                    <pre id="opencode-config" style="background: var(--bg-primary); padding: 1rem; border: 1px solid var(--border); overflow-x: auto; font-size: 0.7rem; line-height: 1.5; color: var(--text-secondary); margin: 0;">{
   "$schema": "https://opencode.ai/config.json",
   "provider": {
     "HaoAI": {
@@ -1722,7 +1722,7 @@ api_key: your key</pre>
       "npm": "@ai-sdk/anthropic",
       "options": {
         "apiKey": "your key",
-        "baseURL": "https://api.aihao.world/anthropic/v1"
+        "baseURL": "{{API_BASE_URL}}/anthropic/v1"
       }
     },
     "HaoAICoding": {
@@ -1738,7 +1738,7 @@ api_key: your key</pre>
       "npm": "@ai-sdk/openai-compatible",
       "options": {
         "apiKey": "your key",
-        "baseURL": "https://api.aihao.world/coding"
+        "baseURL": "{{API_BASE_URL}}/coding"
       }
     }
   }
@@ -1752,6 +1752,56 @@ api_key: your key</pre>
     </div>
 
     <script>
+        // 全局配置
+        let appConfig = {
+            api_base_url: 'http://localhost:8087',
+            chat_url: '',
+            domain: 'localhost'
+        };
+
+        // 加载配置
+        async function loadConfig() {
+            try {
+                const response = await fetch('/get-config');
+                if (response.ok) {
+                    appConfig = await response.json();
+                    updateConfigUI();
+                }
+            } catch (error) {
+                console.error('Failed to load config:', error);
+            }
+        }
+
+        // 更新UI中的配置相关内容
+        function updateConfigUI() {
+            // 更新聊天链接
+            const chatLink = document.querySelector('a[href*="chat."]');
+            if (chatLink && appConfig.chat_url) {
+                chatLink.href = appConfig.chat_url;
+            }
+            
+            // 更新配置示例中的占位符
+            const baseUrl = appConfig.api_base_url || 'http://localhost:8087';
+            
+            // OpenAI 配置
+            const openaiConfig = document.getElementById('openai-config');
+            if (openaiConfig) {
+                openaiConfig.textContent = openaiConfig.textContent.replace('{{API_BASE_URL}}', baseUrl);
+            }
+            
+            // Claude Code 配置
+            const claudeConfig = document.getElementById('claude-config');
+            if (claudeConfig) {
+                claudeConfig.textContent = claudeConfig.textContent.replace('{{API_BASE_URL}}', baseUrl);
+            }
+            
+            // OpenCode 配置
+            const opencodeConfig = document.getElementById('opencode-config');
+            if (opencodeConfig) {
+                opencodeConfig.textContent = opencodeConfig.textContent.replace(/\{\{API_BASE_URL\}\}/g, baseUrl);
+            }
+        }
+
         // 当前认证模式
         let authMode = 'login';
 
@@ -2040,19 +2090,21 @@ api_key: your key</pre>
 
         function copyConfig(type) {
             let config = '';
+            const baseUrl = appConfig.api_base_url || 'http://localhost:8087';
+            
             if (type === 'openai') {
-                config = `base_url: https://api.aihao.world
+                config = `base_url: ${baseUrl}
 api_key: your key`;
             } else if (type === 'claude') {
                 config = `{
   "env": {
     "ANTHROPIC_AUTH_TOKEN": "your key",
-    "ANTHROPIC_BASE_URL": "https://api.aihao.world/anthropic",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "haoai/glm4.5-air",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "haoai/glm4.7",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "haoai/glm5"
+    "ANTHROPIC_BASE_URL": "${baseUrl}/anthropic",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "kimi-claude",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "kimi-claude",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "kimi-claude"
   },
-  "model": "haoai/glm4.7",
+  "model": "kimi-claude",
   "outputStyle": "Default"
 }`;
             } else if (type === 'opencode') {
@@ -2068,7 +2120,7 @@ api_key: your key`;
       "npm": "@ai-sdk/anthropic",
       "options": {
         "apiKey": "your key",
-        "baseURL": "https://api.aihao.world/anthropic/v1"
+        "baseURL": "${baseUrl}/anthropic/v1"
       }
     },
     "HaoAICoding": {
@@ -2084,7 +2136,7 @@ api_key: your key`;
       "npm": "@ai-sdk/openai-compatible",
       "options": {
         "apiKey": "your key",
-        "baseURL": "https://api.aihao.world/coding"
+        "baseURL": "${baseUrl}/coding"
       }
     }
   }
@@ -2117,6 +2169,7 @@ api_key: your key`;
         });
 
         document.addEventListener('DOMContentLoaded', function() {
+            loadConfig();
             loadModels();
             checkLoginStatus();
         });
