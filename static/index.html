@@ -216,31 +216,6 @@
             background: linear-gradient(90deg, transparent, var(--accent), transparent);
         }
 
-        /* 状态指示 */
-        .hero-status {
-            margin-top: 2rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            animation: fadeSlideUp 0.6s ease-out 0.3s both;
-        }
-
-        .hero-status-dot {
-            width: 5px;
-            height: 5px;
-            background: var(--accent);
-            border-radius: 50%;
-            animation: statusPulse 2s ease-in-out infinite;
-        }
-
-        .hero-status-text {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.65rem;
-            color: var(--text-muted);
-            letter-spacing: 0.15em;
-        }
-
         /* 徽章 */
         .hero-badge {
             display: inline-block;
@@ -270,19 +245,6 @@
             color: var(--accent);
             margin-top: 1.5rem;
             animation: fadeSlideUp 0.6s ease-out 0.4s both;
-        }
-
-        .status-dot {
-            width: 6px;
-            height: 6px;
-            background: var(--accent);
-            border-radius: 50%;
-            animation: statusPulse 2s ease-in-out infinite;
-        }
-
-        @keyframes statusPulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.4; }
         }
 
         /* ========================================
@@ -1393,10 +1355,6 @@
         <header class="header">
             <h1 class="hero-title">MODEL HEART</h1>
             <p class="hero-subtitle">LLM 大模型服务聚合平台</p>
-            <div class="hero-status">
-                <span class="hero-status-dot"></span>
-                <span class="hero-status-text">SYSTEM ONLINE</span>
-            </div>
         </header>
 
         <!-- 导航按钮 -->
