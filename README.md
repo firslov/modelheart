@@ -80,11 +80,11 @@ Usage is charged based on tokens consumed. The billing method varies by endpoint
 
 | Endpoint | Billing Method | Details |
 |----------|----------------|---------|
-| `/v1/chat/completions` | Token-based | Input + Output tokens × Model weight |
-| `/v1/completions` | Token-based | Input + Output tokens × Model weight |
+| `/v1/chat/completions` | Token-based | Input tokens × Input weight + Output tokens × Output weight |
+| `/v1/completions` | Token-based | Input tokens × Input weight + Output tokens × Output weight |
 | `/v1/embeddings` | Token-based | Input tokens × Model weight |
-| `/anthropic/v1/messages` | Request-based | Max(input_weight, output_weight) × Server weight |
-| `/coding/chat/completions` | Request-based | Max(input_weight, output_weight) × Server weight |
+| `/anthropic/v1/messages` | Request-based | Max(Input weight, Output weight) × Request count |
+| `/coding/chat/completions` | Request-based | Max(Input weight, Output weight) × Request count |
 
 ### OpenAI Compatible Interface
 

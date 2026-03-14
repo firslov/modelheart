@@ -80,11 +80,11 @@ WORKERS=8 PORT=9000 LOG_LEVEL=debug ./start.sh
 
 | 端点 | 计费方式 | 详细说明 |
 |------|----------|----------|
-| `/v1/chat/completions` | 按 Token 计费 | 输入 + 输出 Token × 模型权重 |
-| `/v1/completions` | 按 Token 计费 | 输入 + 输出 Token × 模型权重 |
+| `/v1/chat/completions` | 按 Token 计费 | 输入 Token × 输入权重 + 输出 Token × 输出权重 |
+| `/v1/completions` | 按 Token 计费 | 输入 Token × 输入权重 + 输出 Token × 输出权重 |
 | `/v1/embeddings` | 按 Token 计费 | 输入 Token × 模型权重 |
-| `/anthropic/v1/messages` | 按请求计费 | max(输入权重, 输出权重) × 服务器权重 |
-| `/coding/chat/completions` | 按请求计费 | max(输入权重, 输出权重) × 服务器权重 |
+| `/anthropic/v1/messages` | 按请求计费 | Max(输入权重, 输出权重) × 请求次数 |
+| `/coding/chat/completions` | 按请求计费 | Max(输入权重, 输出权重) × 请求次数 |
 
 ### OpenAI 兼容接口
 
