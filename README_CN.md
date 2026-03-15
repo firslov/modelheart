@@ -20,13 +20,65 @@
 
 ## 🚀 快速部署
 
-### 1. 安装依赖
+### 方案一：Docker 部署（推荐）
+
+使用 Docker Compose 一键部署，最简单快捷：
+
+```bash
+# 1. 克隆仓库
+git clone <repository-url>
+cd myapi
+
+# 2. 配置环境
+cp .env.example .env
+# 编辑 .env 文件，配置必要参数
+
+# 3. 启动服务
+docker-compose up -d
+
+# 4. 查看日志
+docker-compose logs -f
+```
+
+**默认访问地址**: http://localhost:8087
+
+**默认管理员账号**:
+- 用户名: `admin`
+- 密码: `admin`（如果未设置 ADMIN_PASSWORD_HASH）
+
+> ⚠️ **重要**: 首次登录后请立即修改默认密码！
+
+#### Docker Compose 常用命令
+
+```bash
+# 启动服务
+docker-compose up -d
+
+# 停止服务
+docker-compose down
+
+# 重启服务
+docker-compose restart
+
+# 查看日志
+docker-compose logs -f
+
+# 更新到最新版本
+docker-compose pull && docker-compose up -d
+
+# 使用 Nginx 反向代理
+docker-compose --profile with-nginx up -d
+```
+
+### 方案二：手动部署
+
+#### 1. 安装依赖
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. 配置环境
+#### 2. 配置环境
 
 ```bash
 # 复制配置模板
@@ -51,13 +103,13 @@ SESSION_SECRET_KEY=your-random-secret-key
 ADMIN_PASSWORD_HASH=$2b$12$...
 ```
 
-### 3. 初始化数据库
+#### 3. 初始化数据库
 
 ```bash
 python scripts/init_database.py
 ```
 
-### 4. 启动服务
+#### 4. 启动服务
 
 ```bash
 # 生产环境
@@ -161,25 +213,94 @@ curl https://api.your-domain.com/anthropic/v1/messages \
 | `ADMIN_PASSWORD_HASH` | 管理员密码哈希 | - |
 | `DEFAULT_LIMIT` | 默认 API 限额 | `1000000` |
 
+## 🐳 Docker 部署指南
+
+### 生产环境部署
+
+1. **准备环境配置**
+   ```bash
+   cp .env.example .env
+   # 编辑 .env 配置生产环境参数
+   ```
+
+2. **生成安全密码**
+   ```bash
+   # 使用 Docker 生成 bcrypt 哈希密码
+   docker run --rm python:3.11-slim python -c "
+   import bcrypt
+   password = 'your-secure-password'
+   hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+   print(hashed.decode())
+   "
+   ```
+
+3. **配置 .env**
+   ```bash
+   DOMAIN=your-domain.com
+   API_BASE_URL=https://api.your-domain.com
+   SESSION_SECRET_KEY=$(openssl rand -hex 32)
+   ADMIN_PASSWORD_HASH=<生成的哈希值>
+   ```
+
+4. **部署**
+   ```bash
+   docker-compose up -d
+   ```
+
+### 使用 Nginx 反向代理
+
+```bash
+# 创建 ssl 目录
+mkdir -p ssl
+
+# 放置 SSL 证书
+# ssl/cert.pem
+# ssl/key.pem
+
+# 使用 Nginx 启动
+docker-compose --profile with-nginx up -d
+```
+
+### Docker 构建（自定义）
+
+```bash
+# 构建镜像
+docker build -t model-heart:latest .
+
+# 运行容器
+docker run -d \
+  --name model-heart \
+  -p 8087:8087 \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/logs:/app/logs \
+  -v $(pwd)/.env:/app/.env:ro \
+  --restart unless-stopped \
+  model-heart:latest
+```
+
 ## 🏗️ 项目结构
 
 ```
 myapi/
-├── app/
-│   ├── api/              # API 路由
-│   ├── config/           # 配置管理
-│   ├── core/             # 应用核心
-│   ├── database/         # 数据层
-│   ├── middleware/       # 中间件
-│   ├── models/           # 数据模型
-│   ├── services/         # 业务逻辑
-│   └── utils/            # 工具函数
-├── static/               # 静态资源
-├── templates/            # HTML 模板
-├── scripts/              # 脚本文件
-├── .env.example          # 配置模板
-├── requirements.txt      # 依赖列表
-└── start.sh              # 启动脚本
+├── app/                    # 主应用目录
+│   ├── api/                # API 路由
+│   ├── config/             # 配置管理
+│   ├── core/               # 应用核心
+│   ├── database/           # 数据层
+│   ├── middleware/         # 中间件
+│   ├── models/             # 数据模型
+│   ├── services/           # 业务逻辑
+│   └── utils/              # 工具函数
+├── static/                 # 静态资源
+├── templates/              # HTML 模板
+├── scripts/                # 脚本文件
+├── .env.example            # 配置模板
+├── requirements.txt        # 依赖列表
+├── start.sh                # 启动脚本
+├── Dockerfile              # Docker 镜像定义
+├── docker-compose.yml      # Docker Compose 配置
+├── docker-entrypoint.sh    # Docker 入口脚本
+└── nginx.conf              # Nginx 配置
 ```
 
 ## 📄 许可证

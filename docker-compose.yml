@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: model-heart-api
+    restart: unless-stopped
+    ports:
+      - "8087:8087"
+    environment:
+      - ENV=production
+      - DOMAIN=${DOMAIN:-localhost}
+      - API_BASE_URL=${API_BASE_URL:-http://localhost:8087}
+      - CHAT_URL=${CHAT_URL:-http://localhost:8087}
+      - SESSION_SECRET_KEY=${SESSION_SECRET_KEY}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH}
+      - DEFAULT_LIMIT=${DEFAULT_LIMIT:-1000000}
+      - PORT=8087
+      - HOST=0.0.0.0
+    volumes:
+      - ./app/database:/app/app/database
+      - ./logs:/app/logs
+      - ./.env:/app/.env:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8087/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - model-heart-network
+
+  # 可选：使用 Nginx 作为反向代理
+  nginx:
+    image: nginx:alpine
+    container_name: model-heart-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - app
+    networks:
+      - model-heart-network
+    profiles:
+      - with-nginx
+
+networks:
+  model-heart-network:
+    driver: bridge

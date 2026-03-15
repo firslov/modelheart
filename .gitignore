@@ -48,3 +48,4 @@ templates/test_media_query.css
 
 # Config files with sensitive data
 api.conf
+wechat

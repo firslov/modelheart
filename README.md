@@ -20,13 +20,65 @@ An enterprise-grade LLM API gateway system supporting multi-model aggregation, i
 
 ## 🚀 Quick Start
 
-### 1. Install Dependencies
+### Option 1: Docker Deployment (Recommended)
+
+The easiest way to deploy using Docker Compose:
+
+```bash
+# 1. Clone the repository
+git clone <repository-url>
+cd myapi
+
+# 2. Configure environment
+cp .env.example .env
+# Edit .env file with your settings
+
+# 3. Start with Docker Compose
+docker-compose up -d
+
+# 4. View logs
+docker-compose logs -f
+```
+
+**Default Access**: http://localhost:8087
+
+**Default Admin Credentials**:
+- Username: `admin`
+- Password: `admin` (if ADMIN_PASSWORD_HASH not set)
+
+> ⚠️ **Important**: Change the default password after first login!
+
+#### Docker Compose Commands
+
+```bash
+# Start services
+docker-compose up -d
+
+# Stop services
+docker-compose down
+
+# Restart
+docker-compose restart
+
+# View logs
+docker-compose logs -f
+
+# Update to latest version
+docker-compose pull && docker-compose up -d
+
+# With Nginx reverse proxy
+docker-compose --profile with-nginx up -d
+```
+
+### Option 2: Manual Deployment
+
+#### 1. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Configure Environment
+#### 2. Configure Environment
 
 ```bash
 # Copy configuration template
@@ -51,13 +103,13 @@ SESSION_SECRET_KEY=your-random-secret-key
 ADMIN_PASSWORD_HASH=$2b$12$...
 ```
 
-### 3. Initialize Database
+#### 3. Initialize Database
 
 ```bash
 python scripts/init_database.py
 ```
 
-### 4. Start Service
+#### 4. Start Service
 
 ```bash
 # Production
@@ -161,25 +213,94 @@ curl https://api.your-domain.com/anthropic/v1/messages \
 | `ADMIN_PASSWORD_HASH` | Admin password hash | - |
 | `DEFAULT_LIMIT` | Default API limit | `1000000` |
 
+## 🐳 Docker Deployment Guide
+
+### Production Deployment
+
+1. **Prepare Environment**
+   ```bash
+   cp .env.example .env
+   # Edit .env with production settings
+   ```
+
+2. **Generate Secure Password**
+   ```bash
+   # Generate bcrypt hash for admin password
+   docker run --rm python:3.11-slim python -c "
+   import bcrypt
+   password = 'your-secure-password'
+   hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+   print(hashed.decode())
+   "
+   ```
+
+3. **Configure .env**
+   ```bash
+   DOMAIN=your-domain.com
+   API_BASE_URL=https://api.your-domain.com
+   SESSION_SECRET_KEY=$(openssl rand -hex 32)
+   ADMIN_PASSWORD_HASH=<generated-hash>
+   ```
+
+4. **Deploy**
+   ```bash
+   docker-compose up -d
+   ```
+
+### With Nginx Reverse Proxy
+
+```bash
+# Create ssl directory
+mkdir -p ssl
+
+# Place your SSL certificates
+# ssl/cert.pem
+# ssl/key.pem
+
+# Start with Nginx
+docker-compose --profile with-nginx up -d
+```
+
+### Docker Build (Custom)
+
+```bash
+# Build image
+docker build -t model-heart:latest .
+
+# Run container
+docker run -d \
+  --name model-heart \
+  -p 8087:8087 \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/logs:/app/logs \
+  -v $(pwd)/.env:/app/.env:ro \
+  --restart unless-stopped \
+  model-heart:latest
+```
+
 ## 🏗️ Project Structure
 
 ```
 myapi/
-├── app/
-│   ├── api/              # API routes
-│   ├── config/           # Configuration management
-│   ├── core/             # Application core
-│   ├── database/         # Data layer
-│   ├── middleware/       # Middleware
-│   ├── models/           # Data models
-│   ├── services/         # Business logic
-│   └── utils/            # Utility functions
-├── static/               # Static assets
-├── templates/            # HTML templates
-├── scripts/              # Scripts
-├── .env.example          # Configuration template
-├── requirements.txt      # Dependencies
-└── start.sh              # Startup script
+├── app/                    # API routes
+│   ├── api/                # API routes
+│   ├── config/             # Configuration management
+│   ├── core/               # Application core
+│   ├── database/           # Data layer
+│   ├── middleware/         # Middleware
+│   ├── models/             # Data models
+│   ├── services/           # Business logic
+│   └── utils/              # Utility functions
+├── static/                 # Static assets
+├── templates/              # HTML templates
+├── scripts/                # Scripts
+├── .env.example            # Configuration template
+├── requirements.txt        # Dependencies
+├── start.sh                # Startup script
+├── Dockerfile              # Docker image definition
+├── docker-compose.yml      # Docker Compose configuration
+├── docker-entrypoint.sh    # Docker entrypoint script
+└── nginx.conf              # Nginx configuration
 ```
 
 ## 📄 License
