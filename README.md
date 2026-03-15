@@ -26,8 +26,8 @@ The easiest way to deploy using Docker Compose:
 
 ```bash
 # 1. Clone the repository
-git clone <repository-url>
-cd myapi
+git clone https://github.com/firslov/modelheart.git
+cd modelheart
 
 # 2. Configure environment
 cp .env.example .env

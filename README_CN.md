@@ -26,8 +26,8 @@
 
 ```bash
 # 1. 克隆仓库
-git clone <repository-url>
-cd myapi
+git clone https://github.com/firslov/modelheart.git
+cd modelheart
 
 # 2. 配置环境
 cp .env.example .env
