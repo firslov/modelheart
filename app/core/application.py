@@ -78,16 +78,51 @@ class Application:
         bg_task.add_done_callback(self.background_tasks.discard)
 
     async def _periodic_health_check_task(self) -> None:
-        """定期刷新LLM服务器配置任务"""
+        """定期检测LLM服务器配置变更并刷新
+
+        使用轻量级指纹（模型数量 + 最大ID）检测配置变化，
+        只在检测到变化时才执行完整的配置重载，避免频繁查询全量数据。
+        """
+        from sqlalchemy import select, func
+        from app.database.models import ServerModel, LLMServer
+
+        check_interval = 15
+        full_refresh_interval = settings.CACHE_TTL
+        last_fingerprint = None
+        last_full_refresh = 0.0
+
         while True:
-            await asyncio.sleep(settings.CACHE_TTL)
+            await asyncio.sleep(check_interval)
 
-            # 定期刷新LLM服务器配置
-            async for session in get_db_session():
-                await self.llm_service.init_llm_resources_from_db(session)
-                break
+            try:
+                async for session in get_db_session():
+                    result = await session.execute(
+                        select(
+                            func.count(ServerModel.id),
+                            func.coalesce(func.max(ServerModel.id), 0),
+                            func.count(LLMServer.id),
+                        )
+                        .select_from(ServerModel)
+                        .outerjoin(LLMServer, ServerModel.server_id == LLMServer.id)
+                    )
+                    row = result.one()
+                    fingerprint = (row[0], row[1], row[2])
 
-            logger.debug("LLM servers config refreshed")
+                    current_time = asyncio.get_event_loop().time()
+                    need_refresh = (
+                        fingerprint != last_fingerprint
+                        or current_time - last_full_refresh >= full_refresh_interval
+                    )
+
+                    if need_refresh:
+                        await self.llm_service.init_llm_resources_from_db(session)
+                        self.llm_service.invalidate_models_cache()
+                        last_fingerprint = fingerprint
+                        last_full_refresh = current_time
+                        logger.debug(f"Config refreshed | fingerprint={fingerprint}")
+                    break
+            except Exception as e:
+                logger.error(f"Config check error: {e}")
 
 
 def create_application() -> FastAPI:

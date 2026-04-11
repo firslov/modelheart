@@ -95,9 +95,12 @@ async def _handle_llm_server_action(request, api_service, data, session: AsyncSe
     else:
         raise HTTPException(status_code=400, detail="Invalid action")
 
-    # 重新初始化LLM资源
     llm_service = request.app.state.app.llm_service
-    await llm_service.init_llm_resources_from_db(session)
+
+    # 使用新session读取数据，避免identity map返回陈旧数据
+    from app.database.database import AsyncSessionLocal
+    async with AsyncSessionLocal() as fresh_session:
+        await llm_service.init_llm_resources_from_db(fresh_session)
 
     # 使模型列表缓存失效
     llm_service.invalidate_models_cache()
