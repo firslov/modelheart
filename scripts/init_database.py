@@ -25,6 +25,7 @@ async def main():
         print(f"初始化数据库时发生错误: {e}")
         import traceback
         traceback.print_exc()
+        sys.exit(1)
 
 
 if __name__ == "__main__":

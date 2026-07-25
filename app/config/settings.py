@@ -74,13 +74,16 @@ class Settings(BaseSettings):
 
     # 其他
     TOKENIZER_MODEL: str = "gpt-3.5-turbo"  # 默认分词器模型
+    ANTHROPIC_VERSION: str = "2023-06-01"  # Anthropic API 版本（可随 API 升级调整）
     HEALTH_CHECK_INTERVAL: int = 60  # 健康检查间隔时间(秒)
     MAX_RETRIES: int = 3  # HTTP请求最大重试次数
+    MAX_REQUEST_BODY_SIZE: int = 20 * 1024 * 1024  # 最大请求体大小（20MB），防止恶意大 payload
 
     # API Key 缓存配置
     API_KEY_CACHE_TTL: int = 300  # API Key 缓存有效期（秒），默认5分钟
     USAGE_CACHE_TTL: int = 60  # 用量缓存有效期（秒），默认1分钟
     MAX_CACHE_SIZE: int = 10000  # 最大缓存条目数
+    PER_REQUEST_RESERVE: float = 5000  # 每个并发请求在限额中预留的 token 数，防止竞态超额
 
     class Config:
         case_sensitive = True

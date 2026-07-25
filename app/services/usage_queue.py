@@ -12,9 +12,12 @@
 """
 import asyncio
 from collections import defaultdict
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, TYPE_CHECKING
 from datetime import datetime
 import logging
+
+if TYPE_CHECKING:
+    from app.services.api_service import ApiService
 
 from app.models.queue_models import (
     UsageEventData,
@@ -49,17 +52,21 @@ class UsageQueue:
         self,
         batch_size: int = 100,
         flush_interval: float = 5.0,
+        api_service: Optional["ApiService"] = None,
     ):
         """初始化队列服务
 
         Args:
             batch_size: 批量写入大小，达到此数量时立即刷新
             flush_interval: 刷新间隔（秒），超过此时间时触发刷新
+            api_service: 可选的 ApiService 引用，计费落库后回写缓存用量；
+                为 None 时跳过回写（队列可独立实例化）
         """
         self.queue: asyncio.Queue[UsageEventData] = asyncio.Queue()
         self.batch: List[UsageEventData] = []
         self.batch_size = batch_size
         self.flush_interval = flush_interval
+        self._api_service = api_service
 
         # 工作器控制
         self._worker_task: Optional[asyncio.Task] = None
@@ -68,6 +75,10 @@ class UsageQueue:
 
         # 统计信息
         self.stats = QueueStats()
+
+        # 连续刷新失败计数器（防止持久性错误导致无限重试）
+        self._consecutive_failures = 0
+        self._max_consecutive_failures = 3
 
         # 按事件类型分组的缓冲区（优化批量写入）
         self._grouped_buffer: Dict[UsageEventType, List[UsageEventData]] = defaultdict(
@@ -112,13 +123,28 @@ class UsageQueue:
         # 发送停止信号
         self._stop_event.set()
 
-        # 取消工作器任务
+        # 给工作器一次优雅退出的机会（带超时），超时后再取消
         if self._worker_task and not self._worker_task.done():
-            self._worker_task.cancel()
             try:
-                await self._worker_task
-            except asyncio.CancelledError:
-                pass
+                await asyncio.wait_for(asyncio.shield(self._worker_task), timeout=3.0)
+            except asyncio.TimeoutError:
+                self._worker_task.cancel()
+                try:
+                    await self._worker_task
+                except asyncio.CancelledError:
+                    pass
+
+        # 将队列中滞留的事件全部 drain 进分组缓冲区，避免静默丢弃
+        drained = 0
+        while True:
+            try:
+                event_data = self.queue.get_nowait()
+                self._grouped_buffer[event_data.event_type].append(event_data)
+                drained += 1
+            except asyncio.QueueEmpty:
+                break
+        if drained:
+            logger.info(f"UsageQueue drain | remaining={drained}")
 
         # 刷新剩余数据
         if self._grouped_buffer:
@@ -203,26 +229,42 @@ class UsageQueue:
 
                 await session.commit()
 
+            # 提交成功 — 清空缓冲区并重置失败计数器
+            self._grouped_buffer.clear()
+            self._consecutive_failures = 0
+
             # 更新统计
             self.stats.total_flushed += total_events
             self.stats.last_flush_count = total_events
             self.stats.last_flush_time = start_time
 
             elapsed = asyncio.get_event_loop().time() - start_time
-            # 仅在调试模式或异常情况下记录
-            rate = total_events / elapsed
+            # 仅在调试模式或异常情况下记录（max 防止除零）
+            rate = total_events / max(elapsed, 1e-6)
             if rate < 100 or elapsed > 1.0:
                 logger.warning(f"flush slow | events={total_events} | duration={elapsed:.3f}s | rate={rate:.0f}/s")
             else:
                 logger.debug(f"flush ok | events={total_events} | duration={elapsed:.3f}s | rate={rate:.0f}/s")
 
-            # 清空缓冲区
-            self._grouped_buffer.clear()
-
         except Exception as e:
-            logger.error(f"flush failed | events={total_events} | error={str(e)[:100]}", exc_info=True)
+            self._consecutive_failures += 1
+            logger.error(
+                f"flush failed | events={total_events} | "
+                f"error={str(e)[:100]} | attempt={self._consecutive_failures}/{self._max_consecutive_failures}",
+                exc_info=True,
+            )
             self.stats.total_errors += 1
-            # 注意：数据保留在缓冲区中，下次重试
+
+            # 超过最大连续失败次数，丢弃缓冲区数据防止无限重试
+            if self._consecutive_failures > self._max_consecutive_failures:
+                discarded = sum(len(v) for v in self._grouped_buffer.values())
+                logger.critical(
+                    f"flush abandoned after {self._max_consecutive_failures} failures | "
+                    f"discarded={discarded} events"
+                )
+                self._grouped_buffer.clear()
+                self._consecutive_failures = 0
+            # 否则数据保留在缓冲区中，下次重试
 
     async def _process_update_usage(
         self, session: AsyncSessionLocal, events: List[UsageEventData]
@@ -273,6 +315,10 @@ class UsageQueue:
                     model_updates[event.model]["requests"] += 1
 
             api_key_record.usage += total_weighted_tokens
+
+            # 回写缓存用量，避免额度检查基于陈旧快照
+            if self._api_service is not None:
+                await self._api_service.add_cached_usage(api_key, total_weighted_tokens, count=len(key_events))
 
             # 更新模型使用统计
             for model_name, model_data in model_updates.items():
@@ -334,6 +380,10 @@ class UsageQueue:
             # 计算总用量
             total_usage = sum(m["tokens"] for m in model_updates.values())
             api_key_record.usage += total_usage
+
+            # 回写缓存用量，避免额度检查基于陈旧快照
+            if self._api_service is not None:
+                await self._api_service.add_cached_usage(api_key, total_usage, count=len(key_events))
 
             # 更新模型使用统计
             for model_name, model_data in model_updates.items():

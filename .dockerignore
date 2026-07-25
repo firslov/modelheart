@@ -55,7 +55,6 @@ data/
 # Docker
 Dockerfile
 docker-compose.yml
-docker-entrypoint.sh
 .dockerignore
 
 # Documentation

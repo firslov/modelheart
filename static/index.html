@@ -248,45 +248,6 @@
         }
 
         /* ========================================
-           导航按钮
-           ======================================== */
-
-        .nav-buttons {
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
-            margin-bottom: 4rem;
-            flex-wrap: wrap;
-            animation: fadeSlideUp 0.6s ease-out 0.5s both;
-        }
-
-        .nav-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.875rem 1.5rem;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            color: var(--text-primary);
-            text-decoration: none;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.8rem;
-            font-weight: 500;
-            letter-spacing: 0.05em;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            cursor: pointer;
-        }
-
-        .nav-btn:hover {
-            border-color: var(--accent);
-            background: var(--bg-secondary);
-        }
-
-        .nav-btn i {
-            color: var(--accent);
-        }
-
-        /* ========================================
            章节标题
            ======================================== */
 
@@ -1357,22 +1318,6 @@
             <p class="hero-subtitle">LLM 大模型服务聚合平台</p>
         </header>
 
-        <!-- 导航按钮 -->
-        <nav class="nav-buttons">
-            <a href="https://chat.aihao.world/" target="_blank" class="nav-btn">
-                <i class="fas fa-comments"></i>
-                <span>开启对话</span>
-            </a>
-            <button onclick="showDownloadModal()" class="nav-btn">
-                <i class="fas fa-download"></i>
-                <span>下载APP</span>
-            </button>
-            <button onclick="showUpgradeModal()" class="nav-btn">
-                <i class="fas fa-bolt"></i>
-                <span>升级额度</span>
-            </button>
-        </nav>
-
         <!-- 01 用户认证 -->
         <section>
             <div class="section-header">
@@ -1515,59 +1460,6 @@
         </footer>
     </div>
 
-    <!-- 下载APP弹窗 -->
-    <div id="downloadModal" class="modal hidden">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 class="modal-title">下载客户端</h3>
-                <button onclick="hideDownloadModal()" class="modal-close">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <p style="color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 1.5rem; text-align: center;">
-                    选择您的操作系统平台下载
-                </p>
-
-                <div style="display: flex; flex-direction: column; gap: 1rem;">
-                    <!-- macOS 下载 -->
-                    <button onclick="downloadClient('macos')" class="btn" style="padding: 1rem 1.5rem;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-                            <div style="display: flex; align-items: center; gap: 1rem;">
-                                <i class="fab fa-apple" style="font-size: 1.5rem; color: var(--accent);"></i>
-                                <div style="text-align: left;">
-                                    <div style="font-size: 0.9rem; color: var(--text-primary);">macOS</div>
-                                    <div style="font-size: 0.7rem; color: var(--text-muted);">macOS 11.0 或更高版本</div>
-                                </div>
-                            </div>
-                            <i class="fas fa-download" style="color: var(--accent);"></i>
-                        </div>
-                    </button>
-
-                    <!-- Windows 下载 -->
-                    <button onclick="downloadClient('windows')" class="btn" style="padding: 1rem 1.5rem;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-                            <div style="display: flex; align-items: center; gap: 1rem;">
-                                <i class="fab fa-windows" style="font-size: 1.5rem; color: var(--accent);"></i>
-                                <div style="text-align: left;">
-                                    <div style="font-size: 0.9rem; color: var(--text-primary);">Windows</div>
-                                    <div style="font-size: 0.7rem; color: var(--text-muted);">Windows 10/11</div>
-                                </div>
-                            </div>
-                            <i class="fas fa-download" style="color: var(--accent);"></i>
-                        </div>
-                    </button>
-                </div>
-
-                <div id="downloadStatus" style="display: none; margin-top: 1rem;">
-                    <div class="payment-info" style="text-align: center;">
-                        <p id="downloadMessage" style="color: var(--text-secondary); font-size: 0.75rem;"></p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- 联系客服弹窗 -->
     <div id="contactModal" class="modal hidden">
         <div class="modal-content">
@@ -1581,31 +1473,6 @@
                 <div class="qr-code">
                     <img src="/static/contact-qr.jpg" alt="联系客服二维码">
                     <p style="margin-top: 1rem; color: var(--text-secondary); font-size: 0.75rem;">扫码获取客服支持</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 升级额度弹窗 -->
-    <div id="upgradeModal" class="modal hidden">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 class="modal-title">升级账户额度</h3>
-                <button onclick="hideUpgradeModal()" class="modal-close">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="payment-info">
-                    <p><i class="fas fa-coins" style="margin-right: 0.5rem;"></i>兑换费率: 100 万积分 / ¥1</p>
-                </div>
-
-                <div class="payment-info">
-                    <ul>
-                        <li>高级模型（Claude、GPT-5等）需要更多积分</li>
-                        <li>仅收取最低服务费用用于平台运营</li>
-                        <li>积分根据实际模型定价进行换算</li>
-                    </ul>
                 </div>
             </div>
         </div>
@@ -1713,7 +1580,6 @@ api_key: your key</pre>
         // 全局配置
         let appConfig = {
             api_base_url: 'http://localhost:8087',
-            chat_url: '',
             domain: 'localhost'
         };
 
@@ -1732,13 +1598,6 @@ api_key: your key</pre>
 
         // 更新UI中的配置相关内容
         function updateConfigUI() {
-            // 更新聊天链接
-            const chatLink = document.querySelector('a[href*="chat."]');
-            if (chatLink && appConfig.chat_url) {
-                chatLink.href = appConfig.chat_url;
-            }
-            
-            // 更新配置示例中的占位符
             const baseUrl = appConfig.api_base_url || 'http://localhost:8087';
             
             // OpenAI 配置
@@ -1994,50 +1853,6 @@ api_key: your key</pre>
             document.getElementById('contactModal').classList.add('hidden');
         }
 
-        function showDownloadModal() {
-            document.getElementById('downloadModal').classList.remove('hidden');
-        }
-
-        function hideDownloadModal() {
-            document.getElementById('downloadModal').classList.add('hidden');
-            document.getElementById('downloadStatus').style.display = 'none';
-        }
-
-        async function downloadClient(platform) {
-            const statusDiv = document.getElementById('downloadStatus');
-            const messageP = document.getElementById('downloadMessage');
-
-            statusDiv.style.display = 'block';
-            messageP.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right: 0.5rem;"></i>正在检查下载链接...';
-
-            try {
-                const response = await fetch('/downloads');
-                const data = await response.json();
-
-                // 查找对应平台的文件
-                const file = data.files.find(f => f.platform.toLowerCase() === platform.toLowerCase());
-
-                if (file && file.url) {
-                    messageP.innerHTML = `<i class="fas fa-check" style="margin-right: 0.5rem; color: var(--accent);"></i>正在下载 ${file.filename}...`;
-                    // 触发下载
-                    window.location.href = file.url;
-                } else {
-                    messageP.innerHTML = `<i class="fas fa-exclamation-triangle" style="margin-right: 0.5rem; color: #f59e0b;"></i>暂无 ${platform} 客户端，请联系管理员获取`;
-                }
-            } catch (error) {
-                console.error('Download error:', error);
-                messageP.innerHTML = `<i class="fas fa-times" style="margin-right: 0.5rem; color: #ef4444;"></i>获取下载链接失败，请稍后重试`;
-            }
-        }
-
-        function showUpgradeModal() {
-            document.getElementById('upgradeModal').classList.remove('hidden');
-        }
-
-        function hideUpgradeModal() {
-            document.getElementById('upgradeModal').classList.add('hidden');
-        }
-
         function showConfigModal() {
             document.getElementById('configModal').classList.remove('hidden');
         }
@@ -2108,18 +1923,10 @@ api_key: your key`;
 
         document.addEventListener('click', function (event) {
             const contactModal = document.getElementById('contactModal');
-            const upgradeModal = document.getElementById('upgradeModal');
-            const downloadModal = document.getElementById('downloadModal');
             const configModal = document.getElementById('configModal');
 
             if (event.target === contactModal) {
                 hideContactModal();
-            }
-            if (event.target === upgradeModal) {
-                hideUpgradeModal();
-            }
-            if (event.target === downloadModal) {
-                hideDownloadModal();
             }
             if (event.target === configModal) {
                 hideConfigModal();

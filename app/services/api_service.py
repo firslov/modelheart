@@ -50,11 +50,12 @@ class ApiService:
         self._stats_last_updated = 0
 
         # API Key 缓存 - 使用 OrderedDict 实现 LRU
-        # 格式: {api_key: {"valid": bool, "limit": float, "usage": float, "timestamp": float}}
+        # 格式: {api_key: {"valid": bool, "limit": float, "usage": float, "timestamp": float, "in_flight": int}}
         self._api_key_cache: OrderedDict[str, Dict] = OrderedDict()
         self._api_key_cache_ttl = getattr(settings, 'API_KEY_CACHE_TTL', 300)  # 默认5分钟
         self._api_key_cache_max_size = getattr(settings, 'MAX_CACHE_SIZE', 10000)  # 最大缓存条目
         self._api_key_cache_lock = asyncio.Lock()  # 线程安全锁
+        self._per_request_reserve = getattr(settings, 'PER_REQUEST_RESERVE', 5000)  # 每个请求预留 token 数
 
         # 用量缓存 - 用于 check_usage_limit
         # 格式: {api_key: {"usage": float, "limit": float, "timestamp": float}}
@@ -118,7 +119,8 @@ class ApiService:
                     "valid": api_key_record is not None,
                     "limit": float(api_key_record.limit_value) if api_key_record else 0,  # type: ignore
                     "usage": float(api_key_record.usage) if api_key_record else 0,  # type: ignore
-                    "timestamp": current_time
+                    "timestamp": current_time,
+                    "in_flight": 0,
                 }
                 self._api_key_cache.move_to_end(api_key)
 
@@ -134,9 +136,10 @@ class ApiService:
             raise HTTPException(500, "Internal server error during API key validation")
 
     async def check_usage_limit(self, api_key: str, session: AsyncSession) -> None:
-        """检查使用限额（带缓存优化）
+        """检查使用限额（带并发预留机制）
 
         优先从缓存检查，缓存未命中或接近限额时查询数据库。
+        使用 in_flight 计数器预留额度，防止并发请求集体超额。
 
         Args:
             api_key: API密钥
@@ -152,14 +155,20 @@ class ApiService:
             async with self._api_key_cache_lock:
                 cached = self._api_key_cache.get(api_key)
                 if cached and current_time - cached["timestamp"] < self._api_key_cache_ttl:
-                    # 缓存命中
-                    if cached["usage"] >= cached["limit"]:
+                    # 计算有效用量（实际用量 + 并发预留，上限不超过限额的50%）
+                    reserved = min(
+                        cached.get("in_flight", 0) * self._per_request_reserve,
+                        cached["limit"] * 0.5
+                    )
+                    effective_usage = cached["usage"] + reserved
+                    if effective_usage >= cached["limit"]:
                         raise HTTPException(402, "Usage limit exceeded")
-                    # 如果用量超过 90% 限额，强制刷新缓存（避免超额）
-                    if cached["usage"] >= cached["limit"] * 0.9:
-                        pass  # 继续查询数据库刷新
-                    else:
+                    # 用量低于 90% 限额：只在缓存路径预留并直接返回
+                    if effective_usage < cached["limit"] * 0.9:
+                        cached["in_flight"] = cached.get("in_flight", 0) + 1
+                        self._api_key_cache.move_to_end(api_key)
                         return
+                    # 用量 >= 90%：不在此处递增 in_flight，交由下方 DB 路径统一处理
 
             # 2. 缓存未命中或接近限额，查询数据库
             api_key_repo = self._get_api_key_repo(session)
@@ -172,19 +181,25 @@ class ApiService:
             usage = float(api_key_record.usage)
             limit = float(api_key_record.limit_value)
 
-            # 更新缓存
+            # 更新缓存（含 in_flight 预留）
             async with self._api_key_cache_lock:
                 if len(self._api_key_cache) >= self._api_key_cache_max_size:
                     self._api_key_cache.popitem(last=False)
+
+                existing = self._api_key_cache.get(api_key)
+                in_flight = (existing.get("in_flight", 0) if existing else 0) + 1
+
                 self._api_key_cache[api_key] = {
                     "valid": True,
                     "limit": limit,
                     "usage": usage,
-                    "timestamp": current_time
+                    "timestamp": current_time,
+                    "in_flight": in_flight,
                 }
                 self._api_key_cache.move_to_end(api_key)
 
-            if usage >= limit:
+            effective_usage = usage + (in_flight - 1) * self._per_request_reserve
+            if effective_usage >= limit:
                 raise HTTPException(402, "Usage limit exceeded")
 
         except HTTPException:
@@ -194,6 +209,36 @@ class ApiService:
             import logging
             logging.error(f"Database error in check_usage_limit: {e}")
             raise HTTPException(500, "Internal server error during usage limit check")
+
+    async def add_cached_usage(self, api_key: str, delta: float, count: int = 1) -> None:
+        """累加缓存中的用量并释放并发预留（计费落库后回写）
+
+        仅当缓存条目存在时累加，同时递减 in_flight 计数器。
+
+        Args:
+            api_key: API密钥
+            delta: 用量增量（加权token数）
+            count: 要释放的 in_flight 数量（对应完成的请求数）
+        """
+        async with self._api_key_cache_lock:
+            cached = self._api_key_cache.get(api_key)
+            if cached is not None:
+                cached["usage"] += delta
+                cached["in_flight"] = max(0, cached.get("in_flight", 1) - count)
+
+    async def release_in_flight(self, api_key: str) -> None:
+        """释放一个 in_flight 预留（用于请求失败不计费的场景）
+
+        当 check_usage_limit 通过了但请求最终未产生计费时（上游错误、
+        不支持的模型等），调用此方法释放预留的并发额度。
+
+        Args:
+            api_key: API密钥
+        """
+        async with self._api_key_cache_lock:
+            cached = self._api_key_cache.get(api_key)
+            if cached is not None:
+                cached["in_flight"] = max(0, cached.get("in_flight", 1) - 1)
 
     async def invalidate_api_key_cache(self, api_key: str) -> None:
         """使指定 API Key 的缓存失效
@@ -263,29 +308,43 @@ class ApiService:
         else:
             await self._update_usage_internal(api_key, request_data, model, session)
 
-    async def _get_model_weights(self, model: str, session: AsyncSession) -> tuple[float, float]:
+    async def _get_model_weights(self, model: str, session: AsyncSession, server_url: str = None) -> tuple[float, float]:
         """获取模型权重，使用独立缓存优化
 
-        每个模型有独立的缓存时间戳，避免全局失效。
+        每个模型+服务器组合有独立的缓存时间戳，避免多服务器场景下权重取错。
 
         Args:
             model: 模型名称
             session: 数据库会话
+            server_url: 可选的服务器URL，用于区分不同服务器上的同模型权重配置
 
         Returns:
             tuple: (input_weight, output_weight)
         """
         current_time = time.time()
+        cache_key = f"{model}@{server_url}" if server_url else model
 
         # 检查该模型的缓存是否有效
-        if model in self._model_weights_cache:
-            cache_entry = self._model_weights_cache[model]
+        if cache_key in self._model_weights_cache:
+            cache_entry = self._model_weights_cache[cache_key]
             if current_time - cache_entry["timestamp"] < self._model_weights_cache_ttl:
                 return cache_entry["weights"]
 
         # 从数据库获取模型权重配置
         server_model_repo = self._get_server_model_repo(session)
-        server_model = await server_model_repo.get_by_frontend_name(model)
+
+        if server_url:
+            # 根据 server_url 查找对应服务器上的模型权重
+            llm_server_repo = self._get_llm_server_repo(session)
+            server = await llm_server_repo.get_by_url(server_url)
+            if server:
+                server_model = await server_model_repo.get_by_server_and_frontend_name(
+                    server.id, model
+                )
+            else:
+                server_model = None
+        else:
+            server_model = await server_model_repo.get_by_frontend_name(model)
 
         # 默认权重
         input_weight = 1.0
@@ -296,7 +355,7 @@ class ApiService:
             output_weight = server_model.output_token_weight
 
         # 更新该模型的独立缓存
-        self._model_weights_cache[model] = {
+        self._model_weights_cache[cache_key] = {
             "weights": (input_weight, output_weight),
             "timestamp": current_time
         }
@@ -351,8 +410,9 @@ class ApiService:
                 for m in request_data.get("messages", []):
                     content = m.get("content", "")
                     if isinstance(content, str):
-                        # 使用改进的缓存机制
-                        cache_key = hash(content)
+                        # 使用稳定的哈希缓存 key（hashlib.md5 跨进程一致）
+                        import hashlib
+                        cache_key = hashlib.md5(content.encode('utf-8')).hexdigest()
                         if cache_key in self._token_cache:
                             prompt_tokens += self._token_cache[cache_key]
                             # 更新LRU：将最近使用的key移到列表末尾
@@ -364,11 +424,8 @@ class ApiService:
                                 # 使用tiktoken计算token数量
                                 token_count = len(self.encoding.encode(content))
                             else:
-                                # 改进的回退方案：使用更准确的字符计数算法
-                                # 中文大约1.5个字符=1个token，英文大约4个字符=1个token
-                                chinese_chars = sum(1 for c in content if '\u4e00' <= c <= '\u9fff')
-                                english_chars = len(content) - chinese_chars
-                                token_count = max(1, int(chinese_chars / 1.5 + english_chars / 4))
+                                from app.utils.helpers import estimate_tokens_fallback
+                                token_count = estimate_tokens_fallback(content)
 
                             # 添加到缓存
                             self._token_cache[cache_key] = token_count
@@ -540,7 +597,12 @@ class ApiService:
         return servers_dict
 
     async def save_llm_servers(self, servers_data: Dict, session: AsyncSession) -> None:
-        """保存LLM服务器配置 - 替换整个服务器列表
+        """保存LLM服务器配置 - 使用 upsert 策略避免短暂空窗
+
+        相比 delete-all + insert-all，此方法：
+        1. 对每个服务器执行 upsert（保留模型请求计数）
+        2. 仅删除不在新配置中的旧服务器
+        3. 避免删除到插入之间的空窗期
 
         Args:
             servers_data: 服务器配置数据
@@ -551,49 +613,28 @@ class ApiService:
         llm_server_repo = self._get_llm_server_repo(session)
 
         try:
-            # 先删除所有现有服务器配置（使用Repository的delete_all方法）
-            await llm_server_repo.delete_all()
+            # 1. 获取现有的所有服务器
+            existing_servers = await llm_server_repo.get_all_with_models()
+            existing_urls = {s.server_url for s in existing_servers}
+            new_urls = set(servers_data.keys())
 
-            # 添加新的服务器配置
+            # 2. 删除不再需要的服务器
+            urls_to_delete = existing_urls - new_urls
+            for url in urls_to_delete:
+                await llm_server_repo.delete_by_url(url)
+
+            # 3. Upsert 每个服务器
             for server_url, server_data in servers_data.items():
-                llm_server = LLMServer(
-                    server_url=server_url,
-                    device=server_data.get('device'),
-                    apikey=server_data.get('apikey')
-                )
-                
-                # 添加模型配置 - 同时设置新旧字段以确保兼容性
-                models_data = server_data.get('model', {})
-                for frontend_model_name, model_data in models_data.items():
-                    backend_model_name = model_data.get('name', frontend_model_name)
-                    
-                    server_model = ServerModel(
-                        # 旧字段（保持兼容）
-                        client_model_name=backend_model_name,  # 实际后端模型名称
-                        actual_model_name=frontend_model_name,  # 前端使用的模型名称
-                        # 新字段（更清晰的命名）
-                        backend_model_name=backend_model_name,  # 实际后端模型名称
-                        frontend_model_name=frontend_model_name,  # 前端使用的模型名称
-                        reqs=model_data.get('reqs', 0),
-                        status=model_data.get('status', True),
-                        input_token_weight=model_data.get('input_token_weight', 1.0),
-                        output_token_weight=model_data.get('output_token_weight', 1.0)
-                    )
-                    llm_server.models.append(server_model)
-                
-                session.add(llm_server)
-            
+                await self.update_llm_server(server_url, server_data, session)
+
             await session.commit()
-            
+
         except IntegrityError as e:
-            # 回滚事务
             await session.rollback()
-            # 记录错误并重新抛出
             import logging
             logging.error(f"数据库完整性错误: {e}")
             raise HTTPException(400, f"数据库完整性错误: 可能存在重复的模型配置")
         except Exception as e:
-            # 回滚事务
             await session.rollback()
             import logging
             logging.error(f"保存LLM服务器时出错: {e}")
@@ -711,8 +752,7 @@ class ApiService:
                 
                 session.add(llm_server)
             
-            await session.commit()
-            
+            # 注意：不在方法内部 commit，由调用者统一提交以保证事务原子性
         except IntegrityError as e:
             # 回滚事务
             await session.rollback()

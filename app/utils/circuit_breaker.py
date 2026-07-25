@@ -35,6 +35,7 @@ class CircuitStats:
     """单个熔断器的统计信息"""
     failures: int = 0                    # 连续失败次数
     successes: int = 0                   # 半开状态下的成功次数
+    half_open_in_flight: int = 0         # 半开状态下的在途试探请求数
     last_failure_time: float = 0         # 最后一次失败的时间戳
     state: CircuitState = CircuitState.CLOSED
     total_requests: int = 0              # 总请求数（用于监控）
@@ -137,6 +138,8 @@ class CircuitBreaker:
                     circuit.state = CircuitState.HALF_OPEN
                     circuit.failures = 0
                     circuit.successes = 0
+                    # 当前请求作为第一个在途试探
+                    circuit.half_open_in_flight = 1
 
                     log_circuit(logger, "half_open", key, recovery_after=f"{time_since_failure:.1f}s")
                     return True
@@ -147,12 +150,13 @@ class CircuitBreaker:
                 return False
 
             elif circuit.state == CircuitState.HALF_OPEN:
-                # 半开状态，限制并发请求数
-                if circuit.successes < self.half_open_max_calls:
+                # 半开状态，按在途请求数限制并发试探
+                if circuit.half_open_in_flight < self.half_open_max_calls:
+                    circuit.half_open_in_flight += 1
                     return True
 
-                # 已达到半开状态的最大请求数，拒绝新请求
-                logger.debug(f"circuit HALF_OPEN | server={key} | probes={circuit.successes}/{self.half_open_max_calls}")
+                # 已达到半开状态的最大并发试探数，拒绝新请求
+                logger.debug(f"circuit HALF_OPEN | server={key} | in_flight={circuit.half_open_in_flight}/{self.half_open_max_calls}")
                 return False
 
         return True
@@ -171,12 +175,15 @@ class CircuitBreaker:
             circuit.failures = 0  # 重置连续失败计数
 
             if circuit.state == CircuitState.HALF_OPEN:
+                # 试探结束，释放在途名额
+                circuit.half_open_in_flight = max(0, circuit.half_open_in_flight - 1)
                 circuit.successes += 1
 
                 if circuit.successes >= self.half_open_max_calls:
                     # 半开状态下连续成功，恢复正常
                     circuit.state = CircuitState.CLOSED
                     circuit.successes = 0
+                    circuit.half_open_in_flight = 0
 
                     log_circuit(logger, "close", key, reason="probes_succeeded")
             elif circuit.state == CircuitState.CLOSED:
@@ -200,10 +207,11 @@ class CircuitBreaker:
             circuit.last_failure_time = time.time()
 
             if circuit.state == CircuitState.HALF_OPEN:
-                # 半开状态下任何失败都重新熔断
+                # 半开状态下任何失败都重新熔断，并重置在途计数
                 circuit.state = CircuitState.OPEN
                 circuit.total_circuit_opens += 1
                 circuit.successes = 0
+                circuit.half_open_in_flight = 0
 
                 log_circuit(logger, "open", key, reason="probe_failed", error=str(error)[:50] if error else None)
 
@@ -243,6 +251,7 @@ class CircuitBreaker:
             circuit.state = CircuitState.CLOSED
             circuit.failures = 0
             circuit.successes = 0
+            circuit.half_open_in_flight = 0
 
             log_circuit(logger, "reset", key, reason="manual")
 

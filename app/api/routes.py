@@ -16,6 +16,7 @@ from fastapi.responses import (
 )
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 from pathlib import Path
 
 from app.config.settings import settings
@@ -24,7 +25,7 @@ from app.models.api_models import ApiKeyUsage
 from app.models.queue_models import UsageEventData, UsageEventType
 from app.services.api_service import ApiService
 from app.services.llm_service import LLMService
-from app.utils.helpers import get_current_time, log_api_usage
+from app.utils.helpers import get_current_time, log_api_usage, estimate_tokens_fallback
 from app.utils.logging_config import get_logger
 from app.database.database import get_db_session
 from app.database.repositories import (
@@ -56,6 +57,7 @@ async def _handle_llm_server_action(request, api_service, data, session: AsyncSe
         # 添加新服务器 - 直接使用update_llm_server方法
         # 如果服务器已存在，update_llm_server会更新它；如果不存在，会创建新的
         await api_service.update_llm_server(url, config, session)
+        await session.commit()
     elif action == "update":
         old_url = data.get("oldUrl")
 
@@ -68,11 +70,12 @@ async def _handle_llm_server_action(request, api_service, data, session: AsyncSe
                 del servers_data[old_url]
             # 添加/更新新服务器
             servers_data[url] = config
-            # 使用save_llm_servers保存所有服务器
+            # 使用save_llm_servers保存所有服务器（内部已含 commit）
             await api_service.save_llm_servers(servers_data, session)
         else:
             # 只更新当前服务器的配置
             await api_service.update_llm_server(url, config, session)
+            await session.commit()
     elif action == "delete":
         # 删除服务器 - 加载现有服务器，删除指定服务器
         servers_data = await api_service.load_llm_servers(session)
@@ -92,6 +95,7 @@ async def _handle_llm_server_action(request, api_service, data, session: AsyncSe
                     server_config["model"][model_id]["status"] = model_status
                     # 使用update_llm_server方法只更新这个服务器
                     await api_service.update_llm_server(url, server_config, session)
+                    await session.commit()
     else:
         raise HTTPException(status_code=400, detail="Invalid action")
 
@@ -165,7 +169,7 @@ async def reset_circuit_breaker(request: Request):
     """
     try:
         llm_service, _ = get_services(request)
-        data = await request.json() if request.headers.get("content-type") == "application/json" else {}
+        data = await request.json() if "application/json" in request.headers.get("content-type", "") else {}
         server_key = data.get("server_key")
 
         await llm_service.reset_circuit_breaker(server_key)
@@ -250,6 +254,121 @@ def get_usage_queue(request: Request):
     return request.app.state.app.usage_queue
 
 
+def _estimate_tokens(api_service: ApiService, text: str) -> int:
+    """估算文本 token 数
+
+    优先使用 tiktoken，encoding 不可用时回退到字符分类估算算法。
+    """
+    if not text:
+        return 0
+    if getattr(api_service, "_use_tiktoken", False) and getattr(api_service, "encoding", None):
+        try:
+            return len(api_service.encoding.encode(text))
+        except Exception:
+            pass
+    return estimate_tokens_fallback(text)
+
+
+def _estimate_prompt_tokens(api_service: ApiService, req_data: dict) -> int:
+    """对请求中的 messages / prompt 内容估算 prompt token 数"""
+    total = 0
+    for m in req_data.get("messages") or []:
+        content = m.get("content", "")
+        if isinstance(content, str):
+            total += _estimate_tokens(api_service, content)
+        elif isinstance(content, list):
+            # 兼容多模态消息：只统计文本部分
+            for part in content:
+                if isinstance(part, dict) and part.get("type") == "text":
+                    total += _estimate_tokens(api_service, part.get("text", ""))
+    prompt = req_data.get("prompt")
+    if isinstance(prompt, str):
+        total += _estimate_tokens(api_service, prompt)
+    elif isinstance(prompt, list):
+        for p in prompt:
+            if isinstance(p, str):
+                total += _estimate_tokens(api_service, p)
+    return total
+
+
+def _parse_stream_chunks(raw_text: str):
+    """解析累积的 SSE 流式输出
+
+    返回 (输出文本, usage字典或None)。仅解析完整的 data 行，
+    末尾不完整的行（客户端中断时）会被 json 解析跳过。
+    如果上游 SSE 尾 chunk 携带 usage 字段（stream_options.include_usage），一并提取。
+    """
+    text_parts = []
+    usage = None
+    for line in raw_text.splitlines():
+        line = line.strip()
+        if not line.startswith("data:"):
+            continue
+        payload = line[5:].strip()
+        if not payload or payload == "[DONE]":
+            continue
+        try:
+            data = json.loads(payload)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(data, dict):
+            continue
+        if data.get("usage"):
+            usage = data["usage"]
+        # OpenAI chat/completions 流式格式
+        for choice in data.get("choices") or []:
+            if not isinstance(choice, dict):
+                continue
+            delta = choice.get("delta")
+            if isinstance(delta, dict) and isinstance(delta.get("content"), str):
+                text_parts.append(delta["content"])
+            if isinstance(choice.get("text"), str):
+                text_parts.append(choice["text"])
+    return "".join(text_parts), usage
+
+
+async def _enqueue_stream_usage(
+    usage_queue,
+    api_service: ApiService,
+    api_key: str,
+    model: str,
+    target_server: str,
+    req_data: dict,
+    collected_chunks: list,
+    input_weight: float,
+    output_weight: float,
+):
+    """流式请求计费：优先使用上游 usage 字段，否则用 tiktoken 对请求和累积输出估算"""
+    output_text, upstream_usage = _parse_stream_chunks("".join(collected_chunks))
+    if upstream_usage:
+        prompt_tokens = upstream_usage.get("prompt_tokens", 0)
+        completion_tokens = upstream_usage.get("completion_tokens", 0)
+    else:
+        prompt_tokens = _estimate_prompt_tokens(api_service, req_data)
+        completion_tokens = _estimate_tokens(api_service, output_text)
+
+    await usage_queue.enqueue(
+        UsageEventData(
+            event_type=UsageEventType.UPDATE_USAGE,
+            api_key=api_key,
+            model=model,
+            server_url=target_server,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            input_token_weight=input_weight,
+            output_token_weight=output_weight,
+        )
+    )
+    await usage_queue.enqueue(
+        UsageEventData(
+            event_type=UsageEventType.INCREMENT_MODEL_REQS,
+            api_key=api_key,
+            model=model,
+            server_url=target_server,
+        )
+    )
+
+
 @router.get("/get-config")
 async def get_public_config():
     """获取公共配置信息"""
@@ -291,7 +410,7 @@ async def home():
 @router.get("/login")
 async def login_page(request: Request):
     """登录页面"""
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse(request, "login.html")
 
 
 @router.post("/login")
@@ -325,9 +444,9 @@ async def login(request: Request):
     else:
         # 表单提交失败，返回登录页面并显示错误
         return templates.TemplateResponse(
+            request,
             "login.html",
             {
-                "request": request,
                 "error": "用户名或密码错误"
             }
         )
@@ -370,11 +489,11 @@ async def user_register(
 
         _, api_service = get_services(request)
 
-        # 检查是否已存在该手机号
+        # 检查是否已存在该手机号（先查给出友好提示，IntegrityError 兜底防并发竞态）
         existing_key = await api_key_repo.get_by_phone(phone)
 
         if existing_key:
-            raise HTTPException(status_code=400, detail="该手机号已注册")
+            raise HTTPException(status_code=409, detail="该手机号已注册")
 
         # 生成新的API密钥
         new_key = await api_service.generate_api_key(session)
@@ -386,7 +505,12 @@ async def user_register(
             api_key_record.password_hash = bcrypt.hashpw(
                 password.encode(), bcrypt.gensalt()
             ).decode()
-            await session.commit()
+            try:
+                await session.commit()
+            except IntegrityError:
+                # 并发注册同一手机号时由数据库唯一约束兜底
+                await session.rollback()
+                raise HTTPException(status_code=409, detail="该手机号已注册")
 
         # 设置session
         request.session["user_authenticated"] = True
@@ -519,9 +643,9 @@ async def user_page(
         })
 
     return templates.TemplateResponse(
+        request,
         "user.html",
         {
-            "request": request,
             "phone": api_key_record.phone,
             "api_key": api_key_record.api_key,
             "usage": api_key_record.usage or 0,
@@ -560,26 +684,31 @@ async def generate_api_key(
 
         _, api_service = get_services(request)
 
-        # 检查是否已存在该手机号
+        # 检查是否已存在该手机号（先查给出友好提示，IntegrityError 兜底防并发竞态）
         existing_key = await api_key_repo.get_by_phone(phone)
 
         if existing_key:
             # 如果手机号已存在，提示用户已注册
-            return JSONResponse(status_code=400, content={"detail": "用户已注册"})
-        else:
-            # 生成新的API密钥
-            new_key = await api_service.generate_api_key(session)
+            raise HTTPException(status_code=409, detail="该手机号已注册")
 
-            # 更新记录，添加手机号和密码
-            api_key_record = await api_key_repo.get_by_api_key(new_key)
-            if api_key_record:
-                api_key_record.phone = phone
-                api_key_record.password_hash = bcrypt.hashpw(
-                    password.encode(), bcrypt.gensalt()
-                ).decode()
+        # 生成新的API密钥
+        new_key = await api_service.generate_api_key(session)
+
+        # 更新记录，添加手机号和密码
+        api_key_record = await api_key_repo.get_by_api_key(new_key)
+        if api_key_record:
+            api_key_record.phone = phone
+            api_key_record.password_hash = bcrypt.hashpw(
+                password.encode(), bcrypt.gensalt()
+            ).decode()
+            try:
                 await session.commit()
+            except IntegrityError:
+                # 并发注册同一手机号时由数据库唯一约束兜底
+                await session.rollback()
+                raise HTTPException(status_code=409, detail="该手机号已注册")
 
-            return {"api_key": new_key}
+        return {"api_key": new_key}
 
     except HTTPException:
         raise
@@ -803,9 +932,9 @@ async def usage_dashboard(
         api_keys.append(key_data)
 
     return templates.TemplateResponse(
+        request,
         "dashboard_manage.html",
         {
-            "request": request,
             "total_usage": total_usage,
             "total_entries": total_entries,
             "total_reqs": total_reqs,
@@ -927,78 +1056,91 @@ async def proxy_handler_chat(
     target = f"{target_server}{request.url.path.replace('/v1', '', 1)}"
 
     # 构造请求头
-    headers = llm_service.get_auth_header(model, api_key)
+    headers = llm_service.get_auth_header(model, api_key, target_server)
 
     try:
         # 流式响应处理
         if req_data.get("stream", False):
             # 在流式响应前获取模型权重，避免在流式结束后使用已关闭的 session
-            input_weight, output_weight = await api_service._get_model_weights(model, session)
+            input_weight, output_weight = await api_service._get_model_weights(model, session, target_server)
 
             async def stream_wrapper():
                 start_time = time.time()
                 chunk_count = 0
                 max_retries = 1
+                has_yielded = False  # 是否已向客户端输出过内容（决定断流后是否可重试）
+                should_bill = False  # 上游流已正常建立（2xx），结束或断连都需要计费
+                collected_chunks = []  # 累积上游输出，用于流结束后估算 token
+                server_key = llm_service._extract_server_key(target)
 
-                for attempt in range(max_retries + 1):
-                    try:
-                        client_stream = await llm_service.forward_request(
-                            target, req_data, headers, stream=True
-                        )
-
-                        async with client_stream as response:
-                            first_chunk_time = None
-                            async for chunk in response.aiter_text():
-                                if first_chunk_time is None:
-                                    first_chunk_time = time.time()
-                                    first_chunk_delay = first_chunk_time - start_time
-                                    logger.debug(f"First chunk | model={model} | delay={first_chunk_delay:.3f}s")
-
-                                chunk_count += 1
-                                yield chunk
-
-                        end_time = time.time()
-                        total_duration = end_time - start_time
-
-                        # 记录流式响应性能指标
-                        logger.info(
-                            f"Stream completed | model={model} | "
-                            f"duration={total_duration:.3f}s | chunks={chunk_count} | "
-                            f"first_chunk={first_chunk_delay if 'first_chunk_delay' in locals() else 'N/A':.3f}s"
-                        )
-
-                        # 流式响应结束后，将统计事件加入队列（非阻塞）
-                        await usage_queue.enqueue(
-                            UsageEventData(
-                                event_type=UsageEventType.UPDATE_USAGE,
-                                api_key=api_key,
-                                model=model,
-                                server_url=target_server,
-                                prompt_tokens=0,
-                                completion_tokens=0,
-                                input_token_weight=input_weight,
-                                output_token_weight=output_weight,
-                                request_data=req_data,
+                try:
+                    for attempt in range(max_retries + 1):
+                        try:
+                            client_stream = await llm_service.forward_request(
+                                target, req_data, headers, stream=True
                             )
-                        )
-                        await usage_queue.enqueue(
-                            UsageEventData(
-                                event_type=UsageEventType.INCREMENT_MODEL_REQS,
-                                api_key=api_key,
-                                model=model,
-                                server_url=target_server,
-                            )
-                        )
-                        break  # 成功完成，跳出重试循环
 
-                    except httpx.RemoteProtocolError as exc:
-                        logger.warning(
-                            f"Stream connection error (attempt {attempt + 1}/{max_retries + 1}) model={model}: {exc}"
-                        )
-                        if attempt < max_retries:
-                            await asyncio.sleep(0.5)
-                            continue
-                        else:
+                            async with client_stream as response:
+                                # 上游返回错误状态：记录熔断失败，透传错误后停止（不计费不计数）
+                                if response.status_code >= 400:
+                                    error_body = await response.aread()
+                                    await llm_service.circuit_breaker.record_failure(server_key)
+                                    llm_service._update_server_health(server_key, False)
+                                    logger.warning(
+                                        f"stream upstream error | model={model} | status={response.status_code}"
+                                    )
+                                    error_data = {
+                                        "error": {
+                                            "message": f"上游服务返回错误（状态码 {response.status_code}）",
+                                            "type": "upstream_error",
+                                            "code": response.status_code,
+                                        }
+                                    }
+                                    yield f"data: {json.dumps(error_data)}\n\n"
+                                    yield "data: [DONE]\n\n"
+                                    return
+
+                                should_bill = True
+                                first_chunk_time = None
+                                async for chunk in response.aiter_text():
+                                    if first_chunk_time is None:
+                                        first_chunk_time = time.time()
+                                        first_chunk_delay = first_chunk_time - start_time
+                                        logger.debug(f"First chunk | model={model} | delay={first_chunk_delay:.3f}s")
+
+                                    chunk_count += 1
+                                    collected_chunks.append(chunk)
+                                    has_yielded = True
+                                    yield chunk
+
+                            # 流正常完成，熔断器记录成功
+                            await llm_service.circuit_breaker.record_success(server_key)
+                            llm_service._update_server_health(server_key, True)
+
+                            end_time = time.time()
+                            total_duration = end_time - start_time
+
+                            # 记录流式响应性能指标（零 chunk 时 first_chunk 显示 N/A）
+                            first_chunk_str = (
+                                f"{first_chunk_delay:.3f}s" if first_chunk_time is not None else "N/A"
+                            )
+                            logger.info(
+                                f"Stream completed | model={model} | "
+                                f"duration={total_duration:.3f}s | chunks={chunk_count} | "
+                                f"first_chunk={first_chunk_str}"
+                            )
+                            break  # 成功完成，跳出重试循环
+
+                        except httpx.RemoteProtocolError as exc:
+                            await llm_service.circuit_breaker.record_failure(server_key)
+                            llm_service._update_server_health(server_key, False)
+                            logger.warning(
+                                f"Stream connection error (attempt {attempt + 1}/{max_retries + 1}) model={model}: {exc}"
+                            )
+                            # 仅在尚未向客户端输出任何内容时允许重试，避免重复推送
+                            if attempt < max_retries and not has_yielded:
+                                await asyncio.sleep(0.5)
+                                continue
                             error_data = {
                                 "error": {
                                     "message": f"上游服务连接中断: {str(exc)}",
@@ -1008,17 +1150,38 @@ async def proxy_handler_chat(
                             }
                             yield f"data: {json.dumps(error_data)}\n\n"
                             yield "data: [DONE]\n\n"
+                            break
 
-                    except Exception as exc:
-                        logger.error(f"Stream error model={model}: {exc}")
-                        error_data = {
-                            "error": {
-                                "message": f"流式响应错误: {str(exc)}",
-                                "type": "stream_error"
+                        except Exception as exc:
+                            # HTTPException（如熔断器打开）上游已记录失败，避免重复计数
+                            if not isinstance(exc, HTTPException):
+                                await llm_service.circuit_breaker.record_failure(server_key)
+                                llm_service._update_server_health(server_key, False)
+                            logger.error(f"Stream error model={model}: {exc}")
+                            error_data = {
+                                "error": {
+                                    "message": f"流式响应错误: {str(exc)}",
+                                    "type": "stream_error"
+                                }
                             }
-                        }
-                        yield f"data: {json.dumps(error_data)}\n\n"
-                        yield "data: [DONE]\n\n"
+                            yield f"data: {json.dumps(error_data)}\n\n"
+                            yield "data: [DONE]\n\n"
+                            break
+                finally:
+                    # 无论流正常结束还是客户端中断（GeneratorExit/取消），
+                    # 只要上游流已建立就按已产出内容计费
+                    if should_bill:
+                        try:
+                            await _enqueue_stream_usage(
+                                usage_queue, api_service, api_key, model,
+                                target_server, req_data, collected_chunks,
+                                input_weight, output_weight,
+                            )
+                        except Exception as e:
+                            logger.warning(f"流式计费入队失败 model={model}: {e}")
+                    else:
+                        # 上游错误未产生计费，释放预留的并发额度
+                        await api_service.release_in_flight(api_key)
 
             return StreamingResponse(
                 stream_wrapper(),
@@ -1037,7 +1200,7 @@ async def proxy_handler_chat(
             response = json.loads(response_text)
 
             # 获取模型权重
-            input_weight, output_weight = await api_service._get_model_weights(model, session)
+            input_weight, output_weight = await api_service._get_model_weights(model, session, target_server)
 
             # 将统计事件加入队列
             if "usage" in response:
@@ -1066,14 +1229,17 @@ async def proxy_handler_chat(
 
             return JSONResponse(response)
         except json.JSONDecodeError as e:
+            await api_service.release_in_flight(api_key)
             return JSONResponse(
                 {"error": "Invalid response from upstream server", "message": str(e)},
                 status_code=500,
             )
 
     except HTTPException as e:
+        await api_service.release_in_flight(api_key)
         return JSONResponse({"error": str(e.detail)}, status_code=e.status_code)
     except Exception as e:
+        await api_service.release_in_flight(api_key)
         logger.error(f"chat/completions error: {e}", exc_info=True)
         return JSONResponse({"error": "Internal server error"}, status_code=500)
 
@@ -1104,7 +1270,7 @@ async def proxy_handler_embeddings(
             logger.debug(f"embeddings cache hit | model={model}")
             # 更新用量统计（即使命中缓存也要记录）
             target_server = llm_service.get_target_server(model)
-            input_weight, output_weight = await api_service._get_model_weights(model, session)
+            input_weight, output_weight = await api_service._get_model_weights(model, session, target_server)
             if "usage" in cached_response and "prompt_tokens" in cached_response["usage"]:
                 await usage_queue.enqueue(
                     UsageEventData(
@@ -1133,20 +1299,20 @@ async def proxy_handler_embeddings(
     target = f"{target_server}{request.url.path.replace('/v1', '', 1)}"
 
     # 构造请求头
-    headers = llm_service.get_auth_header(model, api_key)
+    headers = llm_service.get_auth_header(model, api_key, target_server)
 
     try:
         # 转发请求
         response_text = await llm_service.forward_request(target, req_data, headers)
         response = json.loads(response_text)
 
-        # 缓存响应（仅缓存非流式请求）
-        if not req_data.get("stream", False):
+        # 缓存响应（仅缓存非流式且不含错误的响应）
+        if not req_data.get("stream", False) and "error" not in response:
             await response_cache.set(req_data, response)
             logger.debug(f"embeddings cache set | model={model}")
 
         # 获取模型权重
-        input_weight, output_weight = await api_service._get_model_weights(model, session)
+        input_weight, output_weight = await api_service._get_model_weights(model, session, target_server)
 
         # 更新用量 - embeddings 接口只有 prompt_tokens
         if "usage" in response and "prompt_tokens" in response["usage"]:
@@ -1181,8 +1347,10 @@ async def proxy_handler_embeddings(
             status_code=500,
         )
     except HTTPException as e:
+        await api_service.release_in_flight(api_key)
         return JSONResponse({"error": str(e.detail)}, status_code=e.status_code)
     except Exception as e:
+        await api_service.release_in_flight(api_key)
         logger.error(f"embeddings error: {e}", exc_info=True)
         return JSONResponse({"error": "Internal server error"}, status_code=500)
 
@@ -1200,6 +1368,7 @@ async def proxy_handler_completions(
     auth_header = request.headers.get("Authorization", "")
     _, _, api_key = auth_header.partition(" ")
     await api_service.validate_api_key(api_key, session)
+    await api_service.check_usage_limit(api_key, session)
 
     # 请求处理
     req_data = await request.json()
@@ -1210,52 +1379,69 @@ async def proxy_handler_completions(
     target = f"{target_server}{request.url.path.replace('/v1', '', 1)}"
 
     # 构造请求头
-    headers = llm_service.get_auth_header(model, api_key)
+    headers = llm_service.get_auth_header(model, api_key, target_server)
 
     try:
         # 流式响应处理
         if req_data.get("stream", False):
+            # 在流式响应前获取模型权重，避免在流式结束后使用已关闭的 session
+            input_weight, output_weight = await api_service._get_model_weights(model, session, target_server)
+
             async def stream_wrapper():
                 max_retries = 1
+                has_yielded = False  # 是否已向客户端输出过内容（决定断流后是否可重试）
+                should_bill = False  # 上游流已正常建立（2xx），结束或断连都需要计费
+                collected_chunks = []  # 累积上游输出，用于流结束后估算 token
+                server_key = llm_service._extract_server_key(target)
 
-                for attempt in range(max_retries + 1):
-                    try:
-                        client_stream = await llm_service.forward_request(
-                            target, req_data, headers, stream=True
-                        )
-
-                        async with client_stream as response:
-                            async for chunk in response.aiter_text():
-                                yield chunk
-
-                        # 流式响应结束后，将统计事件加入队列
-                        await usage_queue.enqueue(
-                            UsageEventData(
-                                event_type=UsageEventType.UPDATE_USAGE,
-                                api_key=api_key,
-                                model=model,
-                                server_url=target_server,
-                                request_data=req_data,
+                try:
+                    for attempt in range(max_retries + 1):
+                        try:
+                            client_stream = await llm_service.forward_request(
+                                target, req_data, headers, stream=True
                             )
-                        )
-                        await usage_queue.enqueue(
-                            UsageEventData(
-                                event_type=UsageEventType.INCREMENT_MODEL_REQS,
-                                api_key=api_key,
-                                model=model,
-                                server_url=target_server,
-                            )
-                        )
-                        break  # 成功完成
 
-                    except httpx.RemoteProtocolError as exc:
-                        logger.warning(
-                            f"Stream connection error (attempt {attempt + 1}/{max_retries + 1}) model={model}: {exc}"
-                        )
-                        if attempt < max_retries:
-                            await asyncio.sleep(0.5)
-                            continue
-                        else:
+                            async with client_stream as response:
+                                # 上游返回错误状态：记录熔断失败，透传错误后停止（不计费不计数）
+                                if response.status_code >= 400:
+                                    error_body = await response.aread()
+                                    await llm_service.circuit_breaker.record_failure(server_key)
+                                    llm_service._update_server_health(server_key, False)
+                                    logger.warning(
+                                        f"stream upstream error | model={model} | status={response.status_code}"
+                                    )
+                                    error_data = {
+                                        "error": {
+                                            "message": f"上游服务返回错误（状态码 {response.status_code}）",
+                                            "type": "upstream_error",
+                                            "code": response.status_code,
+                                        }
+                                    }
+                                    yield f"data: {json.dumps(error_data)}\n\n"
+                                    yield "data: [DONE]\n\n"
+                                    return
+
+                                should_bill = True
+                                async for chunk in response.aiter_text():
+                                    collected_chunks.append(chunk)
+                                    has_yielded = True
+                                    yield chunk
+
+                            # 流正常完成，熔断器记录成功
+                            await llm_service.circuit_breaker.record_success(server_key)
+                            llm_service._update_server_health(server_key, True)
+                            break  # 成功完成
+
+                        except httpx.RemoteProtocolError as exc:
+                            await llm_service.circuit_breaker.record_failure(server_key)
+                            llm_service._update_server_health(server_key, False)
+                            logger.warning(
+                                f"Stream connection error (attempt {attempt + 1}/{max_retries + 1}) model={model}: {exc}"
+                            )
+                            # 仅在尚未向客户端输出任何内容时允许重试，避免重复推送
+                            if attempt < max_retries and not has_yielded:
+                                await asyncio.sleep(0.5)
+                                continue
                             error_data = {
                                 "error": {
                                     "message": f"上游服务连接中断: {str(exc)}",
@@ -1265,17 +1451,38 @@ async def proxy_handler_completions(
                             }
                             yield f"data: {json.dumps(error_data)}\n\n"
                             yield "data: [DONE]\n\n"
+                            break
 
-                    except Exception as exc:
-                        logger.error(f"Stream error model={model}: {exc}")
-                        error_data = {
-                            "error": {
-                                "message": f"流式响应错误: {str(exc)}",
-                                "type": "stream_error"
+                        except Exception as exc:
+                            # HTTPException（如熔断器打开）上游已记录失败，避免重复计数
+                            if not isinstance(exc, HTTPException):
+                                await llm_service.circuit_breaker.record_failure(server_key)
+                                llm_service._update_server_health(server_key, False)
+                            logger.error(f"Stream error model={model}: {exc}")
+                            error_data = {
+                                "error": {
+                                    "message": f"流式响应错误: {str(exc)}",
+                                    "type": "stream_error"
+                                }
                             }
-                        }
-                        yield f"data: {json.dumps(error_data)}\n\n"
-                        yield "data: [DONE]\n\n"
+                            yield f"data: {json.dumps(error_data)}\n\n"
+                            yield "data: [DONE]\n\n"
+                            break
+                finally:
+                    # 无论流正常结束还是客户端中断（GeneratorExit/取消），
+                    # 只要上游流已建立就按已产出内容计费
+                    if should_bill:
+                        try:
+                            await _enqueue_stream_usage(
+                                usage_queue, api_service, api_key, model,
+                                target_server, req_data, collected_chunks,
+                                input_weight, output_weight,
+                            )
+                        except Exception as e:
+                            logger.warning(f"流式计费入队失败 model={model}: {e}")
+                    else:
+                        # 上游错误未产生计费，释放预留的并发额度
+                        await api_service.release_in_flight(api_key)
 
             return StreamingResponse(
                 stream_wrapper(),
@@ -1294,7 +1501,7 @@ async def proxy_handler_completions(
             response = json.loads(response_text)
 
             # 获取模型权重
-            input_weight, output_weight = await api_service._get_model_weights(model, session)
+            input_weight, output_weight = await api_service._get_model_weights(model, session, target_server)
 
             # 将统计事件加入队列
             if "usage" in response:
@@ -1323,14 +1530,17 @@ async def proxy_handler_completions(
 
             return JSONResponse(response)
         except json.JSONDecodeError as e:
+            await api_service.release_in_flight(api_key)
             return JSONResponse(
                 {"error": "Invalid response from upstream server", "message": str(e)},
                 status_code=500,
             )
 
     except HTTPException as e:
+        await api_service.release_in_flight(api_key)
         return JSONResponse({"error": str(e.detail)}, status_code=e.status_code)
     except Exception as e:
+        await api_service.release_in_flight(api_key)
         logger.error(f"completions error: {e}", exc_info=True)
         return JSONResponse({"error": "Internal server error"}, status_code=500)
 
@@ -1367,6 +1577,7 @@ async def anthropic_proxy_handler(
 
     # 验证API密钥有效性
     await api_service.validate_api_key(api_key, session)
+    await api_service.check_usage_limit(api_key, session)
 
     # 请求处理
     req_data = await request.json()
@@ -1376,26 +1587,29 @@ async def anthropic_proxy_handler(
     target_server = llm_service.get_target_server(model)
 
     # 获取模型权重（用于用量计算）
-    input_weight, output_weight = await api_service._get_model_weights(model, session)
+    input_weight, output_weight = await api_service._get_model_weights(model, session, target_server)
 
     # 记录请求日志
     masked_key = f"{api_key[:8]}...{api_key[-4:]}"
     logger.info(f"anthropic request | model={model} | key={masked_key} | server={target_server}")
 
-    # 构建目标URL - 去掉用户路径中的/anthropic前缀
-    original_path = request.url.path
-    if original_path.startswith("/anthropic/v1/messages"):
-        target = f"{target_server}/v1/messages"
-    else:
-        target = f"{target_server}"
+    # 构建目标URL - /anthropic 裸路径与 /anthropic/v1/messages 都转发到 /v1/messages
+    target = f"{target_server}/v1/messages"
 
     # 构造请求头 - 同时提供 x-api-key 和 Authorization: Bearer 两种认证方式
-    upstream_api_key = llm_service.app_state.cloud_models.get(model, api_key)
+    upstream_api_key = api_key
+    if model in llm_service.app_state.cloud_models:
+        server_mappings = llm_service.app_state.cloud_models[model]
+        upstream_api_key = server_mappings.get(target_server, api_key)
+
+    # 优先透传客户端的 anthropic-version，否则使用配置的默认值
+    client_anthropic_version = request.headers.get("anthropic-version", "")
+
     headers = {
         "x-api-key": upstream_api_key,
         "Authorization": f"Bearer {upstream_api_key}",
         "Content-Type": "application/json",
-        "anthropic-version": "2023-06-01",  # 添加Anthropic版本头
+        "anthropic-version": client_anthropic_version or settings.ANTHROPIC_VERSION,
     }
 
     try:
@@ -1403,59 +1617,97 @@ async def anthropic_proxy_handler(
         if req_data.get("stream", False):
             async def stream_wrapper():
                 max_retries = 1
+                has_yielded = False  # 是否已向客户端输出过内容（决定断流后是否可重试）
+                should_bill = False  # 上游流已正常建立（2xx），结束或断连都需要计费
+                server_key = llm_service._extract_server_key(target)
 
-                for attempt in range(max_retries + 1):
-                    try:
-                        client_stream = await llm_service.forward_request(
-                            target, req_data, headers, stream=True
-                        )
-
-                        async with client_stream as response:
-                            async for chunk in response.aiter_text():
-                                yield chunk
-
-                        # 流式响应成功完成
-                        logger.info(f"anthropic stream completed | model={model} | key={masked_key}")
-                        # 将统计事件加入队列
-                        await usage_queue.enqueue(
-                            UsageEventData(
-                                event_type=UsageEventType.UPDATE_ANTHROPIC_USAGE,
-                                api_key=api_key,
-                                model=model,
-                                input_token_weight=input_weight,
-                                output_token_weight=output_weight,
+                try:
+                    for attempt in range(max_retries + 1):
+                        try:
+                            client_stream = await llm_service.forward_request(
+                                target, req_data, headers, stream=True
                             )
-                        )
-                        await usage_queue.enqueue(
-                            UsageEventData(
-                                event_type=UsageEventType.INCREMENT_MODEL_REQS,
-                                api_key=api_key,
-                                model=model,
-                                server_url=target_server,
-                            )
-                        )
-                        break  # 成功完成
 
-                    except httpx.RemoteProtocolError as exc:
-                        logger.warning(
-                            f"Stream connection error (attempt {attempt + 1}/{max_retries + 1}) model={model}: {exc}"
-                        )
-                        if attempt < max_retries:
-                            await asyncio.sleep(0.5)
-                            continue
-                        else:
+                            async with client_stream as response:
+                                # 上游返回错误状态：记录熔断失败，透传错误后停止（不计费不计数）
+                                if response.status_code >= 400:
+                                    error_body = await response.aread()
+                                    await llm_service.circuit_breaker.record_failure(server_key)
+                                    llm_service._update_server_health(server_key, False)
+                                    logger.warning(
+                                        f"anthropic stream upstream error | model={model} | status={response.status_code}"
+                                    )
+                                    yield f'event: error\n'
+                                    yield f'data: {json.dumps({"error": {"message": f"上游服务返回错误（状态码 {response.status_code}）", "type": "upstream_error"}})}\n\n'
+                                    yield 'event: message_stop\n'
+                                    yield 'data: {"type": "message_stop"}\n\n'
+                                    return
+
+                                should_bill = True
+                                async for chunk in response.aiter_text():
+                                    has_yielded = True
+                                    yield chunk
+
+                            # 流式响应成功完成，熔断器记录成功
+                            await llm_service.circuit_breaker.record_success(server_key)
+                            llm_service._update_server_health(server_key, True)
+                            logger.info(f"anthropic stream completed | model={model} | key={masked_key}")
+                            break  # 成功完成
+
+                        except httpx.RemoteProtocolError as exc:
+                            await llm_service.circuit_breaker.record_failure(server_key)
+                            llm_service._update_server_health(server_key, False)
+                            logger.warning(
+                                f"Stream connection error (attempt {attempt + 1}/{max_retries + 1}) model={model}: {exc}"
+                            )
+                            # 仅在尚未向客户端输出任何内容时允许重试，避免重复推送
+                            if attempt < max_retries and not has_yielded:
+                                await asyncio.sleep(0.5)
+                                continue
                             # Anthropic 错误事件格式
                             yield f'event: error\n'
                             yield f'data: {json.dumps({"error": {"message": f"上游服务连接中断: {str(exc)}", "type": "connection_error"}})}\n\n'
                             yield 'event: message_stop\n'
                             yield 'data: {"type": "message_stop"}\n\n'
+                            break
 
-                    except Exception as exc:
-                        logger.error(f"Stream error model={model}: {exc}")
-                        yield f'event: error\n'
-                        yield f'data: {json.dumps({"error": {"message": f"流式响应错误: {str(exc)}", "type": "stream_error"}})}\n\n'
-                        yield 'event: message_stop\n'
-                        yield 'data: {"type": "message_stop"}\n\n'
+                        except Exception as exc:
+                            # HTTPException（如熔断器打开）上游已记录失败，避免重复计数
+                            if not isinstance(exc, HTTPException):
+                                await llm_service.circuit_breaker.record_failure(server_key)
+                                llm_service._update_server_health(server_key, False)
+                            logger.error(f"Stream error model={model}: {exc}")
+                            yield f'event: error\n'
+                            yield f'data: {json.dumps({"error": {"message": f"流式响应错误: {str(exc)}", "type": "stream_error"}})}\n\n'
+                            yield 'event: message_stop\n'
+                            yield 'data: {"type": "message_stop"}\n\n'
+                            break
+                finally:
+                    # 无论流正常结束还是客户端中断，只要上游流已建立就计费
+                    if should_bill:
+                        try:
+                            await usage_queue.enqueue(
+                                UsageEventData(
+                                    event_type=UsageEventType.UPDATE_ANTHROPIC_USAGE,
+                                    api_key=api_key,
+                                    model=model,
+                                    input_token_weight=input_weight,
+                                    output_token_weight=output_weight,
+                                )
+                            )
+                            await usage_queue.enqueue(
+                                UsageEventData(
+                                    event_type=UsageEventType.INCREMENT_MODEL_REQS,
+                                    api_key=api_key,
+                                    model=model,
+                                    server_url=target_server,
+                                )
+                            )
+                        except Exception as e:
+                            logger.warning(f"anthropic流式计费入队失败 model={model}: {e}")
+                    else:
+                        # 上游错误未产生计费，释放预留的并发额度
+                        await api_service.release_in_flight(api_key)
 
             return StreamingResponse(
                 stream_wrapper(),
@@ -1497,14 +1749,17 @@ async def anthropic_proxy_handler(
 
             return JSONResponse(response)
         except json.JSONDecodeError as e:
+            await api_service.release_in_flight(api_key)
             return JSONResponse(
                 {"error": "Invalid response from upstream server", "message": str(e)},
                 status_code=500,
             )
 
     except HTTPException as e:
+        await api_service.release_in_flight(api_key)
         return JSONResponse({"error": str(e.detail)}, status_code=e.status_code)
     except Exception as e:
+        await api_service.release_in_flight(api_key)
         logger.error(f"anthropic error: {e}", exc_info=True)
         return JSONResponse({"error": "Internal server error"}, status_code=500)
 
@@ -1565,7 +1820,7 @@ async def coding_proxy_handler(
     target_server = llm_service.get_target_server(model)
     
     # 获取模型权重（用于Anthropic方式用量计算）
-    input_weight, output_weight = await api_service._get_model_weights(model, session)
+    input_weight, output_weight = await api_service._get_model_weights(model, session, target_server)
 
     # 记录请求日志
     masked_key = f"{api_key[:8]}...{api_key[-4:]}"
@@ -1580,7 +1835,10 @@ async def coding_proxy_handler(
     target = f"{target_server}{path}"
 
     # 构造请求头 - 使用 OpenAI 兼容格式
-    upstream_api_key = llm_service.app_state.cloud_models.get(model, api_key)
+    upstream_api_key = api_key
+    if model in llm_service.app_state.cloud_models:
+        server_mappings = llm_service.app_state.cloud_models[model]
+        upstream_api_key = server_mappings.get(target_server, api_key)
     headers = {
         "Authorization": f"Bearer {upstream_api_key}",
         "Content-Type": "application/json",
@@ -1591,49 +1849,58 @@ async def coding_proxy_handler(
         if req_data.get("stream", False):
             async def stream_wrapper():
                 max_retries = 1
+                has_yielded = False  # 是否已向客户端输出过内容（决定断流后是否可重试）
+                should_bill = False  # 上游流已正常建立（2xx），结束或断连都需要计费
+                server_key = llm_service._extract_server_key(target)
 
-                for attempt in range(max_retries + 1):
-                    try:
-                        client_stream = await llm_service.forward_request(
-                            target, req_data, headers, stream=True
-                        )
-
-                        async with client_stream as response:
-                            async for chunk in response.aiter_text():
-                                yield chunk
-
-                        # 流式响应成功完成
-                        logger.info(f"coding stream completed | model={model} | key={masked_key}")
-                        
-                        # 使用 Anthropic 方式统计用量（按请求数，不统计token）
-                        await usage_queue.enqueue(
-                            UsageEventData(
-                                event_type=UsageEventType.UPDATE_ANTHROPIC_USAGE,
-                                api_key=api_key,
-                                model=model,
-                                server_url=target_server,
-                                input_token_weight=input_weight,
-                                output_token_weight=output_weight,
+                try:
+                    for attempt in range(max_retries + 1):
+                        try:
+                            client_stream = await llm_service.forward_request(
+                                target, req_data, headers, stream=True
                             )
-                        )
-                        await usage_queue.enqueue(
-                            UsageEventData(
-                                event_type=UsageEventType.INCREMENT_MODEL_REQS,
-                                api_key=api_key,
-                                model=model,
-                                server_url=target_server,
-                            )
-                        )
-                        break  # 成功完成
 
-                    except httpx.RemoteProtocolError as exc:
-                        logger.warning(
-                            f"Stream connection error (attempt {attempt + 1}/{max_retries + 1}) model={model}: {exc}"
-                        )
-                        if attempt < max_retries:
-                            await asyncio.sleep(0.5)
-                            continue
-                        else:
+                            async with client_stream as response:
+                                # 上游返回错误状态：记录熔断失败，透传错误后停止（不计费不计数）
+                                if response.status_code >= 400:
+                                    error_body = await response.aread()
+                                    await llm_service.circuit_breaker.record_failure(server_key)
+                                    llm_service._update_server_health(server_key, False)
+                                    logger.warning(
+                                        f"coding stream upstream error | model={model} | status={response.status_code}"
+                                    )
+                                    error_data = {
+                                        "error": {
+                                            "message": f"上游服务返回错误（状态码 {response.status_code}）",
+                                            "type": "upstream_error",
+                                            "code": response.status_code,
+                                        }
+                                    }
+                                    yield f"data: {json.dumps(error_data)}\n\n"
+                                    yield "data: [DONE]\n\n"
+                                    return
+
+                                should_bill = True
+                                async for chunk in response.aiter_text():
+                                    has_yielded = True
+                                    yield chunk
+
+                            # 流式响应成功完成，熔断器记录成功
+                            await llm_service.circuit_breaker.record_success(server_key)
+                            llm_service._update_server_health(server_key, True)
+                            logger.info(f"coding stream completed | model={model} | key={masked_key}")
+                            break  # 成功完成
+
+                        except httpx.RemoteProtocolError as exc:
+                            await llm_service.circuit_breaker.record_failure(server_key)
+                            llm_service._update_server_health(server_key, False)
+                            logger.warning(
+                                f"Stream connection error (attempt {attempt + 1}/{max_retries + 1}) model={model}: {exc}"
+                            )
+                            # 仅在尚未向客户端输出任何内容时允许重试，避免重复推送
+                            if attempt < max_retries and not has_yielded:
+                                await asyncio.sleep(0.5)
+                                continue
                             error_data = {
                                 "error": {
                                     "message": f"上游服务连接中断: {str(exc)}",
@@ -1643,17 +1910,50 @@ async def coding_proxy_handler(
                             }
                             yield f"data: {json.dumps(error_data)}\n\n"
                             yield "data: [DONE]\n\n"
+                            break
 
-                    except Exception as exc:
-                        logger.error(f"Stream error model={model}: {exc}")
-                        error_data = {
-                            "error": {
-                                "message": f"流式响应错误: {str(exc)}",
-                                "type": "stream_error"
+                        except Exception as exc:
+                            # HTTPException（如熔断器打开）上游已记录失败，避免重复计数
+                            if not isinstance(exc, HTTPException):
+                                await llm_service.circuit_breaker.record_failure(server_key)
+                                llm_service._update_server_health(server_key, False)
+                            logger.error(f"Stream error model={model}: {exc}")
+                            error_data = {
+                                "error": {
+                                    "message": f"流式响应错误: {str(exc)}",
+                                    "type": "stream_error"
+                                }
                             }
-                        }
-                        yield f"data: {json.dumps(error_data)}\n\n"
-                        yield "data: [DONE]\n\n"
+                            yield f"data: {json.dumps(error_data)}\n\n"
+                            yield "data: [DONE]\n\n"
+                            break
+                finally:
+                    # 无论流正常结束还是客户端中断，只要上游流已建立就计费
+                    if should_bill:
+                        try:
+                            await usage_queue.enqueue(
+                                UsageEventData(
+                                    event_type=UsageEventType.UPDATE_ANTHROPIC_USAGE,
+                                    api_key=api_key,
+                                    model=model,
+                                    server_url=target_server,
+                                    input_token_weight=input_weight,
+                                    output_token_weight=output_weight,
+                                )
+                            )
+                            await usage_queue.enqueue(
+                                UsageEventData(
+                                    event_type=UsageEventType.INCREMENT_MODEL_REQS,
+                                    api_key=api_key,
+                                    model=model,
+                                    server_url=target_server,
+                                )
+                            )
+                        except Exception as e:
+                            logger.warning(f"coding流式计费入队失败 model={model}: {e}")
+                    else:
+                        # 上游错误未产生计费，释放预留的并发额度
+                        await api_service.release_in_flight(api_key)
 
             return StreamingResponse(
                 stream_wrapper(),
@@ -1696,13 +1996,16 @@ async def coding_proxy_handler(
 
             return JSONResponse(response)
         except json.JSONDecodeError as e:
+            await api_service.release_in_flight(api_key)
             return JSONResponse(
                 {"error": "Invalid response from upstream server", "message": str(e)},
                 status_code=500,
             )
 
     except HTTPException as e:
+        await api_service.release_in_flight(api_key)
         return JSONResponse({"error": str(e.detail)}, status_code=e.status_code)
     except Exception as e:
+        await api_service.release_in_flight(api_key)
         logger.error(f"coding error: {e}", exc_info=True)
         return JSONResponse({"error": "Internal server error"}, status_code=500)

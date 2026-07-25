@@ -1,8 +1,11 @@
 import os
+import logging
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy import event
+from sqlalchemy import event, text
 from app.config.settings import settings
 from app.database.models import Base
+
+logger = logging.getLogger(__name__)
 
 # 数据库文件路径 - 使用app/database目录下的数据库
 DATABASE_PATH = os.path.join(settings.BASE_DIR, 'app', 'database', 'myapi.db')
@@ -64,6 +67,14 @@ async def init_db():
     """初始化数据库，创建所有表"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # 为存量数据库补充 phone 唯一索引（新库已由 create_all 创建约束）
+        # 若存量数据存在重复手机号导致创建失败，只记 warning，不中断启动
+        try:
+            await conn.execute(
+                text("CREATE UNIQUE INDEX IF NOT EXISTS ix_api_keys_phone ON api_keys (phone)")
+            )
+        except Exception as e:
+            logger.warning(f"创建 api_keys.phone 唯一索引失败（可能存在重复手机号）: {e}")
 
 
 async def close_db():

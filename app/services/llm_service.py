@@ -1,4 +1,3 @@
-import json
 from typing import Dict, Optional, Union, List
 from collections import defaultdict
 from urllib.parse import urlparse
@@ -32,7 +31,7 @@ class LLMService:
         self.http_client: Optional[httpx.AsyncClient] = None
         self.app_state = AppState()
         self._server_health = defaultdict(lambda: {"healthy": True, "last_check": 0})
-        self._server_counters = defaultdict(int)
+        self._server_counters = defaultdict(int)  # 同步方法中无 await 点，asyncio 单线程安全
 
         # 初始化熔断器
         # 配置说明：
@@ -89,6 +88,7 @@ class LLMService:
         """监控并动态调整连接池
 
         使用非阻塞锁检查，避免在高并发下产生锁竞争。
+        通过反射安全访问 httpx 内部结构，版本不兼容时静默降级。
         """
         current_time = time.time()
 
@@ -112,9 +112,21 @@ class LLMService:
                 return
 
             try:
-                # 获取当前连接池状态
-                pool = self.http_client._transport._pool
-                active_connections = len(pool.connections)
+                # 安全获取连接池活跃连接数（避免直接访问 httpx 私有 API 崩溃）
+                active_connections = 0
+                try:
+                    transport = getattr(self.http_client, "_transport", None)
+                    if transport is not None:
+                        pool = getattr(transport, "_pool", None)
+                        if pool is not None and hasattr(pool, "connections"):
+                            active_connections = len(pool.connections)
+                except Exception:
+                    pass  # 私有 API 变更时静默降级
+
+                if active_connections == 0:
+                    self._connection_pool_stats["last_check"] = current_time
+                    return
+
                 self._connection_pool_stats["active_connections"] = active_connections
 
                 # 动态调整连接池大小
@@ -127,22 +139,12 @@ class LLMService:
                         int(self._connection_pool_stats["max_connections"] * 1.2),
                         2000,  # 最大不超过2000
                     )
-                    self.http_client._limits = httpx.Limits(
-                        max_connections=new_max,
-                        max_keepalive_connections=min(200, int(new_max * 0.1)),
-                        keepalive_expiry=300,
-                    )
                     self._connection_pool_stats["max_connections"] = new_max
                     logger.debug(f"pool expanded | connections={new_max} | usage={usage_ratio:.0%}")
                 elif usage_ratio < 0.3:  # 使用率低于30%
                     new_max = max(
                         int(self._connection_pool_stats["max_connections"] * 0.8),
                         500,  # 最小不少于500
-                    )
-                    self.http_client._limits = httpx.Limits(
-                        max_connections=new_max,
-                        max_keepalive_connections=min(200, int(new_max * 0.1)),
-                        keepalive_expiry=300,
                     )
                     self._connection_pool_stats["max_connections"] = new_max
                     logger.debug(f"pool reduced | connections={new_max} | usage={usage_ratio:.0%}")
@@ -201,15 +203,16 @@ class LLMService:
         self.app_state.llm_servers = servers_data
         self.app_state.cloud_models.clear()
         self.app_state.model_mapping.clear()
-        self.app_state.model_name_mapping = {}  # 存储模型名称映射关系
+        self.app_state.model_name_mapping.clear()
 
         for server, config in servers_data.items():
             if isinstance(config["model"], dict):
                 for client_model, target_model in config["model"].items():
                     self.app_state.model_mapping[client_model].append(server)
-                    self.app_state.model_name_mapping[client_model] = target_model
+                    # 按 server_url 存储，避免多个服务器同模型名时互相覆盖
+                    self.app_state.model_name_mapping[client_model][server] = target_model
                     if "apikey" in config:
-                        self.app_state.cloud_models[client_model] = config["apikey"]
+                        self.app_state.cloud_models[client_model][server] = config["apikey"]
             else:
                 # 兼容旧格式
                 models = (
@@ -220,7 +223,7 @@ class LLMService:
                 for model in models:
                     self.app_state.model_mapping[model].append(server)
                     if "apikey" in config:
-                        self.app_state.cloud_models[model] = config["apikey"]
+                        self.app_state.cloud_models[model][server] = config["apikey"]
 
     async def get_cached_models(self, session: AsyncSession) -> Dict:
         """获取缓存的模型列表
@@ -285,8 +288,10 @@ class LLMService:
             }
 
             for model in server.models:
-                server_config["model"][model.actual_model_name] = {
-                    "name": model.client_model_name,
+                frontend_name = model.frontend_model_name or model.actual_model_name
+                backend_name = model.backend_model_name or model.client_model_name
+                server_config["model"][frontend_name] = {
+                    "name": backend_name,
                     "input_token_weight": model.input_token_weight or 1.0,
                     "output_token_weight": model.output_token_weight or 1.0,
                     "status": model.status,
@@ -296,19 +301,17 @@ class LLMService:
 
         return servers_data
 
-    def _update_server_health(self, server: str, is_healthy: bool) -> None:
-        """更新服务器健康状态"""
-        self._server_health[server].update(
-            {"healthy": is_healthy, "last_check": time.time()}
-        )
-
     def _get_healthy_servers(self, servers: List[str]) -> List[str]:
-        """获取健康的服务器列表，使用动态健康检查间隔"""
+        """获取健康的服务器列表，使用动态健康检查间隔
+
+        健康状态统一以 _extract_server_key 提取的 netloc 作为键，
+        与 forward_request 中的写入键保持一致。
+        """
         current_time = time.time()
         healthy_servers = []
 
         for server in servers:
-            health_info = self._server_health[server]
+            health_info = self._server_health[self._extract_server_key(server)]
 
             # 动态计算健康检查间隔
             base_interval = 30  # 基础间隔30秒
@@ -319,6 +322,7 @@ class LLMService:
             # 如果超过检查间隔，重置状态
             if (current_time - health_info["last_check"]) > health_check_interval:
                 health_info["healthy"] = True
+                health_info["last_check"] = current_time  # 更新检查时间，避免每个请求都触发衰减
                 health_info["error_count"] = max(0, error_count - 1)  # 逐步恢复
 
             # 如果服务器健康，加入列表
@@ -363,7 +367,7 @@ class LLMService:
         # 计算服务器权重
         weights = []
         for server in healthy_servers:
-            health_info = self._server_health[server]
+            health_info = self._server_health[self._extract_server_key(server)]
 
             # 基础权重
             weight = 100
@@ -427,10 +431,12 @@ class LLMService:
             stream: 是否为流式请求
 
         Returns:
-            响应数据或流式客户端
+            响应文本（非流式）或流式客户端上下文管理器（流式）
 
         Raises:
-            HTTPException: 当熔断器处于 OPEN 状态时抛出 503 错误
+            HTTPException: 熔断器 OPEN 时抛出 503；非流式请求上游错误时抛出
+                502（上游5xx）/上游4xx状态码/503（连接失败）/504（超时）。
+                流式请求的错误状态检查与熔断记录由调用方（stream_wrapper）负责。
         """
         # 提取服务器标识用于熔断器
         server_key = self._extract_server_key(target)
@@ -446,16 +452,22 @@ class LLMService:
         # 监控并调整连接池
         await self._monitor_connection_pool()
 
-        # 处理模型名称映射
+        # 处理模型名称映射（按路由到的具体服务器查找对应的后端模型名）
         if "model" in data and data["model"] in self.app_state.model_name_mapping:
-            data = data.copy()
-            model_info = self.app_state.model_name_mapping[data["model"]]
-            data["model"] = (
-                model_info if isinstance(model_info, str) else model_info["name"]
-            )
+            server_mappings = self.app_state.model_name_mapping[data["model"]]
+            # 从 target URL 中提取服务器 URL 前缀来匹配
+            for server_url, model_info in server_mappings.items():
+                if target.startswith(server_url):
+                    data = data.copy()
+                    data["model"] = (
+                        model_info if isinstance(model_info, str) else model_info["name"]
+                    )
+                    break
 
         try:
             if stream:
+                # 流式请求直接返回流客户端，响应状态检查和熔断记录由调用方
+                # （routes 中的 stream_wrapper）在进入流后完成
                 stream_client = self.http_client.stream(
                     "POST",
                     target,
@@ -471,7 +483,7 @@ class LLMService:
             response.raise_for_status()
 
             # 请求成功，更新健康状态和熔断器
-            self._update_server_health(target, True)
+            self._update_server_health(server_key, True)
             await self.circuit_breaker.record_success(server_key)
 
             return response.text
@@ -481,93 +493,88 @@ class LLMService:
             if exc.response.status_code >= 500:
                 await self.circuit_breaker.record_failure(server_key, exc)
 
-            self._update_server_health(target, False)
+            self._update_server_health(server_key, False)
             logger.error(f"upstream error | server={server_key} | status={exc.response.status_code}")
 
-            if stream:
-                return exc.response
-            return json.dumps({
-                "error": f"LLM_SERVER 响应状态码 {exc.response.status_code}",
-                "message": str(exc),
-            })
+            # 5xx 统一映射为 502，4xx 透传上游状态码；detail 不含上游 URL
+            if exc.response.status_code >= 500:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"上游服务返回错误（状态码 {exc.response.status_code}）"
+                )
+            raise HTTPException(
+                status_code=exc.response.status_code,
+                detail=f"上游服务返回错误（状态码 {exc.response.status_code}）"
+            )
 
         except httpx.RemoteProtocolError as exc:
             # 连接协议错误，记录失败但不重建客户端
             await self.circuit_breaker.record_failure(server_key, exc)
-            self._update_server_health(target, False)
+            self._update_server_health(server_key, False)
             logger.warning(f"connection reset | server={server_key} | error={str(exc)[:50]}")
 
-            if stream:
-                raise
-
-            return json.dumps({
-                "error": "与 LLM_SERVER 连接已断开，请重试",
-                "message": str(exc),
-            })
+            raise HTTPException(
+                status_code=503,
+                detail="与上游服务的连接中断，请重试"
+            )
 
         except httpx.ConnectError as exc:
             # 连接错误（如 DNS 解析失败、连接拒绝等）
             await self.circuit_breaker.record_failure(server_key, exc)
-            self._update_server_health(target, False)
+            self._update_server_health(server_key, False)
             logger.error(f"connection failed | server={server_key}")
 
-            if stream:
-                raise HTTPException(
-                    status_code=503,
-                    detail=f"Failed to connect to upstream server: {server_key}"
-                )
-
-            return json.dumps({
-                "error": "无法连接到 LLM_SERVER",
-                "message": str(exc),
-            })
+            raise HTTPException(
+                status_code=503,
+                detail="无法连接到上游服务"
+            )
 
         except httpx.TimeoutException as exc:
             # 请求超时
             await self.circuit_breaker.record_failure(server_key, exc)
-            self._update_server_health(target, False)
+            self._update_server_health(server_key, False)
             logger.error(f"request timeout | server={server_key}")
 
-            if stream:
-                raise HTTPException(
-                    status_code=504,
-                    detail=f"Upstream server timeout: {server_key}"
-                )
-
-            return json.dumps({
-                "error": "LLM_SERVER 请求超时",
-                "message": str(exc),
-            })
+            raise HTTPException(
+                status_code=504,
+                detail="上游服务请求超时"
+            )
 
         except Exception as exc:
             # 其他未知错误
             await self.circuit_breaker.record_failure(server_key, exc)
-            self._update_server_health(target, False)
+            self._update_server_health(server_key, False)
             logger.error(f"unexpected error | server={server_key} | error={str(exc)[:100]}", exc_info=True)
 
-            if stream:
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Unexpected error: {str(exc)}"
-                )
+            raise HTTPException(
+                status_code=500,
+                detail="与上游服务通信时出现未知错误"
+            )
 
-            return json.dumps({
-                "error": "与 LLM_SERVER 通信时出现未知错误",
-                "message": str(exc),
-            })
-
-    def get_auth_header(self, model: str, api_key: str) -> Dict[str, str]:
+    def get_auth_header(self, model: str, api_key: str, server_url: str = None) -> Dict[str, str]:
         """生成认证头
+
+        支持多服务器场景：当同一前端模型对应多个上游服务器时，
+        根据 server_url 查找对应的 API 密钥。
 
         Args:
             model: 模型名称
-            api_key: API密钥
+            api_key: API密钥（作为回退值）
+            server_url: 可选的服务器URL，用于查找该服务器专属的API密钥
 
         Returns:
             Dict[str, str]: 认证头
         """
+        upstream_key = api_key
+        if server_url and model in self.app_state.cloud_models:
+            upstream_key = self.app_state.cloud_models[model].get(server_url, api_key)
+        elif model in self.app_state.cloud_models:
+            # 回退兼容：取第一个可用的 API key
+            first_key = next(iter(self.app_state.cloud_models[model].values()), api_key)
+            upstream_key = first_key
+
         return {
-            "Authorization": f"Bearer {self.app_state.cloud_models.get(model, api_key)}",
+            "Authorization": f"Bearer {upstream_key}",
             "Content-Type": "application/json",
         }
 

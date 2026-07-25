@@ -18,6 +18,7 @@ from app.services.llm_service import LLMService
 from app.services.usage_queue import UsageQueue
 from app.utils.logging_config import get_logger
 from app.middleware.logging import RequestTrackingMiddleware, DetailedRequestLoggingMiddleware
+from app.middleware.body_limit import BodySizeLimitMiddleware
 from app.database.database import get_db_session, init_db
 
 logger = get_logger(__name__)
@@ -32,6 +33,7 @@ class Application:
         self.usage_queue = UsageQueue(
             batch_size=100,  # 批量写入大小
             flush_interval=5.0,  # 5秒刷新间隔
+            api_service=self.api_service,  # 计费落库后回写缓存用量
         )
         self.background_tasks: Set[asyncio.Task] = set()
 
@@ -154,6 +156,9 @@ def create_application() -> FastAPI:
 
     # 添加请求追踪中间件
     fastapi_app.add_middleware(RequestTrackingMiddleware)
+
+    # 添加请求体大小限制中间件（防止恶意大 payload）
+    fastapi_app.add_middleware(BodySizeLimitMiddleware)
 
     # 添加详细请求日志中间件（用于排查问题）
     fastapi_app.add_middleware(DetailedRequestLoggingMiddleware)

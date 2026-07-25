@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from pydantic import BaseModel, Field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any, Union
 from datetime import datetime
 from collections import defaultdict
 
@@ -31,7 +33,7 @@ class LLMServer(BaseModel):
     """LLM服务器配置模型"""
 
     url: str = Field(description="服务器URL")
-    model: Dict[str, str] | str | List[str] = Field(
+    model: Union[Dict[str, str], str, List[str]] = Field(
         description="支持的模型，可以是字典(key为客户端使用的模型名，value为实际转发的模型名)、字符串或列表"
     )
     apikey: Optional[str] = Field(default=None, description="API密钥")
@@ -43,14 +45,16 @@ class AppState(BaseModel):
     llm_servers: Dict[str, Dict] = Field(
         default_factory=dict, description="LLM服务器配置"
     )
-    cloud_models: Dict[str, str] = Field(
-        default_factory=dict, description="云端模型配置"
+    cloud_models: Dict[str, Dict[str, str]] = Field(
+        default_factory=lambda: defaultdict(dict),
+        description="模型API密钥映射: {model: {server_url: apikey}}"
     )
     model_mapping: Dict[str, List] = Field(
         default_factory=lambda: defaultdict(list), description="模型到服务器的映射"
     )
-    model_name_mapping: Dict[str, str] = Field(
-        default_factory=dict, description="客户端模型名到实际模型名的映射"
+    model_name_mapping: Dict[str, Dict[str, Any]] = Field(
+        default_factory=lambda: defaultdict(dict),
+        description="客户端模型名到(server_url -> 实际模型信息)的嵌套映射"
     )
     api_usage: Dict[str, ApiKeyUsage] = Field(
         default_factory=dict, description="API使用情况"
