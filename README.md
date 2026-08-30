@@ -1,3 +1,5 @@
+
+
 # Model Heart - LLM API Gateway
 
 An enterprise-grade LLM API gateway supporting multi-model aggregation, intelligent routing, and unified authentication.
@@ -39,6 +41,8 @@ Default access: http://localhost:8087
 ```bash
 docker-compose up -d
 ```
+
+The optional Nginx reverse proxy can be enabled with `docker-compose --profile with-nginx up -d`.
 
 ## 📖 API Endpoints
 
